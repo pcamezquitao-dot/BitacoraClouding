@@ -1,0 +1,254 @@
+' Bitácora 3 - Flujos (PlantUML)
+' Notas clave del negocio:
+' - "Empleado" y "Supervisor" son PARTICIPANTES (tabla participante)
+' - El rol (empleado/supervisor) se deriva de empleado_area según el cargo/rol asociado
+' - Fase 1: App consulta al backend (conexión directa a MariaDB desde el servidor)
+' - Fase 2: App trabaja offline con SQLite y sincroniza cuando hay conexión al servidor
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor White
+  BorderColor Black
+  ArrowColor Black
+  FontSize 14
+}
+skinparam note {
+  BackgroundColor #FFFFEE
+  BorderColor Black
+}
+skinparam defaultFontName Arial
+
+' ==========================================================
+' UC00 - Arranque de la App y decisión de modo (Fase 1 vs Fase 2)
+' ==========================================================
+@startuml UC00_Arranque_modo
+title UC00 - Arranque de la App (modo online/offline)
+
+start
+:Usuario abre Bitácora 3 (Android);
+if (¿Hay configuración\n"Offline(SQLite)" habilitada?) then (Sí)
+  :Usar repositorio local SQLite;
+  note right
+    Fase 2:
+    - Lee/escribe en SQLite
+    - Cola de pendientes para sincronizar
+  end note
+else (No)
+  :Usar repositorio Online (API);
+  note right
+    Fase 1:
+    - Todas las consultas van al backend
+    - Backend consulta MariaDB
+  end note
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC01 - Identificar Participante por QR (empleado o supervisor)
+' Endpoint: GET /participante/by_qr/{qr}
+' ==========================================================
+@startuml UC01_Participante_por_QR
+title UC01 - Identificar Participante por QR
+
+start
+:Usuario toca "Escanear QR";
+:App captura qr (string);
+:App llama API\nGET /participante/by_qr/{qr};
+if (HTTP 200) then (OK)
+  :Recibe {id_participante,\nidentificacion_participante,...};
+  :App guarda "sesión" (id_participante);
+  note right
+    Importante:
+    Empleado y Supervisor están en participante.
+    El rol NO está en participante:
+    se calcula con empleado_area + cargo/rol.
+  end note
+else (404/otro)
+  :Mostrar error "Participante no encontrado";
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC02 - Determinar rol y área operativa (por empleado_area)
+' (esto puede ser parte del backend o de un endpoint dedicado)
+' ==========================================================
+@startuml UC02_Rol_y_Area
+title UC02 - Determinar rol (Empleado/Supervisor) y Área
+
+start
+:Con id_participante activo;
+:App solicita "áreas/rol" del participante;
+note right
+  Recomendado (a futuro):
+  Crear endpoint:
+  GET /participantes/{id}/contexto
+  que retorne:
+  - áreas asignadas (empleado_area)
+  - rol derivado del cargo
+  - área por defecto si aplica
+end note
+
+:Backend consulta empleado_area\nWHERE id_participante = {id};
+if (¿Tiene registros?) then (Sí)
+  :Derivar rol según cargo/rol;
+  if (¿Cargo indica Supervisor?) then (Supervisor)
+    :Rol = SUPERVISOR;
+  else (No)
+    :Rol = EMPLEADO;
+  endif
+  :Retornar lista de áreas asociadas;
+else (No)
+  :Retornar error "Participante sin asignación de área";
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC03 - Crear Bitácora Área Observación
+' Endpoint: POST /bitacora_area_observacion
+' ==========================================================
+@startuml UC03_Crear_Observacion
+title UC03 - Crear Bitácora Área Observación
+
+start
+:Usuario elige Área (o se asigna por defecto);
+:Usuario redacta observación;
+:Usuario (opcional) marca criticidad/tipo;
+:App arma payload:\n- id_participante\n- id_area\n- texto_observacion\n- fecha_hora\n- (metadatos);
+:App llama API\nPOST /bitacora_area_observacion;
+if (HTTP 201/200) then (OK)
+  :Recibe id_bitacora_area_observacion;
+  :Mostrar "Guardado" y opción de adjuntar evidencia;
+else (Error)
+  :Mostrar error + permitir reintento;
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC04 - Subir Evidencia para Observación
+' Endpoint: POST /bitacora_area_evidencia/upload
+' ==========================================================
+@startuml UC04_Subir_Evidencia
+title UC04 - Subir Evidencia (foto/archivo) a Observación
+
+start
+:Usuario toca "Adjuntar evidencia";
+:Selecciona cámara/galería/archivo;
+:App valida tamaño y tipo;
+:App envía multipart/form-data:\n- id_observacion\n- archivo\n- (descripcion opcional);
+:App llama API\nPOST /bitacora_area_evidencia/upload;
+if (HTTP 201/200) then (OK)
+  :Recibe URL/ID evidencia;
+  :Mostrar "Evidencia cargada";
+else (Error)
+  :Mostrar error y permitir reintento;
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC05 - Consultar Supervisor de un Participante (Empleado)
+' Endpoint actual: GET /empleados/{id_empleado}/supervisor
+' Nota: id_empleado = id_participante (porque todo es participante)
+' ==========================================================
+@startuml UC05_Supervisor_de_Participante
+title UC05 - Consultar Supervisor (Participante -> Supervisor)
+
+start
+:App necesita supervisor\n(p.ej. para escalar observación);
+:Usa id_participante como "id_empleado";
+:App llama API\nGET /empleados/{id_participante}/supervisor;
+note right
+  Ajuste conceptual:
+  El endpoint puede mantenerse,
+  pero internamente debe tratar
+  id_empleado como id_participante.
+end note
+if (HTTP 200) then (OK)
+  :Recibe supervisor (id_participante,\nnombre, contacto, etc.);
+  :Mostrar supervisor / permitir notificación;
+else (404/otro)
+  :Mostrar "Supervisor no definido";
+endif
+stop
+@enduml
+
+' ==========================================================
+' UC06 - Sincronización (Fase 2) SQLite -> Servidor (MariaDB)
+' ==========================================================
+@startuml UC06_Sincronizacion_SQLite
+title UC06 - Sincronización Offline (SQLite) con Servidor (MariaDB)
+
+start
+:App detecta conexión a Internet;
+:App consulta cola de pendientes en SQLite\n(observaciones/evidencias no sincronizadas);
+if (¿Hay pendientes?) then (Sí)
+  repeat
+    :Tomar siguiente pendiente;
+    if (Tipo = Observación) then (Obs)
+      :POST /bitacora_area_observacion\ncon datos locales;
+      if (OK) then (Sincronizado)
+        :Guardar id remoto en SQLite;\nMarcar como sincronizado;
+      else (Error)
+        :Marcar como "falló" + contador;\nDejar en cola;
+      endif
+    else (Evidencia)
+      :POST /bitacora_area_evidencia/upload\n(con id remoto de observación);
+      if (OK) then (Sincronizado)
+        :Guardar URL/ID remoto;\nMarcar como sincronizado;
+      else (Error)
+        :Marcar como "falló" + contador;\nDejar en cola;
+      endif
+    endif
+  repeat while (¿Quedan pendientes?) is (Sí)
+else (No)
+  :Nada por sincronizar;
+endif
+:Fin sincronización;
+stop
+@enduml
+
+' ==========================================================
+' Secuencia resumida (online) - Scan QR -> Crear observación -> Evidencia
+' ==========================================================
+@startuml SEQ_Online_Resumen
+title Secuencia Online (Fase 1) - QR -> Observación -> Evidencia
+
+actor Usuario
+participant "Android App" as APP
+participant "FastAPI" as API
+database "MariaDB" as DB
+
+Usuario -> APP: Escanear QR
+APP -> API: GET /participante/by_qr/{qr}
+API -> DB: SELECT participante WHERE identificacion_participante=qr
+DB --> API: datos participante
+API --> APP: 200 {id_participante,...}
+
+Usuario -> APP: Crear observación (texto + área)
+APP -> API: POST /bitacora_area_observacion
+API -> DB: INSERT bitacora_area_observacion
+DB --> API: id_observacion
+API --> APP: 201 {id_observacion}
+
+Usuario -> APP: Adjuntar evidencia
+APP -> API: POST /bitacora_area_evidencia/upload (multipart)
+API -> DB: INSERT bitacora_area_evidencia (+guardar archivo)
+DB --> API: id/url evidencia
+API --> APP: 201 {id/url_evidencia}
+
+@enduml
+
+
+' ==========================================================
+' UC07 - Registro de novedades
+' ==========================================================
+@startuml UC07_registro de Novedades
+actor Usuario
+participant "Android App" as APP
+participant "FastAPI" as API
+database "MariaDB" as DB
+@enduml

@@ -1,0 +1,292 @@
+@startuml
+title Bitacora 5 - Arquitectura Completa Online / Offline / IA
+
+skinparam backgroundColor white
+skinparam shadowing false
+
+start
+
+partition "1. Planeacion del Proyecto" {
+
+:Definir alcance funcional;
+:Definir modulos iniciales;
+:Definir usuarios y roles;
+:Definir indicadores a capturar;
+:Definir procesos de negocio;
+:Definir arquitectura tecnologica;
+
+}
+
+partition "2. Infraestructura" {
+
+:Servidor Linux;
+:Configurar MariaDB;
+:Configurar FastAPI;
+:Configurar almacenamiento de imagenes;
+:Configurar HTTPS;
+:Configurar backups;
+:Configurar ambiente Desarrollo;
+:Configurar ambiente Pruebas;
+:Configurar ambiente Produccion;
+
+}
+
+partition "3. Base de Datos MariaDB" {
+
+:Criar Base de Datos bitacora5;
+
+:Crear tablas maestras;
+:Crear tablas operativas;
+:Crear tablas auditoria;
+:Crear tablas IA;
+
+:Crear indices;
+:Crear llaves foraneas;
+
+:Crear catalogos;
+
+note right
+
+Ejemplos:
+
+usuarios
+fincas
+bloques
+camas
+variedades
+capturas
+fotos
+auditoria
+predicciones
+
+end note
+
+}
+
+partition "4. Backend FastAPI" {
+
+:Crear entorno Python;
+
+:Instalar dependencias;
+
+:Configurar SQLAlchemy;
+
+:Configurar Pydantic;
+
+:Configurar JWT;
+
+:Configurar Logs;
+
+:Crear API REST;
+
+}
+
+partition "5. Servicios Backend" {
+
+:Servicio Login;
+
+:Servicio Catalogos;
+
+:Servicio Capturas;
+
+:Servicio Fotografias;
+
+:Servicio Reportes;
+
+:Servicio Sincronizacion;
+
+:Servicio IA;
+
+}
+
+partition "6. Frontend Android" {
+
+:Crear Aplicacion Kotlin;
+
+:Pantalla Login;
+
+:Pantalla Menu;
+
+:Pantalla Captura;
+
+:Pantalla Consulta;
+
+:Pantalla Reportes;
+
+}
+
+partition "7. Base de Datos Local SQLite" {
+
+:Configurar Room SQLite;
+
+:Crear tablas locales;
+
+note right
+
+usuarios
+
+fincas
+
+bloques
+
+camas
+
+variedades
+
+capturas
+
+fotos
+
+sync_queue
+
+end note
+
+}
+
+partition "8. Operacion del Capturador" {
+
+:Iniciar sesion;
+
+:Descargar catalogos;
+
+:Seleccionar finca;
+
+:Seleccionar bloque;
+
+:Seleccionar cama;
+
+:Seleccionar variedad;
+
+:Capturar datos;
+
+:Tomar fotografia;
+
+}
+
+if (Hay Internet?) then (SI)
+
+partition "9. Flujo Online" {
+
+:Enviar datos a FastAPI;
+
+:Validar datos;
+
+:Guardar en MariaDB;
+
+:Guardar fotografia;
+
+:Registrar auditoria;
+
+}
+
+else (NO)
+
+partition "10. Flujo Offline" {
+
+:Guardar captura en SQLite;
+
+:Guardar fotografia local;
+
+:Estado = PENDIENTE_SYNC;
+
+}
+
+endif
+
+partition "11. Motor de Sincronizacion" {
+
+:Monitorear Internet;
+
+if (Internet disponible?) then (SI)
+
+:Leer pendientes;
+
+:Enviar capturas;
+
+:Enviar fotos;
+
+:Recibir confirmacion;
+
+:Actualizar SQLite;
+
+:Estado = SINCRONIZADO;
+
+else (NO)
+
+:Continuar trabajando Offline;
+
+endif
+
+}
+
+partition "12. Reportes Operativos" {
+
+:Consultar Capturas;
+
+:Consultar Fotografias;
+
+:Consultar Historial;
+
+:Generar Indicadores;
+
+:Generar Dashboard;
+
+}
+
+partition "13. Inteligencia Artificial" {
+
+:Tomar Fotografias Historicas;
+
+:Entrenar TensorFlow;
+
+:Clasificar Estados Fenologicos;
+
+:Contar Tallos;
+
+:Detectar Arroz;
+
+:Detectar Alverja;
+
+:Detectar Frijol;
+
+:Detectar Flor;
+
+:Generar Predicciones;
+
+:Guardar Resultados;
+
+}
+
+partition "14. Analitica" {
+
+:KPIs Produccion;
+
+:KPIs Calidad;
+
+:KPIs Productividad;
+
+:KPIs Fenologia;
+
+:KPIs IA;
+
+}
+
+partition "15. Produccion" {
+
+:Capacitar Usuarios;
+
+:Ejecutar Piloto;
+
+:Validar Resultados;
+
+:Ajustar Sistema;
+
+:Publicar Version Oficial;
+
+:Definir Roadmap;
+
+}
+
+stop
+
+@enduml

@@ -1,0 +1,40 @@
+# Credenciales y configuración privada
+.env
+.env.*
+!.env.example
+
+# Entorno virtual Python
+venv/
+.venv/
+env/
+
+# Caché y archivos temporales Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Registros y temporales
+*.log
+logs/
+tmp/
+temp/
+
+# Bases SQLite locales futuras
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos personales de VS Code
+.vscode
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Android / Kotlin futuro
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.keystore
+*.jks
