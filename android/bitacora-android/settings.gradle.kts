@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "android_app_bitacora5_online"
+rootProject.name = "bitacora-android"
 include(":app")

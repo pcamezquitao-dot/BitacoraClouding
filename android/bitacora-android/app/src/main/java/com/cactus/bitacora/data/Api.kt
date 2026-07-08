@@ -1,6 +1,10 @@
 package com.cactus.bitacora.data
 
-import com.cactus.bitacora.data.models.*
+import com.cactus.bitacora.data.models.AreaByQrIn
+import com.cactus.bitacora.data.models.AreaOut
+import com.cactus.bitacora.data.models.BitacoraDiariaCreate
+import com.cactus.bitacora.data.models.BitacoraDiariaOut
+import com.cactus.bitacora.data.models.HealthOut
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -10,33 +14,39 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 
+object ApiConfig {
+    const val BASE_URL = "http://161.22.47.89/bitacora/"
+}
+
 interface BitacoraApi {
+    @GET("health")
+    suspend fun health(): HealthOut
 
-    @POST("auth/qr")
-    suspend fun loginQr(@Body req: QRLoginRequest): LoginResponse
+    @POST("areas/by_qr")
+    suspend fun getAreaByQr(@Body request: AreaByQrIn): AreaOut
 
-    @GET("catalogos/tipo_novedad")
-    suspend fun getTiposNovedad(): List<TipoNovedadOut>
+    @POST("bitacora_diaria")
+    suspend fun crearBitacoraDiaria(
+        @Body request: BitacoraDiariaCreate
+    ): BitacoraDiariaOut
 
-    @GET("bitacora/supervisor/{id}/empleados")
-    suspend fun getEmpleados(@Path("id") supervisorId: Int): List<EmpleadoOut>
-
-    @POST("bitacora/")
-    suspend fun crearBitacora(@Body req: BitacoraCreate): BitacoraCreateResponse
+    @GET("bitacora_diaria/{id_bitacora}")
+    suspend fun getBitacoraDiaria(
+        @Path("id_bitacora") idBitacora: Int
+    ): BitacoraDiariaOut
 }
 
 object Api {
-    // PC en la misma red WiFi que el celular
-    private const val BASE_URL = "http://192.168.0.5:8000/"
-
     fun create(): BitacoraApi {
-        val logger = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
+        val logger = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        }
         val client = OkHttpClient.Builder()
             .addInterceptor(logger)
             .build()
 
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(ApiConfig.BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

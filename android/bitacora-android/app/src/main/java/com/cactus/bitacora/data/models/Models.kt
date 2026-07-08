@@ -1,38 +1,34 @@
 package com.cactus.bitacora.data.models
 
-data class QRLoginRequest(val qr: String)
-
-data class ParticipanteOut(
-    val id_participante: Int,
-    val identificacion_participante: String,
-    val nombre: String,
-    val apellido: String
+data class HealthOut(
+    val status: String = "ok"
 )
 
-data class LoginResponse(
-    val participante: ParticipanteOut,
-    val es_supervisor: Boolean
+data class AreaByQrIn(
+    val qr: String
 )
 
-data class EmpleadoOut(
-    val id_participante: Int,
-    val identificacion_participante: String,
-    val nombre: String,
-    val apellido: String
+data class AreaOut(
+    val id_area: Int,
+    val descripcion: String
 )
 
-data class TipoNovedadOut(
-    val tipo_novedad: Int,
-    val descripcion_novedad: String
-)
-
-data class BitacoraCreate(
-    val id_supervisor: Int,
+data class BitacoraDiariaCreate(
     val id_empleado: Int,
-    val tipo_novedad: Int,
-    val observaciones: String
+    val id_supervisor: Int? = null,
+    val ts_in_min: Int? = null,
+    val ts_out_min: Int? = null,
+    val tipo_anotacion: Int? = null,
+    val observaciones: String? = null,
+    val client_uuid: String? = null
 )
 
-data class BitacoraCreateResponse(
-    val id_bitacora: String
+data class BitacoraDiariaOut(
+    val id_bitacora: Int,
+    val id_empleado: Int,
+    val id_supervisor: Int?,
+    val ts_in_min: Int,
+    val ts_out_min: Int?,
+    val tipo_anotacion: Int?,
+    val observaciones: String?
 )
