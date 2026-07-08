@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,11 +30,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.cactus.bitacora.data.ApiConfig
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
+import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -52,7 +53,8 @@ class MainActivity : ComponentActivity() {
 
 private enum class AppScreen {
     Health,
-    CreateDailyLog
+    CreateDailyLog,
+    QueryDailyLog
 }
 
 private sealed interface ConnectionState {
@@ -67,6 +69,13 @@ private sealed interface CreateBitacoraState {
     data object Loading : CreateBitacoraState
     data class Success(val idBitacora: Int) : CreateBitacoraState
     data class Error(val message: String) : CreateBitacoraState
+}
+
+private sealed interface QueryBitacoraState {
+    data object Idle : QueryBitacoraState
+    data object Loading : QueryBitacoraState
+    data class Success(val bitacora: BitacoraDiariaOut) : QueryBitacoraState
+    data class Error(val message: String) : QueryBitacoraState
 }
 
 @Composable
@@ -106,11 +115,20 @@ fun BitacoraApp() {
                 ) {
                     Text("Crear")
                 }
+
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = currentScreen != AppScreen.QueryDailyLog,
+                    onClick = { currentScreen = AppScreen.QueryDailyLog }
+                ) {
+                    Text("Consultar")
+                }
             }
 
             when (currentScreen) {
                 AppScreen.Health -> BackendStatusScreen(repository)
                 AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
+                AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
             }
         }
     }
@@ -188,6 +206,101 @@ fun BackendStatusScreen(repository: BitacoraRepository) {
                 Text(currentState.message)
             }
         }
+    }
+}
+
+@Composable
+fun ConsultarBitacoraScreen(repository: BitacoraRepository) {
+    val scope = rememberCoroutineScope()
+    var idBitacora by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf<QueryBitacoraState>(QueryBitacoraState.Idle) }
+
+    fun queryDailyLog() {
+        val id = idBitacora.toIntOrNull()
+
+        if (id == null) {
+            state = QueryBitacoraState.Error("id_bitacora debe ser numerico")
+            return
+        }
+
+        state = QueryBitacoraState.Loading
+        scope.launch {
+            state = try {
+                val response = repository.getBitacoraDiaria(id)
+                QueryBitacoraState.Success(response)
+            } catch (e: Exception) {
+                QueryBitacoraState.Error(e.message ?: "No fue posible consultar la bitacora")
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Consultar Bitacora",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = idBitacora,
+            onValueChange = { idBitacora = it },
+            label = { Text("id_bitacora") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state !is QueryBitacoraState.Loading,
+            onClick = { queryDailyLog() }
+        ) {
+            Text("Consultar bitacora")
+        }
+
+        when (val currentState = state) {
+            QueryBitacoraState.Idle -> Text("Estado: pendiente")
+            QueryBitacoraState.Loading -> {
+                CircularProgressIndicator()
+                Text("Estado: consultando bitacora")
+            }
+            is QueryBitacoraState.Success -> {
+                Text(
+                    text = "Bitacora encontrada",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                BitacoraDetail(currentState.bitacora)
+            }
+            is QueryBitacoraState.Error -> {
+                Text(
+                    text = "Error al consultar bitacora",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(currentState.message)
+            }
+        }
+    }
+}
+
+@Composable
+fun BitacoraDetail(bitacora: BitacoraDiariaOut) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("id_bitacora: ${bitacora.id_bitacora}")
+        Text("id_empleado: ${bitacora.id_empleado}")
+        Text("id_supervisor: ${bitacora.id_supervisor ?: "null"}")
+        Text("ts_in_min: ${bitacora.ts_in_min}")
+        Text("ts_out_min: ${bitacora.ts_out_min ?: "null"}")
+        Text("tipo_anotacion: ${bitacora.tipo_anotacion ?: "null"}")
+        Text("observaciones: ${bitacora.observaciones ?: "null"}")
     }
 }
 
