@@ -1,34 +1,11 @@
 package com.cactus.bitacora.data.models
 
-data class HealthOut(
-    val status: String = "ok"
-)
+typealias HealthOut = com.cactus.bitacora.model.HealthOut
 
-data class AreaByQrIn(
-    val qr: String
-)
+typealias AreaByQrIn = com.cactus.bitacora.model.AreaByQrIn
 
-data class AreaOut(
-    val id_area: Int,
-    val descripcion: String
-)
+typealias AreaOut = com.cactus.bitacora.model.AreaOut
 
-data class BitacoraDiariaCreate(
-    val id_empleado: Int,
-    val id_supervisor: Int? = null,
-    val ts_in_min: Int? = null,
-    val ts_out_min: Int? = null,
-    val tipo_anotacion: Int? = null,
-    val observaciones: String? = null,
-    val client_uuid: String? = null
-)
+typealias BitacoraDiariaCreate = com.cactus.bitacora.model.BitacoraDiariaCreate
 
-data class BitacoraDiariaOut(
-    val id_bitacora: Int,
-    val id_empleado: Int,
-    val id_supervisor: Int?,
-    val ts_in_min: Int,
-    val ts_out_min: Int?,
-    val tipo_anotacion: Int?,
-    val observaciones: String?
-)
+typealias BitacoraDiariaOut = com.cactus.bitacora.model.BitacoraDiariaOut

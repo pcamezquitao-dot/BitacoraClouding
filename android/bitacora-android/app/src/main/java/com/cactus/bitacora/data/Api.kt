@@ -1,21 +1,20 @@
 package com.cactus.bitacora.data
 
+import com.cactus.bitacora.api.NetworkClient
 import com.cactus.bitacora.data.models.AreaByQrIn
 import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.data.models.HealthOut
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
+import com.cactus.bitacora.util.AppConfig
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 
 object ApiConfig {
-    const val BASE_URL = "http://161.22.47.89/bitacora/"
+    val BASE_URL: String
+        get() = AppConfig.BASE_URL
 }
 
 interface BitacoraApi {
@@ -37,19 +36,6 @@ interface BitacoraApi {
 }
 
 object Api {
-    fun create(): BitacoraApi {
-        val logger = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-        val client = OkHttpClient.Builder()
-            .addInterceptor(logger)
-            .build()
-
-        return Retrofit.Builder()
-            .baseUrl(ApiConfig.BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(BitacoraApi::class.java)
-    }
+    fun create(): BitacoraApi =
+        NetworkClient.createService(BitacoraApi::class.java)
 }
