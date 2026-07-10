@@ -23,6 +23,7 @@ class BitacoraDiariaCreate(BaseModel):
     tipo_anotacion: Optional[int] = None
     observaciones: Optional[str] = Field(None, max_length=200)
     client_uuid: Optional[str] = Field(None, max_length=40)
+    qr_area: Optional[str] = Field(None, description="QR de área validado para el empleado")
 
 class BitacoraDiariaOut(BaseModel):
     id_bitacora: int

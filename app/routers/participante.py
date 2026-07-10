@@ -3,14 +3,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.schemas.participante import ParticipanteOut
 
 router = APIRouter(tags=["Participante"])
 
-@router.get("/participante/by_qr/{qr}")
+@router.get("/participante/by_qr/{qr}", response_model=ParticipanteOut)
 def get_participante_by_qr(qr: str, db: Session = Depends(get_db)):
     query = text("""
         SELECT
             id_participante,
+            nombre,
+            apellido,
             identificacion_participante
         FROM participante
         WHERE identificacion_participante = :qr
