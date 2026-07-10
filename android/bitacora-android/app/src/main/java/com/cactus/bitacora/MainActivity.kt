@@ -1,8 +1,22 @@
 package com.cactus.bitacora
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.OptIn
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -31,16 +45,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cactus.bitacora.data.ApiConfig
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.CreateBitacoraResult
 import com.cactus.bitacora.data.SyncRunResult
 import com.cactus.bitacora.data.SyncSummary
+import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+
+private const val TAG_QR_AREA = "QrArea"
+private const val QR_AREA_TYPE = "AREA_ADMINISTRATIVA"
+private const val INVALID_QR_AREA_MESSAGE =
+    "QR de área inválido. Formato esperado: AREA_ADMINISTRATIVA|ID|NOMBRE"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +88,8 @@ private enum class AppScreen {
     Health,
     CreateDailyLog,
     QueryDailyLog,
-    Sync
+    Sync,
+    QrArea
 }
 
 private sealed interface ConnectionState {
@@ -89,6 +119,13 @@ private sealed interface SyncState {
     data object Loading : SyncState
     data class Ready(val summary: SyncSummary, val lastRun: SyncRunResult? = null) : SyncState
     data class Error(val message: String) : SyncState
+}
+
+private sealed interface QrAreaState {
+    data object Idle : QrAreaState
+    data object Loading : QrAreaState
+    data class Success(val area: AreaOut) : QrAreaState
+    data class Error(val message: String) : QrAreaState
 }
 
 @Composable
@@ -147,11 +184,25 @@ fun BitacoraApp() {
                 }
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = currentScreen != AppScreen.QrArea,
+                    onClick = { currentScreen = AppScreen.QrArea }
+                ) {
+                    Text("QR Área")
+                }
+            }
+
             when (currentScreen) {
                 AppScreen.Health -> BackendStatusScreen(repository)
                 AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
                 AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
                 AppScreen.Sync -> SyncScreen(repository)
+                AppScreen.QrArea -> QrAreaScreen()
             }
         }
     }
@@ -553,4 +604,271 @@ fun SyncScreen(repository: BitacoraRepository) {
             }
         }
     }
+}
+
+@Composable
+fun QrAreaScreen() {
+    val context = LocalContext.current
+    var qrCode by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf<QrAreaState>(QrAreaState.Idle) }
+    var isScanning by remember { mutableStateOf(false) }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Log.i(TAG_QR_AREA, "Permiso camara concedido")
+            isScanning = true
+        } else {
+            Log.w(TAG_QR_AREA, "Permiso camara rechazado")
+            state = QrAreaState.Error("Se necesita permiso de cámara para leer el QR del área.")
+        }
+    }
+
+    fun applyQrText(rawQr: String) {
+        Log.i(TAG_QR_AREA, "QR leido: $rawQr")
+        qrCode = rawQr
+        val area = parseAreaQr(rawQr)
+        if (area == null) {
+            Log.w(TAG_QR_AREA, "Error de formato QR Area: $rawQr")
+            state = QrAreaState.Error(INVALID_QR_AREA_MESSAGE)
+            return
+        }
+
+        Log.i(TAG_QR_AREA, "Tipo QR detectado: $QR_AREA_TYPE")
+        Log.i(TAG_QR_AREA, "ID area: ${area.id_area}")
+        Log.i(TAG_QR_AREA, "Nombre area: ${area.descripcion}")
+        state = QrAreaState.Success(area)
+    }
+
+    fun validateManualQr() {
+        val qr = qrCode.trim()
+
+        if (qr.isBlank()) {
+            state = QrAreaState.Error("Debe escribir o pegar un codigo QR")
+            return
+        }
+
+        applyQrText(qr)
+    }
+
+    fun startQrScan() {
+        Log.i(TAG_QR_AREA, "Boton escanear presionado")
+        when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
+            PackageManager.PERMISSION_GRANTED -> {
+                Log.i(TAG_QR_AREA, "Permiso camara concedido")
+                isScanning = true
+            }
+            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "QR Área",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isScanning,
+            onClick = { startQrScan() }
+        ) {
+            Text("Escanear QR Área")
+        }
+
+        if (isScanning) {
+            QrAreaScanner(
+                onQrScanned = { rawQr ->
+                    isScanning = false
+                    applyQrText(rawQr)
+                },
+                onError = { message ->
+                    isScanning = false
+                    state = QrAreaState.Error(message)
+                }
+            )
+        }
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = qrCode,
+            onValueChange = { qrCode = it },
+            label = { Text("codigo QR manual para pruebas") },
+            minLines = 2
+        )
+
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state !is QrAreaState.Loading,
+            onClick = { validateManualQr() }
+        ) {
+            Text("Validar QR manual")
+        }
+
+        when (val currentState = state) {
+            QrAreaState.Idle -> Text("Estado: pendiente")
+            QrAreaState.Loading -> {
+                CircularProgressIndicator()
+                Text("Estado: consultando area")
+            }
+            is QrAreaState.Success -> {
+                Text(
+                    text = "Area encontrada",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text("Área seleccionada: ${currentState.area.descripcion}")
+                Text("id_area: ${currentState.area.id_area}")
+                Text("descripcion: ${currentState.area.descripcion}")
+            }
+            is QrAreaState.Error -> {
+                Text(
+                    text = "Error al consultar area",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(currentState.message)
+            }
+        }
+    }
+}
+
+private fun parseAreaQr(rawQr: String): AreaOut? {
+    val parts = rawQr.trim().split("|")
+    if (parts.size != 3) return null
+
+    val type = parts[0].trim()
+    val idArea = parts[1].trim().toIntOrNull()
+    val areaName = parts[2].trim()
+
+    if (type != QR_AREA_TYPE || idArea == null || areaName.isBlank()) return null
+
+    return AreaOut(
+        id_area = idArea,
+        descripcion = areaName
+    )
+}
+
+@Composable
+private fun QrAreaScanner(
+    onQrScanned: (String) -> Unit,
+    onError: (String) -> Unit
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val hasScanned = remember { AtomicBoolean(false) }
+    val isProcessing = remember { AtomicBoolean(false) }
+    val barcodeScanner = remember {
+        val options = BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+        BarcodeScanning.getClient(options)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            barcodeScanner.close()
+            cameraExecutor.shutdown()
+        }
+    }
+
+    Text("Apunte la cámara al QR del área")
+
+    AndroidView(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(320.dp),
+        factory = { viewContext ->
+            val previewView = PreviewView(viewContext).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
+
+            cameraProviderFuture.addListener({
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+                val analyzer = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor) { imageProxy ->
+                            processQrImage(
+                                imageProxy = imageProxy,
+                                barcodeScanner = barcodeScanner,
+                                hasScanned = hasScanned,
+                                isProcessing = isProcessing,
+                                onQrScanned = onQrScanned,
+                                onError = onError
+                            )
+                        }
+                    }
+
+                try {
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        analyzer
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG_QR_AREA, "No fue posible abrir la camara", e)
+                    onError("No fue posible abrir la cámara para leer el QR del área.")
+                }
+            }, ContextCompat.getMainExecutor(viewContext))
+
+            previewView
+        },
+        update = {}
+    )
+}
+
+@OptIn(ExperimentalGetImage::class)
+private fun processQrImage(
+    imageProxy: ImageProxy,
+    barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    hasScanned: AtomicBoolean,
+    isProcessing: AtomicBoolean,
+    onQrScanned: (String) -> Unit,
+    onError: (String) -> Unit
+) {
+    if (hasScanned.get() || !isProcessing.compareAndSet(false, true)) {
+        imageProxy.close()
+        return
+    }
+
+    val mediaImage = imageProxy.image
+    if (mediaImage == null) {
+        isProcessing.set(false)
+        imageProxy.close()
+        return
+    }
+
+    val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+    barcodeScanner.process(image)
+        .addOnSuccessListener { barcodes ->
+            val qrValue = barcodes.firstOrNull { it.rawValue != null }?.rawValue
+            if (qrValue != null && hasScanned.compareAndSet(false, true)) {
+                onQrScanned(qrValue)
+            }
+        }
+        .addOnFailureListener { e ->
+            Log.e(TAG_QR_AREA, "Error leyendo QR", e)
+            if (hasScanned.compareAndSet(false, true)) {
+                onError("No fue posible leer el QR del area.")
+            }
+        }
+        .addOnCompleteListener {
+            isProcessing.set(false)
+            imageProxy.close()
+        }
 }
