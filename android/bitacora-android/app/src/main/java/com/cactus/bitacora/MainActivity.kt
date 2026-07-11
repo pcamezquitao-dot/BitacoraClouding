@@ -403,6 +403,8 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     var validatingTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
     var scanningTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
     var pendingCameraTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
+    var horaEntrada by remember { mutableStateOf("") }
+    var horaSalida by remember { mutableStateOf("") }
     var tipoAnotacion by remember { mutableStateOf("") }
     var observaciones by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<CreateBitacoraState>(CreateBitacoraState.Idle) }
@@ -524,6 +526,8 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         val empleadoValidado = empleado
         val supervisorValidado = supervisor
         val areaValidada = area
+        val entrada = horaEntrada.toIntOrNull()
+        val salida = horaSalida.toIntOrNull()
         val tipo = tipoAnotacion.toIntOrNull()
 
         if (empleadoValidado == null || supervisorValidado == null || areaValidada == null || !canCreate) {
@@ -536,6 +540,16 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             return
         }
 
+        if (horaEntrada.isNotBlank() && entrada == null) {
+            state = CreateBitacoraState.Error("La hora de entrada debe expresarse en minutos Unix")
+            return
+        }
+
+        if (horaSalida.isNotBlank() && salida == null) {
+            state = CreateBitacoraState.Error("La hora de salida debe expresarse en minutos Unix")
+            return
+        }
+
         state = CreateBitacoraState.Loading
         scope.launch {
             state = try {
@@ -543,6 +557,8 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                     BitacoraDiariaCreate(
                         id_empleado = empleadoValidado.participante.id_participante,
                         id_supervisor = supervisorValidado.participante.id_participante,
+                        ts_in_min = entrada,
+                        ts_out_min = salida,
                         tipo_anotacion = tipo,
                         observaciones = observaciones.ifBlank { null },
                         client_uuid = UUID.randomUUID().toString(),
@@ -573,43 +589,57 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
 
         QrValidationSection(
             title = "Empleado",
+            scanText = "Escanear empleado",
             qr = qrEmpleado,
             onQrChange = { qrEmpleado = it; empleado = null; empleadoError = null; area = null },
             onScan = { startScan(DailyLogQrTarget.EMPLEADO) },
             onValidate = { validateEmpleado(qrEmpleado) },
             loading = validatingTarget == DailyLogQrTarget.EMPLEADO,
-            error = empleadoError
-        )
-        empleado?.let {
-            Text("Nombre: ${it.participante.nombreCompleto()}")
-            Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
-            Text("Área asignada: ${it.asignacion.area_descripcion ?: it.asignacion.id_area}")
+            error = empleadoError,
+            validated = empleado != null
+        ) {
+            empleado?.let {
+                Text("Empleado validado", color = MaterialTheme.colorScheme.primary)
+                Text("Nombre: ${it.participante.nombreCompleto()}")
+                Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+                Text("Área asignada: ${it.asignacion.area_descripcion ?: it.asignacion.id_area}")
+            }
         }
 
         QrValidationSection(
             title = "Supervisor",
+            scanText = "Escanear supervisor",
             qr = qrSupervisor,
             onQrChange = { qrSupervisor = it; supervisor = null; supervisorError = null },
             onScan = { startScan(DailyLogQrTarget.SUPERVISOR) },
             onValidate = { validateSupervisor(qrSupervisor) },
             loading = validatingTarget == DailyLogQrTarget.SUPERVISOR,
-            error = supervisorError
-        )
-        supervisor?.let {
-            Text("Nombre: ${it.participante.nombreCompleto()}")
-            Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+            error = supervisorError,
+            validated = supervisor != null
+        ) {
+            supervisor?.let {
+                Text("Supervisor validado", color = MaterialTheme.colorScheme.primary)
+                Text("Nombre: ${it.participante.nombreCompleto()}")
+                Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+            }
         }
 
         QrValidationSection(
             title = "Área",
+            scanText = "Escanear área",
             qr = qrArea,
             onQrChange = { qrArea = it; area = null; areaError = null },
             onScan = { startScan(DailyLogQrTarget.AREA) },
             onValidate = { validateArea(qrArea) },
             loading = validatingTarget == DailyLogQrTarget.AREA,
-            error = areaError
-        )
-        area?.let { Text("Área seleccionada: ${it.descripcion}") }
+            error = areaError,
+            validated = area != null
+        ) {
+            area?.let {
+                Text("Área validada", color = MaterialTheme.colorScheme.primary)
+                Text("Descripción: ${it.descripcion}")
+            }
+        }
 
         scanningTarget?.let { target ->
             QrAreaScanner(
@@ -634,6 +664,26 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             )
         }
 
+        Text("Datos de la bitácora", style = MaterialTheme.typography.titleMedium)
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = horaEntrada,
+            onValueChange = { horaEntrada = it },
+            label = { Text("Hora de entrada (minutos Unix, opcional)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true
+        )
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = horaSalida,
+            onValueChange = { horaSalida = it },
+            label = { Text("Hora de salida (minutos Unix, opcional)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true
+        )
+
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = tipoAnotacion,
@@ -651,12 +701,17 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             minLines = 3
         )
 
+        Text(
+            "Evidencia, duración y orden no aplican a la bitácora diaria; se mantienen en el flujo de evidencia.",
+            style = MaterialTheme.typography.bodySmall
+        )
+
         Button(
             modifier = Modifier.fillMaxWidth(),
             enabled = canCreate && state !is CreateBitacoraState.Loading,
             onClick = { createDailyLog() }
         ) {
-            Text("Crear bitacora diaria")
+            Text("Crear bitácora")
         }
 
         when (val currentState = state) {
@@ -933,34 +988,47 @@ private fun parseAreaQr(rawQr: String): AreaOut? {
 @Composable
 private fun QrValidationSection(
     title: String,
+    scanText: String,
     qr: String,
     onQrChange: (String) -> Unit,
     onScan: () -> Unit,
     onValidate: () -> Unit,
     loading: Boolean,
-    error: String?
+    error: String?,
+    validated: Boolean,
+    result: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
-    Text(title, style = MaterialTheme.typography.titleMedium)
-    OutlinedTextField(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        value = qr,
-        onValueChange = onQrChange,
-        label = { Text("QR $title (manual)") },
-        singleLine = true
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = if (validated) 3.dp else 1.dp
     ) {
-        Button(modifier = Modifier.weight(1f), enabled = !loading, onClick = onScan) {
-            Text("Escanear")
-        }
-        OutlinedButton(modifier = Modifier.weight(1f), enabled = !loading, onClick = onValidate) {
-            Text("Validar manual")
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = qr,
+                onValueChange = onQrChange,
+                label = { Text("QR $title (ingreso manual)") },
+                singleLine = true
+            )
+            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onScan) {
+                Text(scanText)
+            }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onValidate) {
+                Text("Validar QR manual")
+            }
+            if (loading) {
+                CircularProgressIndicator()
+                Text("Validando $title…")
+            }
+            result()
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
-    if (loading) CircularProgressIndicator()
-    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 }
 
 private fun ParticipanteOut.nombreCompleto(): String =
