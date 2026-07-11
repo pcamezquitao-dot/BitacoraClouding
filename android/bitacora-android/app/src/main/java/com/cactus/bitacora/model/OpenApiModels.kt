@@ -13,6 +13,21 @@ data class AreaOut(
     val descripcion: String
 )
 
+data class ParticipanteOut(
+    val id_participante: Int,
+    val nombre: String? = null,
+    val apellido: String? = null,
+    val identificacion_participante: String? = null
+)
+
+data class EmpleadoAreaActivaOut(
+    val id_participante: Int,
+    val id_area: Int,
+    val area_descripcion: String? = null,
+    val cargo: Int? = null,
+    val fecha_final: String? = null
+)
+
 data class BitacoraDiariaCreate(
     val id_empleado: Int,
     val id_supervisor: Int? = null,
@@ -20,7 +35,8 @@ data class BitacoraDiariaCreate(
     val ts_out_min: Int? = null,
     val tipo_anotacion: Int? = null,
     val observaciones: String? = null,
-    val client_uuid: String? = null
+    val client_uuid: String? = null,
+    val qr_area: String? = null
 )
 
 data class BitacoraDiariaOut(

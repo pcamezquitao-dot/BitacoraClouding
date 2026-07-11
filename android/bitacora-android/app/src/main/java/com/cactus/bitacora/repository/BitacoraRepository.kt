@@ -8,6 +8,7 @@ import com.cactus.bitacora.model.BitacoraCompletaOut
 import com.cactus.bitacora.model.BitacoraDiariaCreate
 import com.cactus.bitacora.model.BitacoraDiariaOut
 import com.cactus.bitacora.model.EvidenciaOut
+import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.util.NetworkResult
 import com.cactus.bitacora.util.safeApiCall
 import okhttp3.MultipartBody
@@ -17,6 +18,53 @@ class BitacoraRepository(
     private val service: BitacoraApiService =
         NetworkClient.createService(BitacoraApiService::class.java)
 ) {
+    suspend fun obtenerAsignacionActiva(
+        idParticipante: Int
+    ): NetworkResult<EmpleadoAreaActivaOut> =
+        safeApiCall { service.obtenerAsignacionActiva(idParticipante) }
+
+    suspend fun validarAsignacionEmpleado(
+        idParticipante: Int,
+        idAreaSeleccionada: Int? = null
+    ): NetworkResult<EmpleadoAreaActivaOut> =
+        when (val result = obtenerAsignacionActiva(idParticipante)) {
+            is NetworkResult.Success -> {
+                if (idAreaSeleccionada != null && result.data.id_area != idAreaSeleccionada) {
+                    NetworkResult.Error(
+                        "El área seleccionada no coincide con la asignación activa del empleado",
+                        422
+                    )
+                } else {
+                    result
+                }
+            }
+            is NetworkResult.Error -> if (result.httpCode == 404) {
+                NetworkResult.Error(
+                    "El empleado no tiene una asignación de área activa",
+                    result.httpCode
+                )
+            } else {
+                result
+            }
+            is NetworkResult.Offline -> result
+            NetworkResult.Loading -> result
+        }
+
+    suspend fun validarAsignacionSupervisor(
+        idParticipante: Int
+    ): NetworkResult<EmpleadoAreaActivaOut> =
+        when (val result = obtenerAsignacionActiva(idParticipante)) {
+            is NetworkResult.Error -> if (result.httpCode == 404) {
+                NetworkResult.Error(
+                    "El supervisor no tiene una asignación de área activa",
+                    result.httpCode
+                )
+            } else {
+                result
+            }
+            else -> result
+        }
+
     suspend fun crearBitacoraDiaria(
         request: BitacoraDiariaCreate
     ): NetworkResult<BitacoraDiariaOut> =

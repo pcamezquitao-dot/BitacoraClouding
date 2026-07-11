@@ -6,6 +6,8 @@ import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.data.models.HealthOut
+import com.cactus.bitacora.model.EmpleadoAreaActivaOut
+import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.util.AppConfig
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -18,6 +20,14 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("participante/by_qr/{qr}")
+    suspend fun getParticipanteByQr(@Path("qr") qr: String): ParticipanteOut
+
+    @GET("empleado-area/{id_participante}/activa")
+    suspend fun getAsignacionActiva(
+        @Path("id_participante") idParticipante: Int
+    ): EmpleadoAreaActivaOut
+
     @GET("health")
     suspend fun health(): HealthOut
 

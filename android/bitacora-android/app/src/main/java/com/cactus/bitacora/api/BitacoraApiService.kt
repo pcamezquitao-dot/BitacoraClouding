@@ -6,6 +6,7 @@ import com.cactus.bitacora.model.BitacoraCompletaOut
 import com.cactus.bitacora.model.BitacoraDiariaCreate
 import com.cactus.bitacora.model.BitacoraDiariaOut
 import com.cactus.bitacora.model.EvidenciaOut
+import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -16,6 +17,11 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 
 interface BitacoraApiService {
+    @GET("empleado-area/{id_participante}/activa")
+    suspend fun obtenerAsignacionActiva(
+        @Path("id_participante") idParticipante: Int
+    ): EmpleadoAreaActivaOut
+
     @POST("bitacora_diaria")
     suspend fun crearBitacoraDiaria(
         @Body request: BitacoraDiariaCreate

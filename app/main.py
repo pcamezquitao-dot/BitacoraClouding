@@ -19,6 +19,7 @@ from app.routers.participante import router as participante_router
 from app.routers.areas import router as areas_router
 from app.routers.empleados import router as empleados_router
 from app.routers.bitacora_uc03 import router as bitacora_uc03_router
+from app.routers.empleado_area import router as empleado_area_router
 
 # =========================
 # 3) Crear app
@@ -35,6 +36,7 @@ app.include_router(participante_router)
 app.include_router(areas_router)
 app.include_router(empleados_router)
 app.include_router(bitacora_uc03_router)
+app.include_router(empleado_area_router)
 
 @app.get("/")
 def root():

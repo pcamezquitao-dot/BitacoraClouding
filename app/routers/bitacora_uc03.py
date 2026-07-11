@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.services.qr_service import parse_area_qr
 from app.services.jerarquia_service import get_supervisor_for_empleado
 from app.services.storage_service import save_upload
+from app.services.empleado_area_service import require_asignacion_activa
 from app.schemas.bitacora import (
     BitacoraAreaObsCreate,
     BitacoraAreaObsOut,
@@ -38,12 +39,35 @@ def _crear_bitacora_diaria(
     tipo_anotacion: int | None,
     observaciones: str | None,
     client_uuid: str | None = None,
+    qr_area: str | None = None,
 ) -> BitacoraDiariaOut:
+    try:
+        require_asignacion_activa(db, id_empleado, "empleado")
+    except LookupError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if qr_area:
+        try:
+            area_seleccionada = parse_area_qr(qr_area)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        asignacion = require_asignacion_activa(db, id_empleado, "empleado")
+        if int(asignacion["id_area"]) != area_seleccionada.id_area:
+            raise HTTPException(
+                status_code=422,
+                detail="El área seleccionada no coincide con la asignación activa del empleado",
+            )
+
     if id_supervisor is None:
         try:
             id_supervisor = get_supervisor_for_empleado(db, id_empleado)
         except LookupError as e:
             raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        require_asignacion_activa(db, id_supervisor, "supervisor")
+    except LookupError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     ts_in_min_calc, fecha_in, hora_in = _now_parts(ts_in_min)
     fecha_out = None
@@ -112,6 +136,16 @@ def _crear_observacion_area_si_aplica(
     ).mappings().first()
     if not area_row:
         raise HTTPException(status_code=404, detail="Área administrativa no encontrada.")
+
+    try:
+        asignacion_empleado = require_asignacion_activa(db, id_empleado, "empleado")
+    except LookupError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if int(asignacion_empleado["id_area"]) != int(area_row["id_area"]):
+        raise HTTPException(
+            status_code=422,
+            detail="El área seleccionada no coincide con la asignación activa del empleado",
+        )
 
     bao = settings.BAO_TABLE
     existe = db.execute(
@@ -219,6 +253,7 @@ def crear_bitacora_diaria(payload: BitacoraDiariaCreate, db: Session = Depends(g
             tipo_anotacion=payload.tipo_anotacion,
             observaciones=payload.observaciones,
             client_uuid=payload.client_uuid,
+            qr_area=payload.qr_area,
         )
         db.commit()
         return out

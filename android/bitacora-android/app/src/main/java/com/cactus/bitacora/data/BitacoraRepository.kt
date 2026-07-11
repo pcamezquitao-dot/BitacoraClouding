@@ -8,6 +8,7 @@ import com.cactus.bitacora.data.local.toLocalEntity
 import com.cactus.bitacora.data.models.AreaByQrIn
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
+import retrofit2.HttpException
 
 class BitacoraRepository(
     context: Context,
@@ -22,6 +23,11 @@ class BitacoraRepository(
     suspend fun getAreaByQr(qr: String) =
         api.getAreaByQr(AreaByQrIn(qr))
 
+    suspend fun getParticipanteByQr(qr: String) = api.getParticipanteByQr(qr)
+
+    suspend fun getAsignacionActiva(idParticipante: Int) =
+        api.getAsignacionActiva(idParticipante)
+
     suspend fun crearBitacoraDiaria(request: BitacoraDiariaCreate): CreateBitacoraResult {
         val requestWithUuid = request.ensureClientUuid()
 
@@ -34,6 +40,18 @@ class BitacoraRepository(
                 )
             )
             CreateBitacoraResult.Sincronizada(response)
+        } catch (e: HttpException) {
+            if (e.code() in 400..499) throw e
+            val localId = bitacoraDao.insert(
+                requestWithUuid.toLocalEntity(
+                    syncStatus = SyncStatus.PENDIENTE,
+                    errorMessage = e.message
+                )
+            )
+            CreateBitacoraResult.Pendiente(
+                localId = localId,
+                message = "Backend no disponible. Bitacora guardada localmente."
+            )
         } catch (e: Exception) {
             val localId = bitacoraDao.insert(
                 requestWithUuid.toLocalEntity(

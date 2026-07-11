@@ -57,6 +57,8 @@ import com.cactus.bitacora.data.SyncSummary
 import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
+import com.cactus.bitacora.model.EmpleadoAreaActivaOut
+import com.cactus.bitacora.model.ParticipanteOut
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -127,6 +129,13 @@ private sealed interface QrAreaState {
     data class Success(val area: AreaOut) : QrAreaState
     data class Error(val message: String) : QrAreaState
 }
+
+private data class ParticipanteValidado(
+    val participante: ParticipanteOut,
+    val asignacion: EmpleadoAreaActivaOut
+)
+
+private enum class DailyLogQrTarget { EMPLEADO, SUPERVISOR, AREA }
 
 @Composable
 fun BitacoraApp() {
@@ -380,25 +389,145 @@ fun BitacoraDetail(bitacora: BitacoraDiariaOut) {
 
 @Composable
 fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var idEmpleado by remember { mutableStateOf("") }
-    var idSupervisor by remember { mutableStateOf("") }
+    var qrEmpleado by remember { mutableStateOf("") }
+    var qrSupervisor by remember { mutableStateOf("") }
+    var qrArea by remember { mutableStateOf("") }
+    var empleado by remember { mutableStateOf<ParticipanteValidado?>(null) }
+    var supervisor by remember { mutableStateOf<ParticipanteValidado?>(null) }
+    var area by remember { mutableStateOf<AreaOut?>(null) }
+    var empleadoError by remember { mutableStateOf<String?>(null) }
+    var supervisorError by remember { mutableStateOf<String?>(null) }
+    var areaError by remember { mutableStateOf<String?>(null) }
+    var validatingTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
+    var scanningTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
+    var pendingCameraTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
     var tipoAnotacion by remember { mutableStateOf("") }
     var observaciones by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<CreateBitacoraState>(CreateBitacoraState.Idle) }
 
-    fun createDailyLog() {
-        val empleado = idEmpleado.toIntOrNull()
-        val supervisor = idSupervisor.toIntOrNull()
-        val tipo = tipoAnotacion.toIntOrNull()
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) scanningTarget = pendingCameraTarget
+        else {
+            when (pendingCameraTarget) {
+                DailyLogQrTarget.EMPLEADO -> empleadoError = "Se necesita permiso de cámara para leer el QR del empleado."
+                DailyLogQrTarget.SUPERVISOR -> supervisorError = "Se necesita permiso de cámara para leer el QR del supervisor."
+                DailyLogQrTarget.AREA -> areaError = "Se necesita permiso de cámara para leer el QR del área."
+                null -> Unit
+            }
+        }
+        pendingCameraTarget = null
+    }
 
-        if (empleado == null) {
-            state = CreateBitacoraState.Error("id_empleado debe ser numerico")
+    fun validateEmpleado(rawQr: String) {
+        val qr = rawQr.trim()
+        empleado = null
+        empleadoError = null
+        area = null
+        areaError = null
+        if (qr.isBlank()) {
+            empleadoError = "Debe ingresar o escanear el QR del empleado"
             return
         }
+        validatingTarget = DailyLogQrTarget.EMPLEADO
+        scope.launch {
+            try {
+                val participante = repository.getParticipanteByQr(qr)
+                val asignacion = try {
+                    repository.getAsignacionActiva(participante.id_participante)
+                } catch (_: Exception) {
+                    throw IllegalStateException("El empleado no tiene una asignación de área activa")
+                }
+                empleado = ParticipanteValidado(participante, asignacion)
+            } catch (e: Exception) {
+                empleadoError = e.message ?: "No fue posible validar el empleado"
+            } finally {
+                validatingTarget = null
+            }
+        }
+    }
 
-        if (idSupervisor.isNotBlank() && supervisor == null) {
-            state = CreateBitacoraState.Error("id_supervisor debe ser numerico")
+    fun validateSupervisor(rawQr: String) {
+        val qr = rawQr.trim()
+        supervisor = null
+        supervisorError = null
+        if (qr.isBlank()) {
+            supervisorError = "Debe ingresar o escanear el QR del supervisor"
+            return
+        }
+        validatingTarget = DailyLogQrTarget.SUPERVISOR
+        scope.launch {
+            try {
+                val participante = repository.getParticipanteByQr(qr)
+                val asignacion = try {
+                    repository.getAsignacionActiva(participante.id_participante)
+                } catch (_: Exception) {
+                    throw IllegalStateException("El supervisor no tiene una asignación de área activa")
+                }
+                supervisor = ParticipanteValidado(participante, asignacion)
+            } catch (e: Exception) {
+                supervisorError = e.message ?: "No fue posible validar el supervisor"
+            } finally {
+                validatingTarget = null
+            }
+        }
+    }
+
+    fun validateArea(rawQr: String) {
+        val qr = rawQr.trim()
+        area = null
+        areaError = null
+        if (qr.isBlank()) {
+            areaError = "Debe ingresar o escanear el QR del área"
+            return
+        }
+        val empleadoActual = empleado
+        if (empleadoActual == null) {
+            areaError = "Primero debe validar un empleado con asignación activa"
+            return
+        }
+        validatingTarget = DailyLogQrTarget.AREA
+        scope.launch {
+            try {
+                val areaConsultada = repository.getAreaByQr(qr)
+                if (areaConsultada.id_area != empleadoActual.asignacion.id_area) {
+                    throw IllegalStateException(
+                        "El área seleccionada no coincide con la asignación activa del empleado"
+                    )
+                }
+                area = areaConsultada
+            } catch (e: Exception) {
+                areaError = e.message ?: "No fue posible validar el área"
+            } finally {
+                validatingTarget = null
+            }
+        }
+    }
+
+    fun startScan(target: DailyLogQrTarget) {
+        pendingCameraTarget = target
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            scanningTarget = target
+            pendingCameraTarget = null
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val canCreate = empleado != null && supervisor != null && area != null &&
+        area?.id_area == empleado?.asignacion?.id_area && validatingTarget == null && scanningTarget == null
+
+    fun createDailyLog() {
+        val empleadoValidado = empleado
+        val supervisorValidado = supervisor
+        val areaValidada = area
+        val tipo = tipoAnotacion.toIntOrNull()
+
+        if (empleadoValidado == null || supervisorValidado == null || areaValidada == null || !canCreate) {
+            state = CreateBitacoraState.Error("Debe validar empleado, supervisor y área antes de crear la bitácora")
             return
         }
 
@@ -412,11 +541,12 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             state = try {
                 when (val result = repository.crearBitacoraDiaria(
                     BitacoraDiariaCreate(
-                        id_empleado = empleado,
-                        id_supervisor = supervisor,
+                        id_empleado = empleadoValidado.participante.id_participante,
+                        id_supervisor = supervisorValidado.participante.id_participante,
                         tipo_anotacion = tipo,
                         observaciones = observaciones.ifBlank { null },
-                        client_uuid = UUID.randomUUID().toString()
+                        client_uuid = UUID.randomUUID().toString(),
+                        qr_area = qrArea.trim()
                     )
                 )) {
                     is CreateBitacoraResult.Sincronizada ->
@@ -441,23 +571,68 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             style = MaterialTheme.typography.titleMedium
         )
 
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = idEmpleado,
-            onValueChange = { idEmpleado = it },
-            label = { Text("id_empleado") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true
+        QrValidationSection(
+            title = "Empleado",
+            qr = qrEmpleado,
+            onQrChange = { qrEmpleado = it; empleado = null; empleadoError = null; area = null },
+            onScan = { startScan(DailyLogQrTarget.EMPLEADO) },
+            onValidate = { validateEmpleado(qrEmpleado) },
+            loading = validatingTarget == DailyLogQrTarget.EMPLEADO,
+            error = empleadoError
         )
+        empleado?.let {
+            Text("Nombre: ${it.participante.nombreCompleto()}")
+            Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+            Text("Área asignada: ${it.asignacion.area_descripcion ?: it.asignacion.id_area}")
+        }
 
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = idSupervisor,
-            onValueChange = { idSupervisor = it },
-            label = { Text("id_supervisor") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true
+        QrValidationSection(
+            title = "Supervisor",
+            qr = qrSupervisor,
+            onQrChange = { qrSupervisor = it; supervisor = null; supervisorError = null },
+            onScan = { startScan(DailyLogQrTarget.SUPERVISOR) },
+            onValidate = { validateSupervisor(qrSupervisor) },
+            loading = validatingTarget == DailyLogQrTarget.SUPERVISOR,
+            error = supervisorError
         )
+        supervisor?.let {
+            Text("Nombre: ${it.participante.nombreCompleto()}")
+            Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+        }
+
+        QrValidationSection(
+            title = "Área",
+            qr = qrArea,
+            onQrChange = { qrArea = it; area = null; areaError = null },
+            onScan = { startScan(DailyLogQrTarget.AREA) },
+            onValidate = { validateArea(qrArea) },
+            loading = validatingTarget == DailyLogQrTarget.AREA,
+            error = areaError
+        )
+        area?.let { Text("Área seleccionada: ${it.descripcion}") }
+
+        scanningTarget?.let { target ->
+            QrAreaScanner(
+                prompt = "Apunte la cámara al QR de ${target.name.lowercase()}",
+                errorMessage = "No fue posible leer el QR de ${target.name.lowercase()}.",
+                onQrScanned = { rawQr ->
+                    scanningTarget = null
+                    when (target) {
+                        DailyLogQrTarget.EMPLEADO -> { qrEmpleado = rawQr; validateEmpleado(rawQr) }
+                        DailyLogQrTarget.SUPERVISOR -> { qrSupervisor = rawQr; validateSupervisor(rawQr) }
+                        DailyLogQrTarget.AREA -> { qrArea = rawQr; validateArea(rawQr) }
+                    }
+                },
+                onError = { message ->
+                    scanningTarget = null
+                    when (target) {
+                        DailyLogQrTarget.EMPLEADO -> empleadoError = message
+                        DailyLogQrTarget.SUPERVISOR -> supervisorError = message
+                        DailyLogQrTarget.AREA -> areaError = message
+                    }
+                }
+            )
+        }
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
@@ -478,7 +653,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
 
         Button(
             modifier = Modifier.fillMaxWidth(),
-            enabled = state !is CreateBitacoraState.Loading,
+            enabled = canCreate && state !is CreateBitacoraState.Loading,
             onClick = { createDailyLog() }
         ) {
             Text("Crear bitacora diaria")
@@ -756,9 +931,49 @@ private fun parseAreaQr(rawQr: String): AreaOut? {
 }
 
 @Composable
+private fun QrValidationSection(
+    title: String,
+    qr: String,
+    onQrChange: (String) -> Unit,
+    onScan: () -> Unit,
+    onValidate: () -> Unit,
+    loading: Boolean,
+    error: String?
+) {
+    Text(title, style = MaterialTheme.typography.titleMedium)
+    OutlinedTextField(
+        modifier = Modifier.fillMaxWidth(),
+        value = qr,
+        onValueChange = onQrChange,
+        label = { Text("QR $title (manual)") },
+        singleLine = true
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(modifier = Modifier.weight(1f), enabled = !loading, onClick = onScan) {
+            Text("Escanear")
+        }
+        OutlinedButton(modifier = Modifier.weight(1f), enabled = !loading, onClick = onValidate) {
+            Text("Validar manual")
+        }
+    }
+    if (loading) CircularProgressIndicator()
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+}
+
+private fun ParticipanteOut.nombreCompleto(): String =
+    listOfNotNull(nombre?.takeIf { it.isNotBlank() }, apellido?.takeIf { it.isNotBlank() })
+        .joinToString(" ")
+        .ifBlank { "Sin nombre registrado" }
+
+@Composable
 private fun QrAreaScanner(
     onQrScanned: (String) -> Unit,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    prompt: String = "Apunte la cámara al QR del área",
+    errorMessage: String = "No fue posible leer el QR del área."
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -778,7 +993,7 @@ private fun QrAreaScanner(
         }
     }
 
-    Text("Apunte la cámara al QR del área")
+    Text(prompt)
 
     AndroidView(
         modifier = Modifier
@@ -806,7 +1021,8 @@ private fun QrAreaScanner(
                                 hasScanned = hasScanned,
                                 isProcessing = isProcessing,
                                 onQrScanned = onQrScanned,
-                                onError = onError
+                                onError = onError,
+                                errorMessage = errorMessage
                             )
                         }
                     }
@@ -821,7 +1037,7 @@ private fun QrAreaScanner(
                     )
                 } catch (e: Exception) {
                     Log.e(TAG_QR_AREA, "No fue posible abrir la camara", e)
-                    onError("No fue posible abrir la cámara para leer el QR del área.")
+                    onError(errorMessage)
                 }
             }, ContextCompat.getMainExecutor(viewContext))
 
@@ -838,7 +1054,8 @@ private fun processQrImage(
     hasScanned: AtomicBoolean,
     isProcessing: AtomicBoolean,
     onQrScanned: (String) -> Unit,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    errorMessage: String
 ) {
     if (hasScanned.get() || !isProcessing.compareAndSet(false, true)) {
         imageProxy.close()
@@ -864,7 +1081,7 @@ private fun processQrImage(
         .addOnFailureListener { e ->
             Log.e(TAG_QR_AREA, "Error leyendo QR", e)
             if (hasScanned.compareAndSet(false, true)) {
-                onError("No fue posible leer el QR del area.")
+                onError(errorMessage)
             }
         }
         .addOnCompleteListener {
