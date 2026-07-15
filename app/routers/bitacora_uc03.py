@@ -116,6 +116,7 @@ def _crear_bitacora_diaria(
 
 def _crear_observacion_area_si_aplica(
     db: Session,
+    id_bitacora: int,
     id_empleado: int,
     id_supervisor: int,
     ts_in_min: int,
@@ -147,6 +148,26 @@ def _crear_observacion_area_si_aplica(
             detail="El área seleccionada no coincide con la asignación activa del empleado",
         )
 
+    bd = settings.BITACORA_DIARIA_TABLE
+    bitacora_row = db.execute(
+        text(f"""
+            SELECT id_bitacora
+            FROM {bd}
+            WHERE id_empleado=:e
+              AND id_supervisor=:s
+              AND ts_in_min=:t
+              AND id_bitacora=:id_bitacora
+            LIMIT 1
+        """),
+        {"e": id_empleado, "s": id_supervisor, "t": ts_in_min, "id_bitacora": id_bitacora},
+    ).mappings().first()
+    if not bitacora_row:
+        raise HTTPException(
+            status_code=404,
+            detail="No existe la bitácora diaria correspondiente para empleado, supervisor y ts_in_min",
+        )
+    id_bitacora_db = int(bitacora_row["id_bitacora"])
+
     bao = settings.BAO_TABLE
     existe = db.execute(
         text(f"SELECT 1 FROM {bao} WHERE id_empleado=:e AND id_supervisor=:s AND ts_in_min=:t LIMIT 1"),
@@ -155,15 +176,16 @@ def _crear_observacion_area_si_aplica(
     if not existe:
         db.execute(text(f"""
             INSERT INTO {bao}
-                (id_empleado, id_supervisor, ts_in_min, id_area, observaciones, created_at)
+                (id_empleado, id_supervisor, ts_in_min, id_area, observaciones, created_at, id_bitacora)
             VALUES
-                (:e, :s, :t, :id_area, :obs, NOW())
+                (:e, :s, :t, :id_area, :obs, NOW(), :id_bitacora)
         """), {
             "e": id_empleado,
             "s": id_supervisor,
             "t": ts_in_min,
             "id_area": int(area_row["id_area"]),
             "obs": observaciones,
+            "id_bitacora": id_bitacora_db,
         })
     return area_row
 
@@ -279,6 +301,7 @@ def crear_bitacora_area_observacion(payload: BitacoraAreaObsCreate, db: Session 
         )
         area_row = _crear_observacion_area_si_aplica(
             db=db,
+            id_bitacora=bd_out.id_bitacora,
             id_empleado=bd_out.id_empleado,
             id_supervisor=int(bd_out.id_supervisor),
             ts_in_min=bd_out.ts_in_min,
@@ -365,6 +388,7 @@ def crear_bitacora_completa_upload(
         )
         _crear_observacion_area_si_aplica(
             db=db,
+            id_bitacora=bd_out.id_bitacora,
             id_empleado=bd_out.id_empleado,
             id_supervisor=int(bd_out.id_supervisor),
             ts_in_min=bd_out.ts_in_min,
