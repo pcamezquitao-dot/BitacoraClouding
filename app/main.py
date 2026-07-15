@@ -20,6 +20,8 @@ from app.routers.areas import router as areas_router
 from app.routers.empleados import router as empleados_router
 from app.routers.bitacora_uc03 import router as bitacora_uc03_router
 from app.routers.empleado_area import router as empleado_area_router
+from app.routers.bitacora_area_evidencia import router as bitacora_area_evidencia_router
+from app.services.evidencia_file_service import evidencia_root
 
 # =========================
 # 3) Crear app
@@ -30,6 +32,7 @@ app = FastAPI(title="BACKEND_FASTAPI_BITACORA3")
 upload_dir = os.getenv("UPLOAD_DIR", "uploads")
 os.makedirs(upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
+evidencia_root()
 
 app.include_router(health_router)
 app.include_router(participante_router)
@@ -37,6 +40,7 @@ app.include_router(areas_router)
 app.include_router(empleados_router)
 app.include_router(bitacora_uc03_router)
 app.include_router(empleado_area_router)
+app.include_router(bitacora_area_evidencia_router)
 
 @app.get("/")
 def root():

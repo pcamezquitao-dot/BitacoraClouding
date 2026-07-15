@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -193,11 +194,11 @@ def _crear_observacion_area_si_aplica(
 def _crear_evidencia(
     db: Session,
     id_bitacora: int,
-    id_empleado: int,
-    id_supervisor: int,
+    id_area: int,
     ts_in_min: int,
     id_tipo_evidencia: int,
     archivo: UploadFile,
+    uuid_cliente: str,
     duracion_seg: int | None = None,
     orden: int | None = None,
 ) -> EvidenciaOut:
@@ -205,61 +206,67 @@ def _crear_evidencia(
     if id_tipo_evidencia not in (1,2,3):
         raise HTTPException(status_code=400, detail="id_tipo_evidencia inválido. Use 1=FOTO,2=AUDIO,3=VIDEO.")
 
-    # La tabla tiene FK contra bitacora_area_observacion(id_empleado,id_supervisor,ts_in_min).
-    bao = settings.BAO_TABLE
+    bd = settings.BITACORA_DIARIA_TABLE
     chk = db.execute(
-        text(f"SELECT 1 FROM {bao} WHERE id_empleado=:e AND id_supervisor=:s AND ts_in_min=:t LIMIT 1"),
-        {"e": id_empleado, "s": id_supervisor, "t": ts_in_min},
+        text(f"SELECT 1 FROM {bd} WHERE id_bitacora=:id LIMIT 1"),
+        {"id": id_bitacora},
     ).first()
     if not chk:
         raise HTTPException(
             status_code=404,
-            detail="No existe bitacora_area_observacion para asociar la evidencia. Envíe qr_area en /bitacora_completa/upload o cree primero /bitacora_area_observacion.",
+            detail="No existe bitacora_diaria para asociar la evidencia.",
         )
 
-    subdir = f"bitacora_{id_bitacora}/empleado_{id_empleado}/ts_{ts_in_min}"
+    bae = settings.BAE_TABLE
+    existente = db.execute(
+        text(f"SELECT id_evidencia FROM {bae} WHERE uuid_cliente=:uuid LIMIT 1"),
+        {"uuid": uuid_cliente},
+    ).first()
+    if existente:
+        row = db.execute(text(f"SELECT * FROM {bae} WHERE id_evidencia=:id"), {"id": existente[0]}).mappings().first()
+        return EvidenciaOut(**dict(row))
+
+    subdir = f"bitacora_{id_bitacora}/area_{id_area}/ts_{ts_in_min}"
     rel_url, sha256, size_bytes = save_upload(archivo, subdir)
 
-    id_evidencia = _next_id_evidencia(db)
-    bae = settings.BAE_TABLE
     sql_ins = text(f"""
         INSERT INTO {bae}
-            (id_evidencia, id_empleado, id_supervisor, ts_in_min, id_tipo_evidencia,
-             archivo_url, archivo_nombre, archivo_hash, duracion_seg, tamanio_bytes,
-             orden, created_at, id_bitacora)
+            (id_bitacora, id_area, ts_in_min, id_tipo_evidencia, archivo_url,
+             archivo_nombre, archivo_hash, mime_type, duracion_seg, tamanio_bytes,
+             orden, uuid_cliente)
         VALUES
-            (:id_evidencia, :e, :s, :t, :tipo,
-             :url, :nombre, :hash, :dur, :size,
-             :orden, NOW(), :id_bitacora)
+            (:id_bitacora, :id_area, :t, :tipo, :url,
+             :nombre, :hash, :mime_type, :dur, :size, :orden, :uuid_cliente)
     """)
-    db.execute(sql_ins, {
-        "id_evidencia": id_evidencia,
-        "e": id_empleado,
-        "s": id_supervisor,
+    result = db.execute(sql_ins, {
+        "id_bitacora": id_bitacora,
+        "id_area": id_area,
         "t": ts_in_min,
         "tipo": id_tipo_evidencia,
         "url": rel_url,
         "nombre": archivo.filename,
         "hash": sha256,
+        "mime_type": archivo.content_type,
         "dur": duracion_seg,
         "size": size_bytes,
         "orden": orden,
-        "id_bitacora": id_bitacora,
+        "uuid_cliente": uuid_cliente,
     })
 
     return EvidenciaOut(
-        id_evidencia=id_evidencia,
+        id_evidencia=int(result.lastrowid),
         id_bitacora=id_bitacora,
-        id_empleado=id_empleado,
-        id_supervisor=id_supervisor,
+        id_area=id_area,
         ts_in_min=ts_in_min,
         id_tipo_evidencia=id_tipo_evidencia,
         archivo_url=rel_url,
         archivo_nombre=archivo.filename,
         archivo_hash=sha256,
+        mime_type=archivo.content_type,
         tamanio_bytes=size_bytes,
         duracion_seg=duracion_seg,
         orden=orden,
+        uuid_cliente=uuid_cliente,
     )
 
 
@@ -328,10 +335,10 @@ def crear_bitacora_area_observacion(payload: BitacoraAreaObsCreate, db: Session 
 @router.post("/bitacora_area_evidencia/upload", response_model=EvidenciaOut)
 def upload_evidencia(
     id_bitacora: int = Form(...),
-    id_empleado: int = Form(...),
-    id_supervisor: int = Form(...),
+    id_area: int = Form(...),
     ts_in_min: int = Form(...),
     id_tipo_evidencia: int = Form(...),
+    uuid_cliente: UUID = Form(...),
     duracion_seg: int | None = Form(None),
     orden: int | None = Form(None),
     archivo: UploadFile = File(...),
@@ -341,11 +348,11 @@ def upload_evidencia(
         evidencia = _crear_evidencia(
             db=db,
             id_bitacora=id_bitacora,
-            id_empleado=id_empleado,
-            id_supervisor=id_supervisor,
+            id_area=id_area,
             ts_in_min=ts_in_min,
             id_tipo_evidencia=id_tipo_evidencia,
             archivo=archivo,
+            uuid_cliente=str(uuid_cliente),
             duracion_seg=duracion_seg,
             orden=orden,
         )
@@ -386,7 +393,7 @@ def crear_bitacora_completa_upload(
             observaciones=observaciones,
             client_uuid=client_uuid,
         )
-        _crear_observacion_area_si_aplica(
+        area_row = _crear_observacion_area_si_aplica(
             db=db,
             id_bitacora=bd_out.id_bitacora,
             id_empleado=bd_out.id_empleado,
@@ -398,11 +405,11 @@ def crear_bitacora_completa_upload(
         evidencia = _crear_evidencia(
             db=db,
             id_bitacora=bd_out.id_bitacora,
-            id_empleado=bd_out.id_empleado,
-            id_supervisor=int(bd_out.id_supervisor),
+            id_area=int(area_row["id_area"]),
             ts_in_min=bd_out.ts_in_min,
             id_tipo_evidencia=id_tipo_evidencia,
             archivo=archivo,
+            uuid_cliente=client_uuid or str(uuid4()),
             duracion_seg=duracion_seg,
             orden=orden,
         )

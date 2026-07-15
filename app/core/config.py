@@ -17,5 +17,9 @@ class Settings(BaseSettings):
     BAE_TABLE: str = "bitacora_area_evidencia"
 
     UPLOAD_DIR: str = "uploads"
+    EVIDENCIAS_DIR: str = "evidencias"
+    EVIDENCIA_FOTO_MAX_BYTES: int = 15 * 1024 * 1024
+    EVIDENCIA_AUDIO_MAX_BYTES: int = 50 * 1024 * 1024
+    EVIDENCIA_VIDEO_MAX_BYTES: int = 200 * 1024 * 1024
 
 settings = Settings()
