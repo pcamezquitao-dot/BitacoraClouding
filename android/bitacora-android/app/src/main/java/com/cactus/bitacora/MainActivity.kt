@@ -66,6 +66,7 @@ import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.location.BitacoraLocationProvider
 import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
+import com.cactus.bitacora.biometric.technical.FaceTechnicalScreen
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -100,7 +101,8 @@ private enum class AppScreen {
     CreateDailyLog,
     QueryDailyLog,
     Sync,
-    QrArea
+    QrArea,
+    FaceTechnical
 }
 
 private sealed interface ConnectionState {
@@ -207,11 +209,18 @@ fun BitacoraApp() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.QrArea,
                     onClick = { currentScreen = AppScreen.QrArea }
                 ) {
                     Text("QR Área")
+                }
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = currentScreen != AppScreen.FaceTechnical,
+                    onClick = { currentScreen = AppScreen.FaceTechnical }
+                ) {
+                    Text("Prueba facial")
                 }
             }
 
@@ -222,6 +231,7 @@ fun BitacoraApp() {
                     AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
                     AppScreen.Sync -> SyncScreen(repository)
                     AppScreen.QrArea -> QrAreaScreen()
+                    AppScreen.FaceTechnical -> FaceTechnicalScreen()
                 }
             }
         }

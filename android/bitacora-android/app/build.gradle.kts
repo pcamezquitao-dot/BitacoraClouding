@@ -72,6 +72,8 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     // Modelo empaquetado: la detección facial debe estar disponible sin Internet.
     implementation("com.google.mlkit:face-detection:16.1.7")
+    // FaceNet real empaquetado para la prueba técnica aislada (Apache-2.0).
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     implementation("com.google.zxing:core:3.5.3")
