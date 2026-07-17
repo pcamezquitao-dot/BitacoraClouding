@@ -70,6 +70,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // Modelo empaquetado: la detección facial debe estar disponible sin Internet.
+    implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     implementation("com.google.zxing:core:3.5.3")
