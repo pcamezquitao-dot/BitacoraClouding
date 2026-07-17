@@ -21,5 +21,6 @@ class Settings(BaseSettings):
     EVIDENCIA_FOTO_MAX_BYTES: int = 15 * 1024 * 1024
     EVIDENCIA_AUDIO_MAX_BYTES: int = 50 * 1024 * 1024
     EVIDENCIA_VIDEO_MAX_BYTES: int = 200 * 1024 * 1024
+    EVIDENCIA_TEXTO_MAX_BYTES: int = 512 * 1024
 
 settings = Settings()

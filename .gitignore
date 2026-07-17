@@ -38,3 +38,11 @@ android/app/build/
 android/local.properties
 *.keystore
 *.jks
+
+# Paquetes locales de despliegue (las fuentes canónicas viven en app/)
+despliegue_evidencias/
+despliegue_evidencias.zip
+
+# Volcados accidentales de texto conservados localmente, no son código fuente
+empleado_area.py, `
+*tro de observacion por area*

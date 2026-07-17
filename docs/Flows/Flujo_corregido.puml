@@ -1,0 +1,93 @@
+@startuml
+title Flujo actual - Bitacora Android
+
+start
+
+:Android ejecuta MainActivity;
+
+:MainActivity.onCreate();
+
+:Inicializar Jetpack Compose;
+
+:Ejecutar BitacoraApp();
+
+:Crear BitacoraRepository;
+
+:Mostrar menú principal;
+
+if (¿Opción seleccionada?) then (Health)
+
+    :Mostrar BackendStatusScreen;
+
+    :Usuario pulsa Probar conexión;
+
+    :BitacoraRepository.checkHealth();
+
+    :BitacoraApi.health();
+
+    :GET /bitacora/health;
+
+    if (¿Respuesta correcta?) then (Sí)
+        :Mostrar Backend disponible;
+    else (No)
+        :Mostrar Backend no disponible;
+    endif
+
+elseif (Crear)
+
+    :Mostrar CrearBitacoraDiariaScreen;
+
+    :Capturar id_empleado;
+    :Capturar id_supervisor;
+    :Capturar tipo_anotacion;
+    :Capturar observaciones;
+
+    if (¿Datos numéricos válidos?) then (Sí)
+
+        :Crear BitacoraDiariaCreate;
+        :Generar client_uuid;
+
+        :BitacoraRepository.crearBitacoraDiaria();
+
+        :BitacoraApi.crearBitacoraDiaria();
+
+        :POST /bitacora/bitacora_diaria;
+
+        if (¿Creación correcta?) then (Sí)
+            :Mostrar id_bitacora;
+        else (No)
+            :Mostrar error de creación;
+        endif
+
+    else (No)
+        :Mostrar error de validación;
+    endif
+
+elseif (Consultar)
+
+    :Mostrar ConsultarBitacoraScreen;
+
+    :Ingresar id_bitacora;
+
+    if (¿ID numérico?) then (Sí)
+
+        :BitacoraRepository.getBitacoraDiaria();
+
+        :BitacoraApi.getBitacoraDiaria();
+
+        :GET /bitacora/bitacora_diaria/{id};
+
+        if (¿Bitácora encontrada?) then (Sí)
+            :Mostrar detalle;
+        else (No)
+            :Mostrar error de consulta;
+        endif
+
+    else (No)
+        :Mostrar id_bitacora debe ser numérico;
+    endif
+
+endif
+
+stop
+@enduml

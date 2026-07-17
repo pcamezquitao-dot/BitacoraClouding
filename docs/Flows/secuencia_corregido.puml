@@ -1,0 +1,50 @@
+@startuml
+title Secuencia actual - Crear bitácora diaria
+
+actor Usuario
+
+participant "MainActivity" as Main
+participant "CrearBitacoraDiariaScreen" as Screen
+participant "BitacoraRepository" as Repository
+participant "BitacoraApi\nRetrofit" as Api
+participant "FastAPI" as Backend
+database "MariaDB" as DB
+
+Usuario -> Main: Abrir aplicación
+Main -> Screen: Mostrar pantalla Crear
+
+Usuario -> Screen: Ingresa empleado,\nsupervisor, tipo y observaciones
+
+Screen -> Screen: Validar datos numéricos
+
+alt Datos inválidos
+    Screen --> Usuario: Mostrar mensaje de error
+else Datos válidos
+
+    Screen -> Screen: Crear BitacoraDiariaCreate
+    Screen -> Screen: Generar client_uuid
+
+    Screen -> Repository: crearBitacoraDiaria(request)
+
+    Repository -> Api: crearBitacoraDiaria(request)
+
+    Api -> Backend: POST /bitacora_diaria
+
+    Backend -> DB: INSERT bitacora_diaria
+
+    alt Creación correcta
+        DB --> Backend: Registro creado
+        Backend --> Api: BitacoraDiariaOut
+        Api --> Repository: BitacoraDiariaOut
+        Repository --> Screen: Resultado
+        Screen --> Usuario: Bitácora creada,\nid_bitacora
+    else Error
+        Backend --> Api: Error HTTP
+        Api --> Repository: Excepción
+        Repository --> Screen: Excepción
+        Screen --> Usuario: Error al crear bitácora
+    end
+
+end
+
+@enduml

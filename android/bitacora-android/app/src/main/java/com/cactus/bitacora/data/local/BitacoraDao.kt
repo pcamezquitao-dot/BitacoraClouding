@@ -9,6 +9,9 @@ interface BitacoraDao {
     @Insert
     suspend fun insert(bitacora: BitacoraLocalEntity): Long
 
+    @Query("SELECT * FROM bitacoras_locales WHERE localId = :localId LIMIT 1")
+    suspend fun getById(localId: Long): BitacoraLocalEntity?
+
     @Query("SELECT * FROM bitacoras_locales WHERE syncStatus = :status ORDER BY createdAtMillis ASC")
     suspend fun getByStatus(status: SyncStatus): List<BitacoraLocalEntity>
 

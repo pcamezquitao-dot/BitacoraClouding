@@ -67,17 +67,22 @@ data class BitacoraAreaObsOut(
 
 data class EvidenciaOut(
     val id_evidencia: Int,
-    val id_bitacora: Int?,
-    val id_empleado: Int,
-    val id_supervisor: Int,
+    val id_bitacora: Int,
+    val id_area: Int,
     val ts_in_min: Int,
     val id_tipo_evidencia: Int,
     val archivo_url: String,
     val archivo_nombre: String?,
     val archivo_hash: String?,
-    val tamanio_bytes: Int?,
+    val mime_type: String?,
+    val tamanio_bytes: Long?,
     val duracion_seg: Int?,
-    val orden: Int?
+    val orden: Int?,
+    val latitud: Double?,
+    val longitud: Double?,
+    val precision_gps: Double?,
+    val uuid_cliente: String,
+    val created_at: String
 )
 
 data class BitacoraCompletaOut(

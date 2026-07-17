@@ -1,0 +1,47 @@
+@startuml
+title Secuencia - Consulta de área mediante QR
+
+actor Usuario
+participant MainActivity
+participant "Lector QR" as QR
+participant AreaRepository
+participant AreaApiService
+participant SafeApiCall
+participant "API FastAPI" as API
+database MariaDB
+database SQLite
+
+Usuario -> MainActivity: Selecciona leer QR
+MainActivity -> QR: Abrir cámara
+QR --> MainActivity: AREA_ADMINISTRATIVA|id|nombre
+
+MainActivity -> AreaRepository: getAreaByQr(AreaQrIn)
+
+AreaRepository -> SafeApiCall: safeApiCall(...)
+SafeApiCall -> AreaApiService: getAreaByQr(qr)
+AreaApiService -> API: POST /area/qr
+
+API -> MariaDB: Consultar areas_administrativas
+MariaDB --> API: Datos del área
+API --> AreaApiService: AreaOut
+AreaApiService --> SafeApiCall: Respuesta HTTP
+SafeApiCall --> AreaRepository: ApiResult<AreaOut>
+AreaRepository --> MainActivity: Resultado
+
+alt Área encontrada
+  MainActivity -> SQLite: Guardar o actualizar área
+  SQLite --> MainActivity: Confirmación
+  MainActivity --> Usuario: Mostrar área encontrada
+else Error de red
+  MainActivity -> SQLite: Buscar área local
+  alt Área disponible localmente
+    SQLite --> MainActivity: Datos del área
+    MainActivity --> Usuario: Mostrar área local
+  else Área no disponible
+    MainActivity --> Usuario: Mostrar error
+  end
+else QR inválido
+  MainActivity --> Usuario: Mostrar código QR inválido
+end
+
+@enduml

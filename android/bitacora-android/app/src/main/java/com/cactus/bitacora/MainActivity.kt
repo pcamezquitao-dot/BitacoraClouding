@@ -1,8 +1,11 @@
 package com.cactus.bitacora
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Size
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +23,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -59,11 +63,16 @@ import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
+import com.cactus.bitacora.location.BitacoraLocationProvider
+import com.cactus.bitacora.location.LocationSnapshot
+import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import retrofit2.HttpException
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -104,8 +113,8 @@ private sealed interface ConnectionState {
 private sealed interface CreateBitacoraState {
     data object Idle : CreateBitacoraState
     data object Loading : CreateBitacoraState
-    data class Success(val idBitacora: Int) : CreateBitacoraState
-    data class Pending(val localId: Long, val message: String) : CreateBitacoraState
+    data class Success(val localId: Long, val idBitacora: Int, val areaId: Int) : CreateBitacoraState
+    data class Pending(val localId: Long, val areaId: Int, val message: String) : CreateBitacoraState
     data class Error(val message: String) : CreateBitacoraState
 }
 
@@ -206,12 +215,14 @@ fun BitacoraApp() {
                 }
             }
 
-            when (currentScreen) {
-                AppScreen.Health -> BackendStatusScreen(repository)
-                AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
-                AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
-                AppScreen.Sync -> SyncScreen(repository)
-                AppScreen.QrArea -> QrAreaScreen()
+            Box(modifier = Modifier.weight(1f)) {
+                when (currentScreen) {
+                    AppScreen.Health -> BackendStatusScreen(repository)
+                    AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
+                    AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
+                    AppScreen.Sync -> SyncScreen(repository)
+                    AppScreen.QrArea -> QrAreaScreen()
+                }
             }
         }
     }
@@ -391,6 +402,7 @@ fun BitacoraDetail(bitacora: BitacoraDiariaOut) {
 fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val locationProvider = remember { BitacoraLocationProvider(context.applicationContext) }
     var qrEmpleado by remember { mutableStateOf("") }
     var qrSupervisor by remember { mutableStateOf("") }
     var qrArea by remember { mutableStateOf("") }
@@ -408,6 +420,39 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     var tipoAnotacion by remember { mutableStateOf("") }
     var observaciones by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<CreateBitacoraState>(CreateBitacoraState.Idle) }
+    var gpsLocation by remember { mutableStateOf<LocationSnapshot?>(null) }
+    var gpsLoading by remember { mutableStateOf(false) }
+    var gpsError by remember { mutableStateOf<String?>(null) }
+
+    fun obtainGps() {
+        gpsLocation = null
+        gpsError = null
+        if (!locationProvider.hasPermission()) {
+            gpsError = "Se necesita permiso de ubicación para crear la bitácora"
+            return
+        }
+        if (!locationProvider.isLocationEnabled()) {
+            gpsError = "La ubicación está desactivada. Actívela y vuelva a intentar."
+            return
+        }
+        gpsLoading = true
+        scope.launch {
+            try {
+                gpsLocation = locationProvider.getCurrentLocation()
+            } catch (e: Exception) {
+                gpsError = e.message ?: "No fue posible obtener el GPS"
+            } finally {
+                gpsLoading = false
+            }
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.any { it }) obtainGps()
+        else gpsError = "Permiso de ubicación rechazado. No se puede crear la bitácora."
+    }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -440,12 +485,22 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 val participante = repository.getParticipanteByQr(qr)
                 val asignacion = try {
                     repository.getAsignacionActiva(participante.id_participante)
-                } catch (_: Exception) {
-                    throw IllegalStateException("El empleado no tiene una asignación de área activa")
+                } catch (e: Exception) {
+                    val detail = e.httpDetail()
+                    if (detail == "Not Found") {
+                        throw IllegalStateException(
+                            "El backend desplegado no incluye el endpoint de empleado_area activa"
+                        )
+                    }
+                    throw IllegalStateException(
+                        detail ?: "El empleado no tiene una asignación de área activa"
+                    )
                 }
                 empleado = ParticipanteValidado(participante, asignacion)
             } catch (e: Exception) {
-                empleadoError = e.message ?: "No fue posible validar el empleado"
+                empleadoError = e.httpDetail()
+                    ?: e.message
+                    ?: "No fue posible validar el empleado"
             } finally {
                 validatingTarget = null
             }
@@ -466,12 +521,22 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 val participante = repository.getParticipanteByQr(qr)
                 val asignacion = try {
                     repository.getAsignacionActiva(participante.id_participante)
-                } catch (_: Exception) {
-                    throw IllegalStateException("El supervisor no tiene una asignación de área activa")
+                } catch (e: Exception) {
+                    val detail = e.httpDetail()
+                    if (detail == "Not Found") {
+                        throw IllegalStateException(
+                            "El backend desplegado no incluye el endpoint de empleado_area activa"
+                        )
+                    }
+                    throw IllegalStateException(
+                        detail ?: "El supervisor no tiene una asignación de área activa"
+                    )
                 }
                 supervisor = ParticipanteValidado(participante, asignacion)
             } catch (e: Exception) {
-                supervisorError = e.message ?: "No fue posible validar el supervisor"
+                supervisorError = e.httpDetail()
+                    ?: e.message
+                    ?: "No fue posible validar el supervisor"
             } finally {
                 validatingTarget = null
             }
@@ -502,7 +567,9 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 }
                 area = areaConsultada
             } catch (e: Exception) {
-                areaError = e.message ?: "No fue posible validar el área"
+                areaError = e.httpDetail()
+                    ?: e.message
+                    ?: "No fue posible validar el área"
             } finally {
                 validatingTarget = null
             }
@@ -519,8 +586,17 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         }
     }
 
-    val canCreate = empleado != null && supervisor != null && area != null &&
-        area?.id_area == empleado?.asignacion?.id_area && validatingTarget == null && scanningTarget == null
+    val missingCreateRequirements = buildList {
+        if (empleado == null) add("Validar empleado")
+        if (supervisor == null) add("Validar supervisor")
+        if (area == null) add("Validar área administrativa")
+        if (area != null && area?.id_area != empleado?.asignacion?.id_area) {
+            add("El área debe coincidir con la asignación del empleado")
+        }
+        if (tipoAnotacion.toIntOrNull() == null) add("Seleccionar un tipo de anotación válido")
+        if (validatingTarget != null || scanningTarget != null) add("Finalizar la validación QR en curso")
+    }
+    val canCreate = missingCreateRequirements.isEmpty()
 
     fun createDailyLog() {
         val empleadoValidado = empleado
@@ -553,6 +629,11 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         state = CreateBitacoraState.Loading
         scope.launch {
             state = try {
+                val closeLocation = if (salida != null) {
+                    locationProvider.getCurrentLocation()
+                } else {
+                    null
+                }
                 when (val result = repository.crearBitacoraDiaria(
                     BitacoraDiariaCreate(
                         id_empleado = empleadoValidado.participante.id_participante,
@@ -563,16 +644,52 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         observaciones = observaciones.ifBlank { null },
                         client_uuid = UUID.randomUUID().toString(),
                         qr_area = qrArea.trim()
-                    )
+                    ),
+                    openLocation = gpsLocation,
+                    closeLocation = closeLocation
                 )) {
                     is CreateBitacoraResult.Sincronizada ->
-                        CreateBitacoraState.Success(result.bitacora.id_bitacora)
+                        CreateBitacoraState.Success(result.localId, result.bitacora.id_bitacora, areaValidada.id_area)
                     is CreateBitacoraResult.Pendiente ->
-                        CreateBitacoraState.Pending(result.localId, result.message)
+                        CreateBitacoraState.Pending(result.localId, areaValidada.id_area, result.message)
                 }
             } catch (e: Exception) {
                 CreateBitacoraState.Error(e.message ?: "No fue posible crear la bitacora diaria")
             }
+        }
+    }
+
+    val qrScannerForTarget: @Composable (DailyLogQrTarget) -> Unit = { target ->
+        if (scanningTarget == target) {
+            QrAreaScanner(
+                prompt = "Apunte la cámara al QR de ${target.name.lowercase()}",
+                errorMessage = "No fue posible leer el QR de ${target.name.lowercase()}.",
+                onQrScanned = { rawQr ->
+                    scanningTarget = null
+                    when (target) {
+                        DailyLogQrTarget.EMPLEADO -> {
+                            qrEmpleado = rawQr
+                            validateEmpleado(rawQr)
+                        }
+                        DailyLogQrTarget.SUPERVISOR -> {
+                            qrSupervisor = rawQr
+                            validateSupervisor(rawQr)
+                        }
+                        DailyLogQrTarget.AREA -> {
+                            qrArea = rawQr
+                            validateArea(rawQr)
+                        }
+                    }
+                },
+                onError = { message ->
+                    scanningTarget = null
+                    when (target) {
+                        DailyLogQrTarget.EMPLEADO -> empleadoError = message
+                        DailyLogQrTarget.SUPERVISOR -> supervisorError = message
+                        DailyLogQrTarget.AREA -> areaError = message
+                    }
+                }
+            )
         }
     }
 
@@ -598,6 +715,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             error = empleadoError,
             validated = empleado != null
         ) {
+            qrScannerForTarget(DailyLogQrTarget.EMPLEADO)
             empleado?.let {
                 Text("Empleado validado", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
@@ -617,6 +735,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             error = supervisorError,
             validated = supervisor != null
         ) {
+            qrScannerForTarget(DailyLogQrTarget.SUPERVISOR)
             supervisor?.let {
                 Text("Supervisor validado", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
@@ -635,36 +754,64 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             error = areaError,
             validated = area != null
         ) {
+            qrScannerForTarget(DailyLogQrTarget.AREA)
             area?.let {
                 Text("Área validada", color = MaterialTheme.colorScheme.primary)
                 Text("Descripción: ${it.descripcion}")
             }
         }
 
-        scanningTarget?.let { target ->
-            QrAreaScanner(
-                prompt = "Apunte la cámara al QR de ${target.name.lowercase()}",
-                errorMessage = "No fue posible leer el QR de ${target.name.lowercase()}.",
-                onQrScanned = { rawQr ->
-                    scanningTarget = null
-                    when (target) {
-                        DailyLogQrTarget.EMPLEADO -> { qrEmpleado = rawQr; validateEmpleado(rawQr) }
-                        DailyLogQrTarget.SUPERVISOR -> { qrSupervisor = rawQr; validateSupervisor(rawQr) }
-                        DailyLogQrTarget.AREA -> { qrArea = rawQr; validateArea(rawQr) }
+        Text("Datos de la bitácora", style = MaterialTheme.typography.titleMedium)
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            tonalElevation = if (gpsLocation != null) 3.dp else 1.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Ubicación GPS obligatoria", style = MaterialTheme.typography.titleMedium)
+                gpsLocation?.let {
+                    Text("GPS disponible", color = MaterialTheme.colorScheme.primary)
+                    Text("Latitud: ${it.latitude}")
+                    Text("Longitud: ${it.longitude}")
+                    Text("Precisión: ${it.accuracy} m")
+                    Text("Proveedor: ${it.provider}")
+                } ?: Text("GPS no disponible")
+                if (gpsLoading) {
+                    CircularProgressIndicator()
+                    Text("Obteniendo ubicación actual…")
+                }
+                gpsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !gpsLoading,
+                    onClick = {
+                        if (locationProvider.hasPermission()) obtainGps()
+                        else locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
                     }
-                },
-                onError = { message ->
-                    scanningTarget = null
-                    when (target) {
-                        DailyLogQrTarget.EMPLEADO -> empleadoError = message
-                        DailyLogQrTarget.SUPERVISOR -> supervisorError = message
-                        DailyLogQrTarget.AREA -> areaError = message
+                ) {
+                    Text(if (gpsLocation == null) "Obtener GPS" else "Actualizar GPS")
+                }
+                if (!locationProvider.isLocationEnabled()) {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        }
+                    ) {
+                        Text("Abrir configuración de ubicación")
                     }
                 }
-            )
+            }
         }
-
-        Text("Datos de la bitácora", style = MaterialTheme.typography.titleMedium)
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
@@ -714,6 +861,14 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             Text("Crear bitácora")
         }
 
+        if (!canCreate) {
+            Text(
+                text = "Falta: ${missingCreateRequirements.joinToString("; ")}",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
         when (val currentState = state) {
             CreateBitacoraState.Idle -> Text("Estado: pendiente")
             CreateBitacoraState.Loading -> {
@@ -727,6 +882,8 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text("id_bitacora: ${currentState.idBitacora}")
+                Text("ID local: ${currentState.localId}")
+                EvidencePanel(repository, currentState.localId, currentState.idBitacora, currentState.areaId)
             }
             is CreateBitacoraState.Pending -> {
                 Text(
@@ -737,6 +894,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 Text(currentState.message)
                 Text("local_id: ${currentState.localId}")
                 Text("estado: PENDIENTE")
+                EvidencePanel(repository, currentState.localId, null, currentState.areaId)
             }
             is CreateBitacoraState.Error -> {
                 Text(
@@ -1036,6 +1194,13 @@ private fun ParticipanteOut.nombreCompleto(): String =
         .joinToString(" ")
         .ifBlank { "Sin nombre registrado" }
 
+private fun Throwable.httpDetail(): String? {
+    if (this !is HttpException) return null
+    val body = response()?.errorBody()?.string().orEmpty()
+    return runCatching { JSONObject(body).optString("detail").takeIf { it.isNotBlank() } }
+        .getOrNull()
+}
+
 @Composable
 private fun QrAreaScanner(
     onQrScanned: (String) -> Unit,
@@ -1062,6 +1227,7 @@ private fun QrAreaScanner(
     }
 
     Text(prompt)
+    Text("Buscando código QR…", color = MaterialTheme.colorScheme.primary)
 
     AndroidView(
         modifier = Modifier
@@ -1070,6 +1236,7 @@ private fun QrAreaScanner(
         factory = { viewContext ->
             val previewView = PreviewView(viewContext).apply {
                 scaleType = PreviewView.ScaleType.FILL_CENTER
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             }
             val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
 
@@ -1079,6 +1246,7 @@ private fun QrAreaScanner(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analyzer = ImageAnalysis.Builder()
+                    .setTargetResolution(Size(1280, 720))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also {
@@ -1090,7 +1258,8 @@ private fun QrAreaScanner(
                                 isProcessing = isProcessing,
                                 onQrScanned = onQrScanned,
                                 onError = onError,
-                                errorMessage = errorMessage
+                                errorMessage = errorMessage,
+                                mainExecutor = ContextCompat.getMainExecutor(viewContext)
                             )
                         }
                     }
@@ -1123,7 +1292,8 @@ private fun processQrImage(
     isProcessing: AtomicBoolean,
     onQrScanned: (String) -> Unit,
     onError: (String) -> Unit,
-    errorMessage: String
+    errorMessage: String,
+    mainExecutor: java.util.concurrent.Executor
 ) {
     if (hasScanned.get() || !isProcessing.compareAndSet(false, true)) {
         imageProxy.close()
@@ -1140,19 +1310,23 @@ private fun processQrImage(
     val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
     barcodeScanner.process(image)
-        .addOnSuccessListener { barcodes ->
-            val qrValue = barcodes.firstOrNull { it.rawValue != null }?.rawValue
+        .addOnSuccessListener(mainExecutor) { barcodes ->
+            val qrValue = barcodes
+                .asSequence()
+                .mapNotNull { it.rawValue?.trim() }
+                .firstOrNull { it.isNotEmpty() }
             if (qrValue != null && hasScanned.compareAndSet(false, true)) {
+                Log.i(TAG_QR_AREA, "Código QR detectado")
                 onQrScanned(qrValue)
             }
         }
-        .addOnFailureListener { e ->
+        .addOnFailureListener(mainExecutor) { e ->
             Log.e(TAG_QR_AREA, "Error leyendo QR", e)
             if (hasScanned.compareAndSet(false, true)) {
                 onError(errorMessage)
             }
         }
-        .addOnCompleteListener {
+        .addOnCompleteListener(mainExecutor) {
             isProcessing.set(false)
             imageProxy.close()
         }

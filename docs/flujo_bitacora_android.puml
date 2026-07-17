@@ -1,0 +1,69 @@
+@startuml
+title Flujo general - Bitacora Android
+
+start
+
+:Usuario abre Bitacora Android;
+
+if (¿Tiene configuración o sesión válida?) then (Sí)
+else (No)
+  :Cargar configuración inicial;
+endif
+
+:Mostrar pantalla principal;
+
+:Usuario escanea código QR;
+
+if (¿Tipo de QR?) then (Área)
+  :Consultar AreaRepository;
+  :AreaApiService.getAreaByQr();
+elseif (Empleado)
+  :Consultar EmpleadoRepository;
+elseif (Supervisor)
+  :Consultar ParticipanteRepository;
+else (QR no válido)
+  :Mostrar error de código QR;
+  stop
+endif
+
+if (¿Hay conexión a Internet?) then (Sí)
+  :Consultar API FastAPI;
+
+  if (¿Respuesta correcta?) then (Sí)
+    :Guardar datos localmente;
+    :Mostrar información encontrada;
+  else (No)
+    :SafeApiCall procesa error;
+    :Mostrar mensaje de error;
+  endif
+
+else (No)
+  :Consultar datos en SQLite;
+
+  if (¿Existe información local?) then (Sí)
+    :Mostrar información guardada;
+  else (No)
+    :Mostrar mensaje sin conexión y sin datos;
+  endif
+endif
+
+:Usuario registra entrada,\nsalida o anotación;
+
+:Guardar registro en SQLite;
+
+if (¿Hay conexión?) then (Sí)
+  :Enviar registro al servidor;
+
+  if (¿Sincronización correcta?) then (Sí)
+    :Marcar registro como sincronizado;
+  else (No)
+    :Mantener registro pendiente;
+  endif
+else (No)
+  :Mantener registro pendiente;
+endif
+
+:Mostrar resultado al usuario;
+
+stop
+@enduml

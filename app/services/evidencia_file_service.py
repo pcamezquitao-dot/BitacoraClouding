@@ -23,6 +23,11 @@ TIPOS = {
         "extensions": {".mp4"},
         "max": lambda: settings.EVIDENCIA_VIDEO_MAX_BYTES,
     },
+    4: {
+        "mimes": {"text/plain"},
+        "extensions": {".txt"},
+        "max": lambda: settings.EVIDENCIA_TEXTO_MAX_BYTES,
+    },
 }
 
 
