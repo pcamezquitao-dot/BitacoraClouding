@@ -130,6 +130,14 @@ class FaceTemplateServiceTest(unittest.TestCase):
         self.assertFalse(db.templates[0]["active"])
         self.assertTrue(db.templates[1]["active"])
 
+    def test_reintento_identico_no_duplica_plantilla(self):
+        db = FakeFaceDb()
+        first = enroll_or_replace(db, self.payload(0.25))
+        retry = enroll_or_replace(db, self.payload(0.25))
+
+        self.assertEqual(first["id_face_template"], retry["id_face_template"])
+        self.assertEqual(1, len(db.templates))
+
     def test_recuperacion_activa_por_participante(self):
         db = FakeFaceDb()
         enroll_or_replace(db, self.payload())

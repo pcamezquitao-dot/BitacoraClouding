@@ -31,6 +31,26 @@ TIPOS = {
 }
 
 
+def _matches_signature(header: bytes, mime: str, extension: str) -> bool:
+    if mime == "image/jpeg" and extension in {".jpg", ".jpeg"}:
+        return header.startswith(b"\xff\xd8\xff")
+    if mime == "image/png" and extension == ".png":
+        return header.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime == "image/webp" and extension == ".webp":
+        return header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+    if mime in {"audio/wav", "audio/x-wav"} and extension == ".wav":
+        return header.startswith(b"RIFF") and header[8:12] == b"WAVE"
+    if mime == "audio/mpeg" and extension == ".mp3":
+        return header.startswith(b"ID3") or (
+            len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0
+        )
+    if mime in {"audio/mp4", "video/mp4"} and extension in {".m4a", ".mp4"}:
+        return len(header) >= 12 and header[4:8] == b"ftyp"
+    if mime == "text/plain" and extension == ".txt":
+        return b"\x00" not in header
+    return False
+
+
 def evidencia_root() -> Path:
     root = Path(settings.EVIDENCIAS_DIR).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -55,6 +75,13 @@ def save_validated_evidence(file: UploadFile, id_tipo_evidencia: int):
     mime = (file.content_type or "").lower()
     if mime not in policy["mimes"] or extension not in policy["extensions"]:
         raise HTTPException(status_code=415, detail="Tipo de archivo no permitido")
+    header = file.file.read(32)
+    file.file.seek(0)
+    if not _matches_signature(header, mime, extension):
+        raise HTTPException(
+            status_code=415,
+            detail="La firma del archivo no coincide con el tipo declarado",
+        )
 
     safe_name = f"{uuid4().hex}{extension}"
     relative = f"{id_tipo_evidencia}/{safe_name}"

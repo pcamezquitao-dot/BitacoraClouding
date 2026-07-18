@@ -70,6 +70,10 @@ def enroll_or_replace(db: Session, payload: FaceTemplateEnrollIn):
     if not participant:
         raise LookupError("El participante no existe")
 
+    existing = get_active_for_participant(db, payload.id_participante)
+    if existing and hmac.compare_digest(existing["embedding_sha256"], digest):
+        return existing
+
     db.execute(
         text(
             f"UPDATE {table} SET active = 0, revoked_at = NOW(), "

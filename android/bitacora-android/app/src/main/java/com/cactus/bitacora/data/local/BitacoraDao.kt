@@ -22,6 +22,21 @@ interface BitacoraDao {
     suspend fun countByStatus(status: SyncStatus): Int
 
     @Query(
+        "SELECT COUNT(*) FROM bitacoras_locales " +
+            "WHERE syncStatus IN ('PENDIENTE_CREAR','PENDIENTE_ACTUALIZAR','PENDIENTE_ELIMINAR')"
+    )
+    suspend fun countPending(): Int
+
+    @Query("SELECT COUNT(*) FROM bitacoras_locales WHERE syncStatus = 'ERROR'")
+    suspend fun countErrors(): Int
+
+    @Query(
+        "UPDATE bitacoras_locales SET syncAttempts = syncAttempts + 1 " +
+            "WHERE localId = :localId"
+    )
+    suspend fun incrementSyncAttempts(localId: Long)
+
+    @Query(
         """
         UPDATE bitacoras_locales
         SET syncStatus = :status,

@@ -1,10 +1,9 @@
 package com.cactus.bitacora.data.local
 
 enum class SyncStatus {
-    LOCAL,
-    PENDIENTE,
-    SYNCING,
+    PENDIENTE_CREAR,
+    PENDIENTE_ACTUALIZAR,
+    PENDIENTE_ELIMINAR,
     SINCRONIZADO,
-    ERROR,
-    PENDING_GPS
+    ERROR
 }

@@ -15,7 +15,9 @@ class BitacoraLocalEntityTest {
             qr_area = "AREA_ADMINISTRATIVA|7|Operaciones"
         )
 
-        val restored = request.toLocalEntity(syncStatus = SyncStatus.PENDIENTE).toCreateRequest()
+        val restored = request.toLocalEntity(
+            syncStatus = SyncStatus.PENDIENTE_CREAR
+        ).toCreateRequest()
 
         assertEquals(request, restored)
     }
@@ -29,7 +31,7 @@ class BitacoraLocalEntityTest {
             id_empleado = 10,
             client_uuid = "gps-test"
         ).toLocalEntity(
-            syncStatus = SyncStatus.PENDIENTE,
+            syncStatus = SyncStatus.PENDIENTE_CREAR,
             openLocation = opening,
             closeLocation = closing
         )

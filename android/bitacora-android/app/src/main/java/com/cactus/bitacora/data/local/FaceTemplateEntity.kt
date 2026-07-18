@@ -13,6 +13,7 @@ import androidx.room.PrimaryKey
 )
 data class FaceTemplateEntity(
     @PrimaryKey val participantId: Int,
+    val localSyncUuid: String,
     val participantCode: String,
     val displayName: String,
     val encryptedEmbedding: ByteArray,
@@ -22,6 +23,7 @@ data class FaceTemplateEntity(
     val remoteTemplateId: Int? = null,
     val embeddingSha256: String? = null,
     val encryptionVersion: String = "local-keystore-aesgcm-v1",
-    val centralSyncState: String = "PENDING",
+    val centralSyncState: String = "PENDIENTE_CREAR",
+    val syncAttempts: Int = 0,
     val lastSyncError: String? = null
 )

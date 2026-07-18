@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class FaceTemplateEnrollIn(BaseModel):
+    client_uuid: str | None = Field(default=None, max_length=36)
     id_participante: int
     participant_code: str = Field(min_length=1, max_length=100)
     display_name: str = Field(min_length=1, max_length=255)

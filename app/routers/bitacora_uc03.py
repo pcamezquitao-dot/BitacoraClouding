@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.config import settings
@@ -18,6 +19,24 @@ from app.schemas.bitacora import (
 from app.schemas.evidencia import EvidenciaOut, BitacoraCompletaOut
 
 router = APIRouter(tags=["bitacora_uc03"])
+
+
+def _get_bitacora_by_client_uuid(db: Session, client_uuid: str | None):
+    if not client_uuid:
+        return None
+    table = settings.BITACORA_DIARIA_TABLE
+    return db.execute(
+        text(
+            f"""
+            SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min,
+                   ts_out_min, tipo_anotacion, observaciones
+            FROM {table}
+            WHERE client_uuid = :client_uuid
+            LIMIT 1
+            """
+        ),
+        {"client_uuid": client_uuid},
+    ).mappings().first()
 
 
 def _now_parts(ts_in_min: int | None = None):
@@ -42,6 +61,10 @@ def _crear_bitacora_diaria(
     client_uuid: str | None = None,
     qr_area: str | None = None,
 ) -> BitacoraDiariaOut:
+    existing = _get_bitacora_by_client_uuid(db, client_uuid)
+    if existing:
+        return BitacoraDiariaOut(**existing)
+
     try:
         require_asignacion_activa(db, id_empleado, "empleado")
     except LookupError as e:
@@ -286,6 +309,12 @@ def crear_bitacora_diaria(payload: BitacoraDiariaCreate, db: Session = Depends(g
         )
         db.commit()
         return out
+    except IntegrityError:
+        db.rollback()
+        existing = _get_bitacora_by_client_uuid(db, payload.client_uuid)
+        if existing:
+            return BitacoraDiariaOut(**existing)
+        raise HTTPException(status_code=409, detail="Conflicto de idempotencia de bitácora")
     except HTTPException:
         db.rollback()
         raise

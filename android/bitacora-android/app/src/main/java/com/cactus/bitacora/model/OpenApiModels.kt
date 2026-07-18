@@ -87,6 +87,7 @@ data class EvidenciaOut(
 )
 
 data class FaceTemplateEnrollIn(
+    val client_uuid: String,
     val id_participante: Int,
     val participant_code: String,
     val display_name: String,

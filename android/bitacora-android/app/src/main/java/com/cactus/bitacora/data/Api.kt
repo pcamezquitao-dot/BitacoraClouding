@@ -25,6 +25,7 @@ import com.cactus.bitacora.model.FaceTemplateMetadataOut
 import com.cactus.bitacora.model.FaceTemplateDeactivateIn
 import retrofit2.http.Header
 import retrofit2.http.PATCH
+import retrofit2.http.DELETE
 
 object ApiConfig {
     val BASE_URL: String
@@ -32,6 +33,11 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @DELETE("bitacora-area-evidencias/{id_evidencia}")
+    suspend fun deleteEvidence(
+        @Path("id_evidencia") idEvidence: Int
+    )
+
     @POST("face-templates/enroll")
     suspend fun enrollFaceTemplate(
         @Header("Authorization") authorization: String,
@@ -91,6 +97,7 @@ interface BitacoraApi {
         @Part("id_tipo_evidencia") type: RequestBody,
         @Part("uuid_cliente") clientUuid: RequestBody,
         @Part("archivo_nombre") originalName: RequestBody?,
+        @Part("archivo_hash") fileHash: RequestBody?,
         @Part("mime_type") mimeType: RequestBody?,
         @Part("duracion_seg") duration: RequestBody?,
         @Part("tamanio_bytes") size: RequestBody?,

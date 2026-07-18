@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cactus.bitacora.biometric.FaceIdentificationTarget
 import com.cactus.bitacora.biometric.local.EnrolledParticipant
 import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
+import com.cactus.bitacora.sync.OfflineSyncScheduler
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -81,6 +82,15 @@ data class FaceRecognitionCandidate(
     val displayName: String,
     val similarity: Float
 )
+
+internal enum class FaceEnrollmentReviewAction { CANCEL, REPEAT, SAVE }
+
+internal fun shouldPersistEnrollment(
+    validSamples: Int,
+    action: FaceEnrollmentReviewAction
+): Boolean =
+    action == FaceEnrollmentReviewAction.SAVE &&
+        validSamples >= LocalFaceTemplateRepository.REQUIRED_ENROLLMENT_CAPTURES
 
 fun faceEnrollmentSelectionError(
     participantCode: String,
@@ -129,6 +139,7 @@ fun FaceTechnicalScreen(
     var candidate by remember { mutableStateOf<FaceRecognitionCandidate?>(null) }
     var activeTemplateCount by remember { mutableStateOf<Int?>(null) }
     var enrollmentSaved by remember { mutableStateOf(false) }
+    var enrollmentReady by remember { mutableStateOf(false) }
     var operationInProgress by remember { mutableStateOf(false) }
     var existingEnrollment by remember { mutableStateOf<Boolean?>(null) }
     var replaceExisting by remember { mutableStateOf(false) }
@@ -142,6 +153,7 @@ fun FaceTechnicalScreen(
         candidate = null
         qualityAccepted = false
         operationInProgress = false
+        enrollmentReady = false
         visibleState = FaceVisibleState.SEARCHING
         detail = "Centre el rostro dentro del recuadro"
     }
@@ -152,7 +164,7 @@ fun FaceTechnicalScreen(
             onQuality = { quality ->
                 mainExecutor.execute {
                     qualityAccepted = quality.accepted
-                    if (!operationInProgress && candidate == null && !enrollmentSaved) {
+                    if (!operationInProgress && candidate == null && !enrollmentSaved && !enrollmentReady) {
                         visibleState = if (quality.accepted) {
                             FaceVisibleState.DETECTED
                         } else {
@@ -164,7 +176,7 @@ fun FaceTechnicalScreen(
             },
             onFaceCount = { count ->
                 mainExecutor.execute {
-                    if (!operationInProgress && count != 1 && candidate == null && !enrollmentSaved) {
+                    if (!operationInProgress && count != 1 && candidate == null && !enrollmentSaved && !enrollmentReady) {
                         qualityAccepted = false
                         visibleState = FaceVisibleState.SEARCHING
                         detail = when {
@@ -188,26 +200,13 @@ fun FaceTechnicalScreen(
                 scope.launch {
                     try {
                         if (mode == FaceFlowMode.ENROLLMENT) {
-                            val identity = requireNotNull(enrollmentIdentity) {
-                                "Falta la identidad del participante que se desea registrar"
-                            }
                             enrollmentEmbeddings += embedding
                             if (enrollmentEmbeddings.size >=
                                 LocalFaceTemplateRepository.REQUIRED_ENROLLMENT_CAPTURES
                             ) {
-                                repository.enroll(
-                                    identity.participantId,
-                                    identity.participantCode,
-                                    identity.displayName,
-                                    enrollmentEmbeddings.toList(),
-                                    embedder.modelVersion,
-                                    replaceExisting = replaceExisting
-                                )
-                                enrollmentEmbeddings.clear()
-                                activeTemplateCount = repository.activeCount()
-                                enrollmentSaved = true
+                                enrollmentReady = true
                                 visibleState = FaceVisibleState.SUCCESS
-                                detail = "Rostro registrado correctamente para ${identity.displayName}"
+                                detail = "Captura completa. Revise los datos y guarde el enrolamiento."
                             } else {
                                 visibleState = FaceVisibleState.DETECTED
                                 detail = "Captura válida. Realice la siguiente captura."
@@ -480,6 +479,7 @@ fun FaceTechnicalScreen(
                 !operationInProgress &&
                 candidate == null &&
                 !enrollmentSaved &&
+                !enrollmentReady &&
                 (mode == FaceFlowMode.ENROLLMENT || activeTemplateCount != 0),
             onClick = {
                 operationInProgress = true
@@ -504,6 +504,91 @@ fun FaceTechnicalScreen(
                     "Capturar"
                 }
             )
+        }
+        if (mode == FaceFlowMode.ENROLLMENT && enrollmentReady && !enrollmentSaved) {
+            Text("Revisión del enrolamiento", style = MaterialTheme.typography.titleLarge)
+            enrollmentIdentity?.let {
+                Text("Participante seleccionado: ${it.displayName}")
+                Text("Código: ${it.participantCode}")
+            }
+            Text("Muestras válidas: ${enrollmentEmbeddings.size}")
+            Text("Estado de la captura: lista para guardar")
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        enrollmentEmbeddings.clear()
+                        analyzer.cancelPendingCapture()
+                        onCancel()
+                    }
+                ) { Text("Cancelar") }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        enrollmentEmbeddings.clear()
+                        enrollmentReady = false
+                        resetAttempt()
+                    }
+                ) { Text("Repetir captura") }
+            }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !operationInProgress,
+                onClick = {
+                    val identity = enrollmentIdentity
+                    if (
+                        identity == null ||
+                        !shouldPersistEnrollment(
+                            enrollmentEmbeddings.size,
+                            FaceEnrollmentReviewAction.SAVE
+                        )
+                    ) {
+                        detail = "No fue posible guardar el enrolamiento"
+                        visibleState = FaceVisibleState.ERROR
+                        return@Button
+                    }
+                    operationInProgress = true
+                    scope.launch {
+                        try {
+                            repository.enroll(
+                                identity.participantId,
+                                identity.participantCode,
+                                identity.displayName,
+                                enrollmentEmbeddings.toList(),
+                                embedder.modelVersion,
+                                replaceExisting = replaceExisting
+                            )
+                            activeTemplateCount = repository.activeCount()
+                            existingEnrollment = true
+                            enrollmentSaved = true
+                            enrollmentReady = false
+                            val syncState = repository.getSyncState(identity.participantId)
+                            detail = if (syncState == "SINCRONIZADO") {
+                                "Enrolamiento guardado localmente. Enrolamiento sincronizado"
+                            } else {
+                                OfflineSyncScheduler.enqueueNow(context.applicationContext)
+                                "Enrolamiento guardado localmente. Pendiente de sincronización"
+                            }
+                            visibleState = FaceVisibleState.SUCCESS
+                            enrollmentEmbeddings.clear()
+                        } catch (error: Exception) {
+                            visibleState = FaceVisibleState.ERROR
+                            detail = if (
+                                error.message?.contains("Ya existe", ignoreCase = true) == true
+                            ) {
+                                "Ya existe un enrolamiento para este participante"
+                            } else {
+                                "No fue posible guardar el enrolamiento"
+                            }
+                        } finally {
+                            operationInProgress = false
+                        }
+                    }
+                }
+            ) { Text("Guardar enrolamiento") }
         }
 
         if (candidate != null) {
@@ -531,9 +616,10 @@ fun FaceTechnicalScreen(
                 analyzer.cancelPendingCapture()
                 enrollmentEmbeddings.clear()
                 enrollmentSaved = false
+                enrollmentReady = false
                 resetAttempt()
             }
-        ) { Text("Intentar nuevamente") }
+        ) { Text("Repetir captura") }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = {

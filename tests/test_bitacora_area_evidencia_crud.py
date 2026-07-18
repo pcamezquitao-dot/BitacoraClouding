@@ -5,12 +5,19 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
+from starlette.datastructures import Headers
 
 from app.core.config import settings
 from app.schemas.bitacora_area_evidencia import BitacoraAreaEvidenciaCreate
 from app.services.evidencia_file_service import resolve_evidencia_path, save_validated_evidence
 from app.routers.bitacora_area_evidencia import _insert
 from unittest.mock import MagicMock, patch
+
+VALID_JPEG = (
+    b"\xff\xd8\xff\xe0"
+    b"\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    b"\xff\xd9"
+)
 
 
 def metadata(**overrides):
@@ -39,12 +46,15 @@ class BitacoraAreaEvidenciaCrudTest(unittest.TestCase):
         previous = settings.EVIDENCIAS_DIR
         with tempfile.TemporaryDirectory() as directory:
             settings.EVIDENCIAS_DIR = directory
-            upload = UploadFile(filename="../foto.jpg", file=io.BytesIO(b"jpeg-test"))
-            upload.headers = {"content-type": "image/jpeg"}
+            upload = UploadFile(
+                filename="../foto.jpg",
+                file=io.BytesIO(VALID_JPEG),
+                headers=Headers({"content-type": "image/jpeg"}),
+            )
             relative, original, mime, size, digest, path = save_validated_evidence(upload, 1)
             self.assertEqual(original, "foto.jpg")
             self.assertEqual(mime, "image/jpeg")
-            self.assertEqual(size, 9)
+            self.assertEqual(size, len(VALID_JPEG))
             self.assertEqual(len(digest), 64)
             self.assertTrue(path.is_file())
             self.assertNotIn("..", relative)
@@ -53,6 +63,16 @@ class BitacoraAreaEvidenciaCrudTest(unittest.TestCase):
     def test_rechaza_mime_no_permitido(self):
         upload = UploadFile(filename="malware.exe", file=io.BytesIO(b"bad"))
         upload.headers = {"content-type": "application/octet-stream"}
+        with self.assertRaises(HTTPException) as raised:
+            save_validated_evidence(upload, 1)
+        self.assertEqual(raised.exception.status_code, 415)
+
+    def test_rechaza_mime_jpeg_con_firma_falsificada(self):
+        upload = UploadFile(
+            filename="falso.jpg",
+            file=io.BytesIO(b"contenido que no es jpeg"),
+            headers=Headers({"content-type": "image/jpeg"}),
+        )
         with self.assertRaises(HTTPException) as raised:
             save_validated_evidence(upload, 1)
         self.assertEqual(raised.exception.status_code, 415)

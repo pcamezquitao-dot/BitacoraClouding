@@ -12,6 +12,7 @@ class FaceTemplateEntityTest {
         val encrypted = byteArrayOf(1, 2, 3, 4)
         val entity = FaceTemplateEntity(
             participantId = 9,
+            localSyncUuid = "11111111-1111-1111-1111-111111111111",
             participantCode = "P0009",
             displayName = "Supervisor prueba",
             encryptedEmbedding = encrypted,
@@ -35,6 +36,7 @@ class FaceTemplateEntityTest {
     fun localTemplateTracksCentralSynchronizationWithoutRoleData() {
         val entity = FaceTemplateEntity(
             participantId = 2,
+            localSyncUuid = "22222222-2222-2222-2222-222222222222",
             participantCode = "P0002",
             displayName = "Participante",
             encryptedEmbedding = byteArrayOf(1),
@@ -43,12 +45,12 @@ class FaceTemplateEntityTest {
             active = true,
             remoteTemplateId = 17,
             embeddingSha256 = "a".repeat(64),
-            centralSyncState = "SYNCED"
+            centralSyncState = "SINCRONIZADO"
         )
 
         assertEquals(2, entity.participantId)
         assertEquals(17, entity.remoteTemplateId)
-        assertEquals("SYNCED", entity.centralSyncState)
+        assertEquals("SINCRONIZADO", entity.centralSyncState)
         assertTrue(
             FaceTemplateEntity::class.java.declaredFields.none {
                 it.name.contains("role", ignoreCase = true)

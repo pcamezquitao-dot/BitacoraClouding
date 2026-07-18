@@ -3,6 +3,7 @@ package com.cactus.bitacora.biometric.local
 import android.content.Context
 import android.provider.Settings
 import android.util.Base64
+import android.util.Log
 import com.cactus.bitacora.biometric.technical.FaceTechnicalMath
 import com.cactus.bitacora.data.Api
 import com.cactus.bitacora.data.BitacoraApi
@@ -15,7 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.util.UUID
 import kotlin.math.sqrt
+import retrofit2.HttpException
 
 data class EnrolledParticipant(
     val participantId: Int,
@@ -44,6 +47,7 @@ class LocalFaceTemplateRepository(
     companion object {
         const val REQUIRED_ENROLLMENT_CAPTURES = 3
         const val MATCH_THRESHOLD = 0.65f
+        private const val SYNC_TAG = "OfflineSync"
     }
 
     private val dao = BitacoraDatabase.getInstance(context).faceTemplateDao()
@@ -63,7 +67,8 @@ class LocalFaceTemplateRepository(
         replaceExisting: Boolean = false
     ) = withContext(Dispatchers.IO) {
         require(embeddings.size >= REQUIRED_ENROLLMENT_CAPTURES)
-        check(replaceExisting || dao.getByParticipantId(participantId) == null) {
+        val existing = dao.getByParticipantId(participantId)
+        check(replaceExisting || existing == null) {
             "Ya existe un rostro registrado para este participante"
         }
         val template = averageNormalized(embeddings)
@@ -72,6 +77,7 @@ class LocalFaceTemplateRepository(
         dao.upsert(
             FaceTemplateEntity(
                 participantId = participantId,
+                localSyncUuid = UUID.randomUUID().toString(),
                 participantCode = participantCode,
                 displayName = displayName,
                 encryptedEmbedding = crypto.encrypt(template),
@@ -79,10 +85,21 @@ class LocalFaceTemplateRepository(
                 modelVersion = modelVersion,
                 active = true,
                 embeddingSha256 = digest,
-                centralSyncState = "PENDING"
+                remoteTemplateId = existing?.remoteTemplateId,
+                centralSyncState = if (existing?.remoteTemplateId == null) {
+                    "PENDIENTE_CREAR"
+                } else {
+                    "PENDIENTE_ACTUALIZAR"
+                }
             )
         )
-        uploadPending(dao.getByParticipantId(participantId)!!)
+        val saved = dao.getByParticipantId(participantId)!!
+        Log.i(
+            SYNC_TAG,
+            "face localUuid=${saved.localSyncUuid} participantId=${saved.participantId} " +
+                "state=${saved.centralSyncState} serverId=${saved.remoteTemplateId}"
+        )
+        uploadPending(saved)
     }
 
     suspend fun identify(embedding: FloatArray): EnrolledParticipant? =
@@ -108,6 +125,10 @@ class LocalFaceTemplateRepository(
 
     suspend fun activeCount(): Int = withContext(Dispatchers.IO) { dao.countActive() }
 
+    suspend fun pendingCount(): Int = withContext(Dispatchers.IO) { dao.countPending() }
+
+    suspend fun errorCount(): Int = withContext(Dispatchers.IO) { dao.countErrors() }
+
     suspend fun getEnrollment(participantId: Int): FaceEnrollmentRecord? =
         withContext(Dispatchers.IO) {
             dao.getByParticipantId(participantId)
@@ -122,19 +143,20 @@ class LocalFaceTemplateRepository(
                 }
         }
 
+    suspend fun getSyncState(participantId: Int): String? =
+        withContext(Dispatchers.IO) {
+            dao.getByParticipantId(participantId)?.centralSyncState
+        }
+
     suspend fun deleteEnrollment(participantId: Int) = withContext(Dispatchers.IO) {
         val local = dao.getByParticipantId(participantId)
-        if (local?.remoteTemplateId != null && authorization.isNotBlank()) {
-            api.deactivateFaceTemplate(
-                authorization,
-                local.remoteTemplateId,
-                FaceTemplateDeactivateIn(
-                    revoked_by = deviceId,
-                    revocation_reason = "Eliminado desde dispositivo"
-                )
-            )
+        if (local == null) return@withContext
+        if (local.remoteTemplateId == null) {
+            dao.deleteByParticipantId(participantId)
+        } else {
+            dao.markPendingDelete(participantId)
+            uploadPending(dao.getByParticipantId(participantId)!!)
         }
-        dao.deleteByParticipantId(participantId)
     }
 
     suspend fun syncWithCentral(): FaceCentralSyncResult = withContext(Dispatchers.IO) {
@@ -160,6 +182,7 @@ class LocalFaceTemplateRepository(
             dao.upsert(
                 FaceTemplateEntity(
                     participantId = template.id_participante,
+                    localSyncUuid = UUID.randomUUID().toString(),
                     participantCode = template.participant_code,
                     displayName = template.display_name,
                     encryptedEmbedding = crypto.encrypt(raw.toFloatArray()),
@@ -169,7 +192,7 @@ class LocalFaceTemplateRepository(
                     remoteTemplateId = template.id_face_template,
                     embeddingSha256 = template.embedding_sha256,
                     encryptionVersion = "local-keystore-aesgcm-v1",
-                    centralSyncState = "SYNCED"
+                    centralSyncState = "SINCRONIZADO"
                 )
             )
         }
@@ -181,16 +204,48 @@ class LocalFaceTemplateRepository(
     }
 
     private suspend fun uploadPending(entity: FaceTemplateEntity): Boolean {
+        val localUuid = entity.localSyncUuid.ifBlank {
+            UUID.nameUUIDFromBytes(
+                "${entity.participantId}:${entity.enrolledAtMillis}".toByteArray()
+            ).toString().also { dao.updateLocalSyncUuid(entity.participantId, it) }
+        }
+        val endpoint = "POST ${AppConfig.BASE_URL}face-templates/enroll"
         if (authorization.isBlank()) {
-            dao.markCentralError(entity.participantId, "Token de sincronización facial no configurado")
+            val message = "Token de sincronización facial no configurado"
+            Log.e(
+                SYNC_TAG,
+                "face localUuid=$localUuid participantId=${entity.participantId} " +
+                    "state=${entity.centralSyncState} endpoint=$endpoint " +
+                    "http=NO_ENVIADO error=$message"
+            )
+            dao.markCentralError(entity.participantId, message)
             return false
         }
         return try {
+            if (
+                entity.centralSyncState == "PENDIENTE_ELIMINAR" ||
+                (entity.centralSyncState == "ERROR" && !entity.active)
+            ) {
+                val remoteId = requireNotNull(entity.remoteTemplateId) {
+                    "La plantilla pendiente de eliminar no tiene ID del servidor"
+                }
+                api.deactivateFaceTemplate(
+                    authorization,
+                    remoteId,
+                    FaceTemplateDeactivateIn(
+                        revoked_by = deviceId,
+                        revocation_reason = "Eliminado desde dispositivo"
+                    )
+                )
+                dao.deleteByParticipantId(entity.participantId)
+                return true
+            }
             val raw = crypto.decrypt(entity.encryptedEmbedding).toByteArray()
             val digest = raw.sha256()
             val response = api.enrollFaceTemplate(
                 authorization,
                 FaceTemplateEnrollIn(
+                    client_uuid = localUuid,
                     id_participante = entity.participantId,
                     participant_code = entity.participantCode,
                     display_name = entity.displayName,
@@ -201,11 +256,23 @@ class LocalFaceTemplateRepository(
                 )
             )
             dao.markCentralSynced(entity.participantId, response.id_face_template, digest)
+            Log.i(
+                SYNC_TAG,
+                "face localUuid=$localUuid participantId=${entity.participantId} " +
+                    "state=SINCRONIZADO endpoint=$endpoint http=200 " +
+                    "serverId=${response.id_face_template}"
+            )
             true
         } catch (error: Exception) {
+            val diagnostic = error.safeSyncDiagnostic()
+            Log.e(
+                SYNC_TAG,
+                "face localUuid=$localUuid participantId=${entity.participantId} " +
+                    "state=ERROR endpoint=$endpoint $diagnostic"
+            )
             dao.markCentralError(
                 entity.participantId,
-                error.message ?: "No fue posible sincronizar la plantilla"
+                diagnostic
             )
             false
         }
@@ -243,4 +310,12 @@ class LocalFaceTemplateRepository(
     private fun ByteArray.sha256(): String =
         MessageDigest.getInstance("SHA-256").digest(this)
             .joinToString("") { "%02x".format(it) }
+
+    private fun Throwable.safeSyncDiagnostic(): String =
+        if (this is HttpException) {
+            "http=${code()} message=${message().take(200)}"
+        } else {
+            "http=NO_DISPONIBLE message=${message?.take(200) ?: javaClass.simpleName}"
+        }
+
 }

@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BitacoraEvidenceEntity::class,
         FaceTemplateEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -36,7 +36,9 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
-                    MIGRATION_5_6
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 ).build().also { instance = it }
             }
 
@@ -136,6 +138,41 @@ abstract class BitacoraDatabase : RoomDatabase() {
                         "NOT NULL DEFAULT 'PENDING'"
                 )
                 db.execSQL("ALTER TABLE face_templates ADD COLUMN lastSyncError TEXT")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE bitacoras_locales ADD COLUMN syncAttempts " +
+                        "INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE face_templates ADD COLUMN syncAttempts " +
+                        "INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "UPDATE bitacoras_locales SET syncStatus = 'PENDIENTE_CREAR' " +
+                        "WHERE syncStatus IN ('LOCAL', 'PENDIENTE', 'SYNCING', 'PENDING_GPS')"
+                )
+                db.execSQL(
+                    "UPDATE bitacora_evidences SET syncStatus = 'PENDIENTE_CREAR' " +
+                        "WHERE syncStatus IN ('LOCAL', 'PENDIENTE', 'SYNCING', 'PENDING_GPS')"
+                )
+                db.execSQL(
+                    "UPDATE face_templates SET centralSyncState = 'PENDIENTE_CREAR' " +
+                        "WHERE centralSyncState IN ('PENDING', 'ERROR')"
+                )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE face_templates ADD COLUMN localSyncUuid " +
+                        "TEXT NOT NULL DEFAULT ''"
+                )
+                db.execSQL("ALTER TABLE bitacora_evidences ADD COLUMN fileHash TEXT")
             }
         }
     }

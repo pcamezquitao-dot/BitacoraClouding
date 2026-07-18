@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -23,13 +25,25 @@ router = APIRouter(
     tags=["Face templates"],
     dependencies=[Depends(require_face_sync_access)],
 )
+logger = logging.getLogger("bitacora.sync")
 
 
 @router.post("/enroll", response_model=FaceTemplateMetadataOut)
 def enroll(payload: FaceTemplateEnrollIn, db: Session = Depends(get_db)):
+    logger.info(
+        "face enroll local_uuid=%s participant_id=%s endpoint=/face-templates/enroll",
+        payload.client_uuid,
+        payload.id_participante,
+    )
     try:
         result = enroll_or_replace(db, payload)
         db.commit()
+        logger.info(
+            "face enrolled local_uuid=%s participant_id=%s server_id=%s status=committed",
+            payload.client_uuid,
+            payload.id_participante,
+            result["id_face_template"],
+        )
         return result
     except LookupError as error:
         db.rollback()
@@ -37,8 +51,14 @@ def enroll(payload: FaceTemplateEnrollIn, db: Session = Depends(get_db)):
     except ValueError as error:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(error)) from error
-    except Exception:
+    except Exception as error:
         db.rollback()
+        logger.exception(
+            "face enroll failed local_uuid=%s participant_id=%s error=%s",
+            payload.client_uuid,
+            payload.id_participante,
+            type(error).__name__,
+        )
         raise
 
 

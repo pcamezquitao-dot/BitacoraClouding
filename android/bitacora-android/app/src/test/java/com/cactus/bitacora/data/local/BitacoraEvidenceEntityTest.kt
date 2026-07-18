@@ -23,7 +23,7 @@ class BitacoraEvidenceEntityTest {
         originalName = path,
         mimeType = "application/octet-stream",
         gpsStatus = GpsStatus.READY,
-        syncStatus = SyncStatus.PENDIENTE
+        syncStatus = SyncStatus.PENDIENTE_CREAR
     )
 
     @Test fun bitacoraCanHaveZeroEvidences() = assertTrue(emptyList<BitacoraEvidenceEntity>().isEmpty())
@@ -39,7 +39,11 @@ class BitacoraEvidenceEntityTest {
     @Test fun allRequiredTypesCanBeStoredOffline() {
         val types = listOf(EvidenceType.PHOTO, EvidenceType.VIDEO, EvidenceType.AUDIO, EvidenceType.TEXT)
         assertEquals(types, types.map { evidence(it).evidenceType })
-        assertTrue(types.map { evidence(it) }.all { it.syncStatus == SyncStatus.PENDIENTE })
+        assertTrue(
+            types.map { evidence(it) }.all {
+                it.syncStatus == SyncStatus.PENDIENTE_CREAR
+            }
+        )
     }
 
     @Test fun networkErrorPreservesFileAndCanRetry() {
@@ -72,8 +76,14 @@ class BitacoraEvidenceEntityTest {
     }
 
     @Test fun rejectedPermissionAndMissingGpsAreExplicitStates() {
-        val denied = evidence().copy(gpsStatus = GpsStatus.PERMISSION_DENIED, syncStatus = SyncStatus.PENDING_GPS)
-        val unavailable = evidence().copy(gpsStatus = GpsStatus.UNAVAILABLE, syncStatus = SyncStatus.PENDING_GPS)
+        val denied = evidence().copy(
+            gpsStatus = GpsStatus.PERMISSION_DENIED,
+            syncStatus = SyncStatus.ERROR
+        )
+        val unavailable = evidence().copy(
+            gpsStatus = GpsStatus.UNAVAILABLE,
+            syncStatus = SyncStatus.ERROR
+        )
         assertEquals(GpsStatus.PERMISSION_DENIED, denied.gpsStatus)
         assertEquals(GpsStatus.UNAVAILABLE, unavailable.gpsStatus)
         assertNull(denied.remoteId)

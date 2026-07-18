@@ -27,6 +27,7 @@ data class BitacoraEvidenceEntity(
     val localFilePath: String? = null,
     val mimeType: String? = null,
     val fileSize: Long? = null,
+    val fileHash: String? = null,
     val durationSeconds: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val latitude: Double? = null,
@@ -36,7 +37,7 @@ data class BitacoraEvidenceEntity(
     val gpsTimestamp: Long? = null,
     val locationProvider: String? = null,
     val gpsStatus: GpsStatus = GpsStatus.PENDING,
-    val syncStatus: SyncStatus = SyncStatus.LOCAL,
+    val syncStatus: SyncStatus = SyncStatus.PENDIENTE_CREAR,
     val syncAttempts: Int = 0,
     val lastSyncError: String? = null
 )

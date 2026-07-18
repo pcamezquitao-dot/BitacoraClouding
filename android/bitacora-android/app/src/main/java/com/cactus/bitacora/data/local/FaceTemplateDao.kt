@@ -17,7 +17,8 @@ interface FaceTemplateDao {
 
     @Query(
         "SELECT * FROM face_templates " +
-            "WHERE centralSyncState IN ('PENDING', 'ERROR') AND active = 1"
+            "WHERE centralSyncState IN " +
+            "('PENDIENTE_CREAR','PENDIENTE_ACTUALIZAR','PENDIENTE_ELIMINAR','ERROR')"
     )
     suspend fun getPendingCentralSync(): List<FaceTemplateEntity>
 
@@ -32,7 +33,7 @@ interface FaceTemplateDao {
         UPDATE face_templates
         SET remoteTemplateId = :remoteTemplateId,
             embeddingSha256 = :embeddingSha256,
-            centralSyncState = 'SYNCED',
+            centralSyncState = 'SINCRONIZADO',
             lastSyncError = NULL
         WHERE participantId = :participantId
         """
@@ -46,14 +47,43 @@ interface FaceTemplateDao {
     @Query(
         """
         UPDATE face_templates
-        SET centralSyncState = 'ERROR', lastSyncError = :message
+        SET centralSyncState = 'ERROR',
+            syncAttempts = syncAttempts + 1,
+            lastSyncError = :message
         WHERE participantId = :participantId
         """
     )
     suspend fun markCentralError(participantId: Int, message: String)
 
-    @Query("UPDATE face_templates SET active = 0 WHERE centralSyncState = 'SYNCED'")
+    @Query("UPDATE face_templates SET active = 0 WHERE centralSyncState = 'SINCRONIZADO'")
     suspend fun deactivateCentralCopies()
+
+    @Query(
+        """
+        UPDATE face_templates
+        SET active = 0,
+            centralSyncState = 'PENDIENTE_ELIMINAR',
+            lastSyncError = NULL
+        WHERE participantId = :participantId
+        """
+    )
+    suspend fun markPendingDelete(participantId: Int)
+
+    @Query(
+        "UPDATE face_templates SET localSyncUuid = :localSyncUuid " +
+            "WHERE participantId = :participantId"
+    )
+    suspend fun updateLocalSyncUuid(participantId: Int, localSyncUuid: String)
+
+    @Query(
+        "SELECT COUNT(*) FROM face_templates " +
+            "WHERE centralSyncState IN " +
+            "('PENDIENTE_CREAR','PENDIENTE_ACTUALIZAR','PENDIENTE_ELIMINAR')"
+    )
+    suspend fun countPending(): Int
+
+    @Query("SELECT COUNT(*) FROM face_templates WHERE centralSyncState = 'ERROR'")
+    suspend fun countErrors(): Int
 
     @Query("DELETE FROM face_templates WHERE participantId = :participantId")
     suspend fun deleteByParticipantId(participantId: Int)

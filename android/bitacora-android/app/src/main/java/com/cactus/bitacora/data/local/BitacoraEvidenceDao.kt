@@ -24,16 +24,34 @@ interface BitacoraEvidenceDao {
     @Query("SELECT * FROM bitacora_evidences WHERE syncStatus IN (:statuses) ORDER BY createdAt ASC")
     suspend fun getBySyncStatuses(statuses: List<SyncStatus>): List<BitacoraEvidenceEntity>
 
+    @Query(
+        "SELECT COUNT(*) FROM bitacora_evidences " +
+            "WHERE syncStatus IN ('PENDIENTE_CREAR','PENDIENTE_ACTUALIZAR','PENDIENTE_ELIMINAR')"
+    )
+    suspend fun countPending(): Int
+
+    @Query("SELECT COUNT(*) FROM bitacora_evidences WHERE syncStatus = 'ERROR'")
+    suspend fun countErrors(): Int
+
     @Query("SELECT COUNT(*) FROM bitacora_evidences WHERE bitacoraLocalId = :bitacoraLocalId AND evidenceType = :type")
     suspend fun countByType(bitacoraLocalId: Long, type: EvidenceType): Int
 
     @Query("DELETE FROM bitacora_evidences WHERE localId = :localId")
     suspend fun deleteById(localId: Long)
 
+    @Query(
+        """
+        UPDATE bitacora_evidences
+        SET syncStatus = 'PENDIENTE_ELIMINAR', lastSyncError = NULL
+        WHERE localId = :localId
+        """
+    )
+    suspend fun markPendingDelete(localId: Long)
+
     @Transaction
     suspend fun insertWithRequiredGps(evidence: BitacoraEvidenceEntity): Long {
-        require(evidence.gpsStatus == GpsStatus.READY || evidence.syncStatus == SyncStatus.PENDING_GPS) {
-            "La evidencia requiere GPS o debe conservarse como PENDING_GPS"
+        require(evidence.gpsStatus == GpsStatus.READY) {
+            "La evidencia requiere GPS antes de quedar pendiente de sincronización"
         }
         return insert(evidence)
     }

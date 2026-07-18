@@ -31,6 +31,7 @@ data class BitacoraLocalEntity(
     val closeLocationProvider: String? = null,
     val clientUuid: String,
     val syncStatus: SyncStatus,
+    val syncAttempts: Int = 0,
     val errorMessage: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis(),
     val updatedAtMillis: Long = System.currentTimeMillis()

@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -25,6 +26,7 @@ COLUMNAS = """
     tamanio_bytes, orden, latitud, longitud, precision_gps,
     uuid_cliente, created_at
 """
+logger = logging.getLogger("bitacora.sync")
 
 
 def _get(db: Session, id_evidencia: int):
@@ -136,8 +138,20 @@ def crear_con_archivo(
     precision_gps: float | None = Form(None),
     db: Session = Depends(get_db),
 ):
+    logger.info(
+        "evidence upload local_uuid=%s bitacora_id=%s original_name=%s declared_size=%s",
+        uuid_cliente,
+        id_bitacora,
+        Path(file.filename or "").name,
+        tamanio_bytes,
+    )
     existing = _get_by_uuid(db, uuid_cliente)
     if existing:
+        logger.info(
+            "evidence idempotent local_uuid=%s server_id=%s",
+            uuid_cliente,
+            existing["id_evidencia"],
+        )
         return existing
     saved_path: Path | None = None
     try:
@@ -163,6 +177,15 @@ def crear_con_archivo(
         )
         row = _insert(db, payload)
         db.commit()
+        logger.info(
+            "evidence committed local_uuid=%s bitacora_id=%s generated_name=%s "
+            "size=%s server_id=%s",
+            uuid_cliente,
+            id_bitacora,
+            Path(relative).name,
+            detected_size,
+            row["id_evidencia"],
+        )
         return row
     except HTTPException:
         db.rollback()
@@ -181,6 +204,12 @@ def crear_con_archivo(
         db.rollback()
         if saved_path:
             saved_path.unlink(missing_ok=True)
+        logger.exception(
+            "evidence failed local_uuid=%s bitacora_id=%s error=%s",
+            uuid_cliente,
+            id_bitacora,
+            type(exc).__name__,
+        )
         raise HTTPException(status_code=400, detail=f"No se pudo cargar la evidencia: {exc}")
 
 

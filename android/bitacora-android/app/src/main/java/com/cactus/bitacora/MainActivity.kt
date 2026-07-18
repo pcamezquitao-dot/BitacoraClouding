@@ -75,7 +75,7 @@ import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
 import com.cactus.bitacora.biometric.technical.FaceFlowMode
 import com.cactus.bitacora.biometric.technical.FaceRecognitionCandidate
 import com.cactus.bitacora.biometric.technical.FaceTechnicalScreen
-import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
+import com.cactus.bitacora.sync.OfflineSyncScheduler
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -156,10 +156,9 @@ private data class DailyLogFaceSession(
 fun BitacoraApp() {
     val context = LocalContext.current.applicationContext
     val repository = remember { BitacoraRepository(context) }
-    val faceRepository = remember { LocalFaceTemplateRepository(context) }
     var currentScreen by remember { mutableStateOf(AppScreen.Health) }
     LaunchedEffect(Unit) {
-        faceRepository.syncWithCentral()
+        OfflineSyncScheduler.schedule(context)
     }
     BackHandler(enabled = currentScreen != AppScreen.Health) {
         currentScreen = mainDestinationAfterBack()
@@ -761,6 +760,8 @@ internal fun missingRoleMessage(target: DailyLogQrTarget): String =
     "El participante reconocido no tiene el rol activo requerido: " +
         if (target == DailyLogQrTarget.SUPERVISOR) "Supervisor" else "Empleado"
 
+internal const val SAVE_DAILY_LOG_LABEL = "Guardar bitácora"
+
 @Composable
 fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     val context = LocalContext.current
@@ -1313,7 +1314,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             enabled = canCreate && state !is CreateBitacoraState.Loading,
             onClick = { createDailyLog() }
         ) {
-            Text("Crear bitácora")
+            Text(SAVE_DAILY_LOG_LABEL)
         }
 
         if (!canCreate) {
@@ -1332,17 +1333,18 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             }
             is CreateBitacoraState.Success -> {
                 Text(
-                    text = "Bitacora diaria creada",
+                    text = "Bitácora guardada localmente",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.titleMedium
                 )
+                Text("Estado: sincronizada")
                 Text("id_bitacora: ${currentState.idBitacora}")
                 Text("ID local: ${currentState.localId}")
                 EvidencePanel(repository, currentState.localId, currentState.idBitacora, currentState.areaId)
             }
             is CreateBitacoraState.Pending -> {
                 Text(
-                    text = "Bitacora guardada localmente",
+                    text = "Bitácora guardada localmente",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -1365,6 +1367,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
 
 @Composable
 fun SyncScreen(repository: BitacoraRepository) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<SyncState>(SyncState.Idle) }
 
@@ -1380,15 +1383,8 @@ fun SyncScreen(repository: BitacoraRepository) {
     }
 
     fun syncNow() {
-        state = SyncState.Loading
-        scope.launch {
-            state = try {
-                val result = repository.sincronizarPendientes()
-                SyncState.Ready(repository.getSyncSummary(), result)
-            } catch (e: Exception) {
-                SyncState.Error(e.message ?: "No fue posible sincronizar")
-            }
-        }
+        OfflineSyncScheduler.enqueueNow(context.applicationContext)
+        loadSummary()
     }
 
     Column(
@@ -1426,6 +1422,9 @@ fun SyncScreen(repository: BitacoraRepository) {
             }
             is SyncState.Ready -> {
                 Text("total pendientes: ${currentState.summary.pendientes}")
+                Text("bitácoras pendientes: ${currentState.summary.bitacorasPendientes}")
+                Text("evidencias pendientes: ${currentState.summary.evidenciasPendientes}")
+                Text("enrolamientos pendientes: ${currentState.summary.enrolamientosPendientes}")
                 Text("total sincronizados: ${currentState.summary.sincronizados}")
                 Text("total con error: ${currentState.summary.errores}")
 

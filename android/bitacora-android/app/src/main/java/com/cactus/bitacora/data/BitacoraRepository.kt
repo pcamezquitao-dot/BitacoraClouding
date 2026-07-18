@@ -16,6 +16,8 @@ import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import retrofit2.HttpException
 import com.cactus.bitacora.location.LocationSnapshot
 import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -101,7 +103,7 @@ class BitacoraRepository(
         val requestWithUuid = request.ensureClientUuid()
         val localId = bitacoraDao.insert(
             requestWithUuid.toLocalEntity(
-                syncStatus = SyncStatus.PENDIENTE,
+                syncStatus = SyncStatus.PENDIENTE_CREAR,
                 openLocation = openLocation,
                 closeLocation = closeLocation
             )
@@ -117,7 +119,11 @@ class BitacoraRepository(
             )
             CreateBitacoraResult.Sincronizada(localId, response)
         } catch (e: HttpException) {
-            val status = if (e.code() in 400..499) SyncStatus.ERROR else SyncStatus.PENDIENTE
+            val status = if (e.isRetryableSyncError()) {
+                SyncStatus.PENDIENTE_CREAR
+            } else {
+                SyncStatus.ERROR
+            }
             bitacoraDao.updateSyncState(
                 localId = localId,
                 status = status,
@@ -131,7 +137,7 @@ class BitacoraRepository(
         } catch (e: Exception) {
             bitacoraDao.updateSyncState(
                 localId = localId,
-                status = SyncStatus.PENDIENTE,
+                status = SyncStatus.PENDIENTE_CREAR,
                 backendId = null,
                 errorMessage = e.message
             )
@@ -146,20 +152,30 @@ class BitacoraRepository(
         api.getBitacoraDiaria(idBitacora)
 
     suspend fun getSyncSummary() = SyncSummary(
-        pendientes = bitacoraDao.countByStatus(SyncStatus.PENDIENTE),
+        bitacorasPendientes = bitacoraDao.countPending(),
+        evidenciasPendientes = evidenceDao.countPending(),
+        enrolamientosPendientes = faceTemplateRepository.pendingCount(),
         sincronizados = bitacoraDao.countByStatus(SyncStatus.SINCRONIZADO),
-        errores = bitacoraDao.countByStatus(SyncStatus.ERROR)
+        errores = bitacoraDao.countErrors() + evidenceDao.countErrors() +
+            faceTemplateRepository.errorCount()
     )
 
     suspend fun sincronizarPendientes(): SyncRunResult {
         val pendientes = bitacoraDao.getByStatuses(
-            listOf(SyncStatus.PENDIENTE, SyncStatus.ERROR)
+            listOf(
+                SyncStatus.PENDIENTE_CREAR,
+                SyncStatus.PENDIENTE_ACTUALIZAR,
+                SyncStatus.PENDIENTE_ELIMINAR,
+                SyncStatus.ERROR
+            )
         )
         var sincronizados = 0
         var errores = 0
+        var reintentables = 0
 
         pendientes.forEach { local ->
             try {
+                bitacoraDao.incrementSyncAttempts(local.localId)
                 val response = api.crearBitacoraDiaria(local.toCreateRequest())
                 bitacoraDao.updateSyncState(
                     localId = local.localId,
@@ -169,31 +185,45 @@ class BitacoraRepository(
                 )
                 sincronizados++
             } catch (e: Exception) {
+                val retryable = e.isRetryableSyncError()
                 bitacoraDao.updateSyncState(
                     localId = local.localId,
-                    status = SyncStatus.ERROR,
+                    status = if (retryable) local.syncStatus.pendingEquivalent()
+                    else SyncStatus.ERROR,
                     backendId = local.backendId,
                     errorMessage = e.message ?: "No fue posible sincronizar"
                 )
                 errores++
+                if (retryable) reintentables++
             }
         }
 
         val pendingEvidences = evidenceDao.getBySyncStatuses(
-            listOf(SyncStatus.LOCAL, SyncStatus.PENDIENTE, SyncStatus.ERROR)
+            listOf(
+                SyncStatus.PENDIENTE_CREAR,
+                SyncStatus.PENDIENTE_ACTUALIZAR,
+                SyncStatus.PENDIENTE_ELIMINAR,
+                SyncStatus.ERROR
+            )
         )
         pendingEvidences.forEach {
-            if (syncEvidence(it)) sincronizados++ else errores++
+            val result = syncEvidence(it)
+            if (result.success) sincronizados++ else {
+                errores++
+                if (result.retryable) reintentables++
+            }
         }
         val faceSync = faceTemplateRepository.syncWithCentral()
         sincronizados += faceSync.uploaded + faceSync.downloaded
         errores += faceSync.errors
+        reintentables += faceSync.errors
 
         return SyncRunResult(
             revisados = pendientes.size + pendingEvidences.size +
                 faceSync.uploaded + faceSync.downloaded + faceSync.errors,
             sincronizados = sincronizados,
-            errores = errores
+            errores = errores,
+            erroresReintentables = reintentables
         )
     }
 
@@ -202,20 +232,35 @@ class BitacoraRepository(
         require(bitacoraDao.getById(evidence.bitacoraLocalId) != null) {
             "La evidencia debe estar asociada a una bitácora existente"
         }
-        evidence.localFilePath?.let { require(File(it).isFile) { "El archivo local no existe" } }
-        return evidenceDao.insertWithRequiredGps(evidence)
+        val file = evidence.localFilePath?.let(::File)
+        file?.let { require(it.isFile) { "El archivo local no existe" } }
+        val prepared = evidence.copy(
+            fileSize = evidence.fileSize ?: file?.length(),
+            fileHash = evidence.fileHash ?: file?.sha256()
+        )
+        val localId = evidenceDao.insertWithRequiredGps(prepared)
+        Log.i(
+            SYNC_TAG,
+            "evidence localUuid=${prepared.clientUuid} localId=$localId " +
+                "bitacoraLocalId=${prepared.bitacoraLocalId} name=${file?.name} " +
+                "size=${prepared.fileSize} state=${prepared.syncStatus}"
+        )
+        return localId
     }
 
     suspend fun getEvidences(localId: Long) = evidenceDao.getForBitacora(localId)
 
     suspend fun deleteEvidence(localId: Long) {
         val evidence = evidenceDao.getById(localId) ?: return
-        require(evidence.syncStatus != SyncStatus.SINCRONIZADO) { "Una evidencia sincronizada no se puede eliminar localmente" }
-        evidenceDao.deleteById(localId)
-        evidence.localFilePath?.let { File(it).delete() }
+        if (evidence.remoteId == null) {
+            evidenceDao.deleteById(localId)
+            evidence.localFilePath?.let { File(it).delete() }
+        } else {
+            evidenceDao.markPendingDelete(localId)
+        }
     }
 
-    private suspend fun syncEvidence(evidence: BitacoraEvidenceEntity): Boolean {
+    private suspend fun syncEvidence(evidence: BitacoraEvidenceEntity): SyncItemResult {
         val parent = bitacoraDao.getById(evidence.bitacoraLocalId)
         if (parent == null) {
             evidenceDao.update(
@@ -224,7 +269,7 @@ class BitacoraRepository(
                     lastSyncError = "La bitácora local asociada no existe"
                 )
             )
-            return false
+            return SyncItemResult(false, false)
         }
         val backendId = parent.backendId
         if (backendId == null) {
@@ -234,28 +279,74 @@ class BitacoraRepository(
                     lastSyncError = "La bitácora aún no tiene identificador del servidor"
                 )
             )
-            return false
+            return SyncItemResult(false, false)
         }
         val file = evidence.localFilePath?.let(::File)
+        if (evidence.syncStatus == SyncStatus.PENDIENTE_ELIMINAR) {
+            val remoteId = evidence.remoteId
+            if (remoteId == null) {
+                evidenceDao.deleteById(evidence.localId)
+                evidence.localFilePath?.let { File(it).delete() }
+                return SyncItemResult(true, false)
+            }
+            return try {
+                api.deleteEvidence(remoteId)
+                evidenceDao.deleteById(evidence.localId)
+                evidence.localFilePath?.let { File(it).delete() }
+                SyncItemResult(true, false)
+            } catch (error: Exception) {
+                val retryable = error.isRetryableSyncError()
+                evidenceDao.update(
+                    evidence.copy(
+                        syncStatus = if (retryable) SyncStatus.PENDIENTE_ELIMINAR
+                        else SyncStatus.ERROR,
+                        syncAttempts = evidence.syncAttempts + 1,
+                        lastSyncError = error.message
+                    )
+                )
+                SyncItemResult(false, retryable)
+            }
+        }
         if (file == null || !file.isFile) {
             evidenceDao.update(evidence.copy(syncStatus = SyncStatus.ERROR, lastSyncError = "El archivo local no existe"))
-            return false
+            return SyncItemResult(false, false)
         }
         fun body(value: Any?) = value?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
         return try {
-            evidenceDao.update(evidence.copy(syncStatus = SyncStatus.SYNCING, syncAttempts = evidence.syncAttempts + 1))
+            evidenceDao.update(evidence.copy(syncAttempts = evidence.syncAttempts + 1))
             val response = api.uploadEvidence(
                 MultipartBody.Part.createFormData("file", evidence.originalName ?: file.name, file.asRequestBody(evidence.mimeType?.toMediaTypeOrNull())),
                 body(backendId)!!, body(evidence.areaId)!!, body(evidence.createdAt / 60000L)!!,
                 body(evidence.evidenceType.backendType)!!, body(evidence.clientUuid)!!,
-                body(evidence.originalName), body(evidence.mimeType), body(evidence.durationSeconds),
+                body(evidence.originalName), body(evidence.fileHash),
+                body(evidence.mimeType), body(evidence.durationSeconds),
                 body(evidence.fileSize), null, body(evidence.latitude), body(evidence.longitude), body(evidence.accuracy)
             )
             evidenceDao.update(evidence.copy(remoteId = response.id_evidencia, syncStatus = SyncStatus.SINCRONIZADO, lastSyncError = null))
-            true
+            Log.i(
+                SYNC_TAG,
+                "evidence localUuid=${evidence.clientUuid} bitacoraServerId=$backendId " +
+                    "name=${file.name} size=${file.length()} http=201 " +
+                    "serverId=${response.id_evidencia} state=SINCRONIZADO"
+            )
+            SyncItemResult(true, false)
         } catch (e: Exception) {
-            evidenceDao.update(evidence.copy(syncStatus = SyncStatus.ERROR, lastSyncError = e.message ?: "No fue posible sincronizar"))
-            false
+            val retryable = e.isRetryableSyncError()
+            val diagnostic = e.safeSyncDiagnostic()
+            Log.e(
+                SYNC_TAG,
+                "evidence localUuid=${evidence.clientUuid} bitacoraServerId=$backendId " +
+                    "name=${file.name} size=${file.length()} $diagnostic"
+            )
+            evidenceDao.update(
+                evidence.copy(
+                    syncStatus = if (retryable) evidence.syncStatus.pendingEquivalent()
+                    else SyncStatus.ERROR,
+                    syncAttempts = evidence.syncAttempts + 1,
+                    lastSyncError = diagnostic
+                )
+            )
+            SyncItemResult(false, retryable)
         }
     }
 
@@ -274,7 +365,42 @@ class BitacoraRepository(
         }
 }
 
+internal data class SyncItemResult(val success: Boolean, val retryable: Boolean)
+
+internal fun Throwable.isRetryableSyncError(): Boolean = when (this) {
+    is IOException -> true
+    is HttpException -> code() == 408 || code() == 429 || code() >= 500
+    else -> true
+}
+
+private fun SyncStatus.pendingEquivalent(): SyncStatus = when (this) {
+    SyncStatus.PENDIENTE_ACTUALIZAR -> SyncStatus.PENDIENTE_ACTUALIZAR
+    SyncStatus.PENDIENTE_ELIMINAR -> SyncStatus.PENDIENTE_ELIMINAR
+    else -> SyncStatus.PENDIENTE_CREAR
+}
+
 private const val PARTICIPANT_SEARCH_TAG = "ParticipantSearch"
+private const val SYNC_TAG = "OfflineSync"
+
+private fun File.sha256(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    inputStream().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+private fun Throwable.safeSyncDiagnostic(): String =
+    if (this is HttpException) {
+        "http=${code()} message=${message().take(200)}"
+    } else {
+        "http=NO_DISPONIBLE message=${message?.take(200) ?: javaClass.simpleName}"
+    }
 
 sealed interface CreateBitacoraResult {
     data class Sincronizada(val localId: Long, val bitacora: BitacoraDiariaOut) : CreateBitacoraResult
@@ -282,13 +408,19 @@ sealed interface CreateBitacoraResult {
 }
 
 data class SyncSummary(
-    val pendientes: Int,
+    val bitacorasPendientes: Int,
+    val evidenciasPendientes: Int,
+    val enrolamientosPendientes: Int,
     val sincronizados: Int,
     val errores: Int
-)
+) {
+    val pendientes: Int
+        get() = bitacorasPendientes + evidenciasPendientes + enrolamientosPendientes
+}
 
 data class SyncRunResult(
     val revisados: Int,
     val sincronizados: Int,
-    val errores: Int
+    val errores: Int,
+    val erroresReintentables: Int = 0
 )
