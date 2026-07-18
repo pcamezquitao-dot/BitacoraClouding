@@ -23,4 +23,8 @@ class Settings(BaseSettings):
     EVIDENCIA_VIDEO_MAX_BYTES: int = 200 * 1024 * 1024
     EVIDENCIA_TEXTO_MAX_BYTES: int = 512 * 1024
 
+    FACE_TEMPLATE_TABLE: str = "participante_face_template"
+    FACE_TEMPLATE_API_TOKEN: str = ""
+    FACE_TEMPLATE_MASTER_KEY: str = ""
+
 settings = Settings()

@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.cactus.bitacora"
     compileSdk = 34
+    flavorDimensions += "edition"
 
     defaultConfig {
         applicationId = "com.cactus.bitacora"
@@ -15,6 +16,24 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        buildConfigField(
+            "String",
+            "FACE_TEMPLATE_API_TOKEN",
+            "\"${providers.gradleProperty("FACE_TEMPLATE_API_TOKEN").orElse("").get()}\""
+        )
+    }
+
+    productFlavors {
+        create("production") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora"
+            manifestPlaceholders["appLabel"] = "Bitacora"
+        }
+        create("facial1") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.facial1"
+            manifestPlaceholders["appLabel"] = "Bitacora Facial 1"
+        }
     }
 
     // ✅ Alinear Java/Kotlin (soluciona "Inconsistent JVM-target compatibility")
@@ -29,6 +48,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

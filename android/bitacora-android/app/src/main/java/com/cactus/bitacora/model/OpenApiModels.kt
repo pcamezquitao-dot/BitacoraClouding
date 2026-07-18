@@ -17,7 +17,8 @@ data class ParticipanteOut(
     val id_participante: Int,
     val nombre: String? = null,
     val apellido: String? = null,
-    val identificacion_participante: String? = null
+    val identificacion_participante: String? = null,
+    val documento: String? = null
 )
 
 data class EmpleadoAreaActivaOut(
@@ -83,6 +84,50 @@ data class EvidenciaOut(
     val precision_gps: Double?,
     val uuid_cliente: String,
     val created_at: String
+)
+
+data class FaceTemplateEnrollIn(
+    val id_participante: Int,
+    val participant_code: String,
+    val display_name: String,
+    val embedding_base64: String,
+    val embedding_sha256: String,
+    val model_version: String,
+    val encryption_version: String = "server-aesgcm-v1",
+    val created_by: String? = null,
+    val device_id: String? = null
+)
+
+data class FaceTemplateMetadataOut(
+    val id_face_template: Int,
+    val id_participante: Int,
+    val participant_code: String,
+    val display_name: String,
+    val embedding_sha256: String,
+    val model_version: String,
+    val encryption_version: String,
+    val enrolled_at: String,
+    val active: Boolean,
+    val device_id: String? = null
+)
+
+data class FaceTemplateAuthorizedOut(
+    val id_face_template: Int,
+    val id_participante: Int,
+    val participant_code: String,
+    val display_name: String,
+    val embedding_sha256: String,
+    val model_version: String,
+    val encryption_version: String,
+    val enrolled_at: String,
+    val active: Boolean,
+    val device_id: String? = null,
+    val embedding_base64: String
+)
+
+data class FaceTemplateDeactivateIn(
+    val revoked_by: String? = null,
+    val revocation_reason: String? = null
 )
 
 data class BitacoraCompletaOut(

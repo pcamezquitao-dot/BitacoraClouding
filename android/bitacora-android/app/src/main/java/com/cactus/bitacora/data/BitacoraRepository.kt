@@ -1,6 +1,8 @@
 package com.cactus.bitacora.data
 
 import android.content.Context
+import android.util.Log
+import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
 import com.cactus.bitacora.data.local.BitacoraDao
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
 import com.cactus.bitacora.data.local.EvidenceType
@@ -26,6 +28,7 @@ class BitacoraRepository(
     private val bitacoraDao: BitacoraDao =
         BitacoraDatabase.getInstance(context).bitacoraDao()
     private val evidenceDao = BitacoraDatabase.getInstance(context).evidenceDao()
+    private val faceTemplateRepository = LocalFaceTemplateRepository(context, api)
 
     suspend fun checkHealth() =
         api.health()
@@ -33,10 +36,62 @@ class BitacoraRepository(
     suspend fun getAreaByQr(qr: String) =
         api.getAreaByQr(AreaByQrIn(qr))
 
-    suspend fun getParticipanteByQr(qr: String) = api.getParticipanteByQr(qr)
+    suspend fun getParticipanteByQr(qr: String) =
+        api.getParticipanteByQr(normalizeParticipantQuery(qr))
+
+    suspend fun searchParticipantes(query: String): ParticipantSearchResult {
+        val normalized = normalizeParticipantQuery(query)
+        if (normalized.isBlank()) {
+            return ParticipantSearchResult(query, normalized, "API participante", emptyList())
+        }
+
+        var participants: List<com.cactus.bitacora.model.ParticipanteOut> = emptyList()
+        var source = "API participante/search"
+        try {
+            val searchResults = api.searchParticipantes(normalized)
+            if (searchResults.isNotEmpty()) {
+                participants = searchResults
+                source = "API participante/search"
+            } else {
+                participants = findParticipantByExactCode(normalized)
+                source = "API participante/search + participante/by_qr"
+            }
+        } catch (exception: HttpException) {
+            if (exception.code() != 404) throw exception
+            participants = findParticipantByExactCode(normalized)
+            source = "API participante/by_qr (fallback: search no desplegado)"
+        }
+
+        Log.i(
+            PARTICIPANT_SEARCH_TAG,
+            "recibido='$query', normalizado='$normalized', fuente='$source', " +
+                "resultados=${participants.size}"
+        )
+        return ParticipantSearchResult(query, normalized, source, participants)
+    }
+
+    private suspend fun findParticipantByExactCode(
+        normalizedCode: String
+    ): List<com.cactus.bitacora.model.ParticipanteOut> =
+        try {
+            listOf(api.getParticipanteByQr(normalizedCode))
+        } catch (exception: HttpException) {
+            if (exception.code() == 404) emptyList() else throw exception
+        }
 
     suspend fun getAsignacionActiva(idParticipante: Int) =
         api.getAsignacionActiva(idParticipante)
+
+    suspend fun getAsignacionesActivas(idParticipante: Int) =
+        try {
+            api.getAsignacionesActivas(idParticipante)
+        } catch (exception: HttpException) {
+            if (exception.code() == 404) {
+                listOf(api.getAsignacionActiva(idParticipante))
+            } else {
+                throw exception
+            }
+        }
 
     suspend fun crearBitacoraDiaria(
         request: BitacoraDiariaCreate,
@@ -124,12 +179,19 @@ class BitacoraRepository(
             }
         }
 
-        evidenceDao.getBySyncStatuses(listOf(SyncStatus.PENDIENTE, SyncStatus.ERROR)).forEach {
+        val pendingEvidences = evidenceDao.getBySyncStatuses(
+            listOf(SyncStatus.LOCAL, SyncStatus.PENDIENTE, SyncStatus.ERROR)
+        )
+        pendingEvidences.forEach {
             if (syncEvidence(it)) sincronizados++ else errores++
         }
+        val faceSync = faceTemplateRepository.syncWithCentral()
+        sincronizados += faceSync.uploaded + faceSync.downloaded
+        errores += faceSync.errors
 
         return SyncRunResult(
-            revisados = pendientes.size,
+            revisados = pendientes.size + pendingEvidences.size +
+                faceSync.uploaded + faceSync.downloaded + faceSync.errors,
             sincronizados = sincronizados,
             errores = errores
         )
@@ -154,8 +216,26 @@ class BitacoraRepository(
     }
 
     private suspend fun syncEvidence(evidence: BitacoraEvidenceEntity): Boolean {
-        val parent = bitacoraDao.getById(evidence.bitacoraLocalId) ?: return false
-        val backendId = parent.backendId ?: return false
+        val parent = bitacoraDao.getById(evidence.bitacoraLocalId)
+        if (parent == null) {
+            evidenceDao.update(
+                evidence.copy(
+                    syncStatus = SyncStatus.ERROR,
+                    lastSyncError = "La bitácora local asociada no existe"
+                )
+            )
+            return false
+        }
+        val backendId = parent.backendId
+        if (backendId == null) {
+            evidenceDao.update(
+                evidence.copy(
+                    syncStatus = SyncStatus.ERROR,
+                    lastSyncError = "La bitácora aún no tiene identificador del servidor"
+                )
+            )
+            return false
+        }
         val file = evidence.localFilePath?.let(::File)
         if (file == null || !file.isFile) {
             evidenceDao.update(evidence.copy(syncStatus = SyncStatus.ERROR, lastSyncError = "El archivo local no existe"))
@@ -193,6 +273,8 @@ class BitacoraRepository(
             this
         }
 }
+
+private const val PARTICIPANT_SEARCH_TAG = "ParticipantSearch"
 
 sealed interface CreateBitacoraResult {
     data class Sincronizada(val localId: Long, val bitacora: BitacoraDiariaOut) : CreateBitacoraResult

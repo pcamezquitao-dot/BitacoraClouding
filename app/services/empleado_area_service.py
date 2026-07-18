@@ -23,6 +23,23 @@ def get_asignacion_activa(db: Session, id_participante: int):
     ).mappings().first()
 
 
+def get_asignaciones_activas(db: Session, id_participante: int):
+    tabla = settings.EMPLEADO_AREA_TABLE
+    areas = settings.AREAS_TABLE
+    return db.execute(
+        text(f"""
+            SELECT ea.id_participante, ea.id_area, aa.descripcion AS area_descripcion,
+                   ea.cargo, ea.fecha_final
+            FROM {tabla} ea
+            LEFT JOIN {areas} aa ON aa.id_Area_Administrativa = ea.id_area
+            WHERE ea.id_participante = :id_participante
+              AND (ea.fecha_final IS NULL OR ea.fecha_final >= CURDATE())
+            ORDER BY ea.id_area, ea.cargo
+        """),
+        {"id_participante": id_participante},
+    ).mappings().all()
+
+
 def require_asignacion_activa(db: Session, id_participante: int, rol: str):
     asignacion = get_asignacion_activa(db, id_participante)
     if not asignacion:

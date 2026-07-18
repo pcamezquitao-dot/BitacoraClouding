@@ -90,3 +90,34 @@ class BitacoraAreaEvidenciaCrudTest(unittest.TestCase):
         self.assertEqual(result, existing)
         validate.assert_not_called()
         db.execute.assert_not_called()
+
+    def test_permite_varias_evidencias_para_una_misma_bitacora(self):
+        db = MagicMock()
+        db.execute.side_effect = [
+            MagicMock(lastrowid=101),
+            MagicMock(lastrowid=102),
+        ]
+        first = BitacoraAreaEvidenciaCreate(**metadata())
+        second = BitacoraAreaEvidenciaCreate(
+            **metadata(
+                archivo_url="1/evidencia-2.jpg",
+                uuid_cliente="550e8400-e29b-41d4-a716-446655440001",
+            )
+        )
+        with patch(
+            "app.routers.bitacora_area_evidencia._get_by_uuid",
+            return_value=None,
+        ), patch(
+            "app.routers.bitacora_area_evidencia._validate_parent"
+        ), patch(
+            "app.routers.bitacora_area_evidencia._get",
+            side_effect=[
+                {"id_evidencia": 101, "id_bitacora": 4},
+                {"id_evidencia": 102, "id_bitacora": 4},
+            ],
+        ):
+            saved = [_insert(db, first), _insert(db, second)]
+
+        self.assertEqual([101, 102], [row["id_evidencia"] for row in saved])
+        self.assertTrue(all(row["id_bitacora"] == 4 for row in saved))
+        self.assertEqual(2, db.execute.call_count)

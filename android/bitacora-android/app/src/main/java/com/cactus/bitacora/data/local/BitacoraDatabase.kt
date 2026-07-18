@@ -8,13 +8,18 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [BitacoraLocalEntity::class, BitacoraEvidenceEntity::class],
-    version = 4,
+    entities = [
+        BitacoraLocalEntity::class,
+        BitacoraEvidenceEntity::class,
+        FaceTemplateEntity::class
+    ],
+    version = 6,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun bitacoraDao(): BitacoraDao
     abstract fun evidenceDao(): BitacoraEvidenceDao
+    abstract fun faceTemplateDao(): FaceTemplateDao
 
     companion object {
         @Volatile
@@ -26,7 +31,13 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     context.applicationContext,
                     BitacoraDatabase::class.java,
                     "bitacora_local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
+                ).build().also { instance = it }
             }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -83,6 +94,48 @@ abstract class BitacoraDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bitacora_evidences ADD COLUMN areaId INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE bitacora_evidences ADD COLUMN originalName TEXT")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS face_templates (
+                        participantId INTEGER NOT NULL PRIMARY KEY,
+                        participantCode TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        encryptedEmbedding BLOB NOT NULL,
+                        enrolledAtMillis INTEGER NOT NULL,
+                        modelVersion TEXT NOT NULL,
+                        active INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_face_templates_participantCode " +
+                        "ON face_templates(participantCode)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_face_templates_active " +
+                        "ON face_templates(active)"
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE face_templates ADD COLUMN remoteTemplateId INTEGER")
+                db.execSQL("ALTER TABLE face_templates ADD COLUMN embeddingSha256 TEXT")
+                db.execSQL(
+                    "ALTER TABLE face_templates ADD COLUMN encryptionVersion TEXT " +
+                        "NOT NULL DEFAULT 'local-keystore-aesgcm-v1'"
+                )
+                db.execSQL(
+                    "ALTER TABLE face_templates ADD COLUMN centralSyncState TEXT " +
+                        "NOT NULL DEFAULT 'PENDING'"
+                )
+                db.execSQL("ALTER TABLE face_templates ADD COLUMN lastSyncError TEXT")
             }
         }
     }

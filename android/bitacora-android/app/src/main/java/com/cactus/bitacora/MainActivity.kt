@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Size
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
@@ -20,6 +21,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +61,7 @@ import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.CreateBitacoraResult
 import com.cactus.bitacora.data.SyncRunResult
 import com.cactus.bitacora.data.SyncSummary
+import com.cactus.bitacora.data.normalizeParticipantQuery
 import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
@@ -66,7 +70,12 @@ import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.location.BitacoraLocationProvider
 import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
+import com.cactus.bitacora.biometric.FaceIdentificationTarget
+import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
+import com.cactus.bitacora.biometric.technical.FaceFlowMode
+import com.cactus.bitacora.biometric.technical.FaceRecognitionCandidate
 import com.cactus.bitacora.biometric.technical.FaceTechnicalScreen
+import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -78,10 +87,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-private const val TAG_QR_AREA = "QrArea"
-private const val QR_AREA_TYPE = "AREA_ADMINISTRATIVA"
-private const val INVALID_QR_AREA_MESSAGE =
-    "QR de área inválido. Formato esperado: AREA_ADMINISTRATIVA|ID|NOMBRE"
+private const val TAG_QR_SCANNER = "QrScanner"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,13 +102,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppScreen {
+internal enum class AppScreen {
     Health,
+    FaceEnrollment,
     CreateDailyLog,
     QueryDailyLog,
-    Sync,
-    QrArea,
-    FaceTechnical
+    Sync
 }
 
 private sealed interface ConnectionState {
@@ -134,25 +139,31 @@ private sealed interface SyncState {
     data class Error(val message: String) : SyncState
 }
 
-private sealed interface QrAreaState {
-    data object Idle : QrAreaState
-    data object Loading : QrAreaState
-    data class Success(val area: AreaOut) : QrAreaState
-    data class Error(val message: String) : QrAreaState
-}
-
 private data class ParticipanteValidado(
     val participante: ParticipanteOut,
     val asignacion: EmpleadoAreaActivaOut
 )
 
-private enum class DailyLogQrTarget { EMPLEADO, SUPERVISOR, AREA }
+internal enum class DailyLogQrTarget { EMPLEADO, SUPERVISOR, AREA }
+
+private data class DailyLogFaceSession(
+    val target: DailyLogQrTarget,
+    val mode: FaceFlowMode,
+    val enrollmentIdentity: FaceEnrollmentIdentity? = null
+)
 
 @Composable
 fun BitacoraApp() {
     val context = LocalContext.current.applicationContext
     val repository = remember { BitacoraRepository(context) }
+    val faceRepository = remember { LocalFaceTemplateRepository(context) }
     var currentScreen by remember { mutableStateOf(AppScreen.Health) }
+    LaunchedEffect(Unit) {
+        faceRepository.syncWithCentral()
+    }
+    BackHandler(enabled = currentScreen != AppScreen.Health) {
+        currentScreen = mainDestinationAfterBack()
+    }
 
     Scaffold { padding ->
         Column(
@@ -166,6 +177,14 @@ fun BitacoraApp() {
                 text = "BitacoraClouding",
                 style = MaterialTheme.typography.headlineSmall
             )
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = currentScreen != AppScreen.FaceEnrollment,
+                onClick = { currentScreen = AppScreen.FaceEnrollment }
+            ) {
+                Text("Enrolamiento facial")
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -204,34 +223,16 @@ fun BitacoraApp() {
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.QrArea,
-                    onClick = { currentScreen = AppScreen.QrArea }
-                ) {
-                    Text("QR Área")
-                }
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.FaceTechnical,
-                    onClick = { currentScreen = AppScreen.FaceTechnical }
-                ) {
-                    Text("Prueba facial")
-                }
-            }
-
             Box(modifier = Modifier.weight(1f)) {
                 when (currentScreen) {
                     AppScreen.Health -> BackendStatusScreen(repository)
+                    AppScreen.FaceEnrollment -> FaceEnrollmentAdminScreen(
+                        repository = repository,
+                        onBack = { currentScreen = mainDestinationAfterBack() }
+                    )
                     AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
                     AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
                     AppScreen.Sync -> SyncScreen(repository)
-                    AppScreen.QrArea -> QrAreaScreen()
-                    AppScreen.FaceTechnical -> FaceTechnicalScreen()
                 }
             }
         }
@@ -409,6 +410,358 @@ fun BitacoraDetail(bitacora: BitacoraDiariaOut) {
 }
 
 @Composable
+private fun FaceEnrollmentAdminScreen(
+    repository: BitacoraRepository,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<ParticipanteOut>>(emptyList()) }
+    var selectedParticipant by remember { mutableStateOf<ParticipanteOut?>(null) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var diagnostic by remember { mutableStateOf<String?>(null) }
+    var activeAssignments by remember { mutableStateOf<List<EmpleadoAreaActivaOut>>(emptyList()) }
+    var assignmentsInfo by remember { mutableStateOf("Sin información de roles activos") }
+    var scanningQr by remember { mutableStateOf(false) }
+    var faceSession by remember { mutableStateOf<DailyLogFaceSession?>(null) }
+
+    suspend fun acceptParticipant(participant: ParticipanteOut): Boolean =
+        try {
+            selectedParticipant = participant
+            results = emptyList()
+            query = participant.identificacion_participante.orEmpty()
+            error = null
+            activeAssignments = try {
+                repository.getAsignacionesActivas(participant.id_participante)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            assignmentsInfo = if (activeAssignments.isEmpty()) {
+                "Sin roles o asignaciones activas (esto no impide enrolar)"
+            } else {
+                activeAssignments.joinToString(" · ") {
+                    "${roleLabel(it.cargo)} / ${it.area_descripcion ?: "Área ${it.id_area}"}"
+                }
+            }
+            true
+        } catch (exception: Exception) {
+            selectedParticipant = null
+            error = exception.message ?: "No fue posible seleccionar el participante"
+            false
+        }
+
+    fun chooseParticipant(participant: ParticipanteOut) {
+        loading = true
+        error = null
+        scope.launch {
+            acceptParticipant(participant)
+            loading = false
+        }
+    }
+
+    fun resolveQr(rawCode: String) {
+        val code = normalizeParticipantQuery(rawCode)
+        if (code.isBlank()) {
+            error = "Escriba o escanee el código del participante"
+            return
+        }
+        query = code
+        loading = true
+        error = null
+        scope.launch {
+            try {
+                val participant = repository.getParticipanteByQr(code)
+                diagnostic =
+                    "Código recibido: $rawCode\n" +
+                    "Código normalizado: $code\n" +
+                    "Fuente consultada: API participante/by_qr\n" +
+                    "Registros encontrados: 1"
+                acceptParticipant(participant)
+            } catch (exception: HttpException) {
+                selectedParticipant = null
+                diagnostic =
+                    "Código recibido: $rawCode\n" +
+                    "Código normalizado: $code\n" +
+                    "Fuente consultada: API participante/by_qr\n" +
+                    "Registros encontrados: 0\n" +
+                    "Motivo: el código no existe en participante"
+                error = if (exception.code() == 404) {
+                    "No existe un participante con el código $code"
+                } else {
+                    exception.httpDetail() ?: exception.message()
+                }
+            } catch (exception: Exception) {
+                selectedParticipant = null
+                error = exception.httpDetail()
+                    ?: exception.message
+                    ?: "No fue posible encontrar el participante"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    fun search() {
+        val received = query
+        val term = normalizeParticipantQuery(received)
+        if (term.isBlank()) {
+            error = "Escriba un código o nombre para buscar"
+            return
+        }
+        loading = true
+        error = null
+        selectedParticipant = null
+        scope.launch {
+            try {
+                val searchResult = repository.searchParticipantes(received)
+                results = searchResult.participants
+                diagnostic =
+                    "Código recibido: ${searchResult.receivedCode}\n" +
+                    "Código normalizado: ${searchResult.normalizedCode}\n" +
+                    "Fuente consultada: ${searchResult.source}\n" +
+                    "Registros encontrados: ${searchResult.participants.size}"
+                if (results.isEmpty()) {
+                    error = "No existe un participante para el código o nombre indicado"
+                    diagnostic = diagnostic.orEmpty() +
+                        "\nMotivo: sin coincidencias en participante"
+                } else if (
+                    results.size == 1 &&
+                    results.first().identificacion_participante
+                        ?.let(::normalizeParticipantQuery) == term
+                ) {
+                    acceptParticipant(results.first())
+                }
+            } catch (exception: Exception) {
+                results = emptyList()
+                diagnostic =
+                    "Código recibido: $received\n" +
+                    "Código normalizado: $term\n" +
+                    "Fuente consultada: API del servidor\n" +
+                    "Registros encontrados: 0\n" +
+                    "Motivo: ${exception.message ?: "error de comunicación"}"
+                error = exception.httpDetail()
+                    ?: exception.message
+                    ?: "No fue posible buscar participantes"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        scanningQr = granted
+        if (!granted) error = "Se necesita permiso de cámara para leer el QR personal"
+    }
+
+    fun startQrScan() {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            scanningQr = true
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    BackHandler {
+        when {
+            faceSession != null -> faceSession = null
+            scanningQr -> scanningQr = false
+            else -> onBack()
+        }
+    }
+
+    faceSession?.let { session ->
+        key(session.target, session.mode, session.enrollmentIdentity?.participantId) {
+            FaceTechnicalScreen(
+                target = null,
+                mode = session.mode,
+                enrollmentIdentity = session.enrollmentIdentity,
+                onConfirmed = {
+                    message = "Reconocimiento correcto: ${it.displayName}"
+                    faceSession = null
+                },
+                onEnrollmentComplete = {
+                    message = "Rostro registrado correctamente"
+                    faceSession = null
+                },
+                onTestRecognition = {
+                    faceSession = session.copy(
+                        mode = FaceFlowMode.IDENTIFICATION,
+                        enrollmentIdentity = null
+                    )
+                },
+                onUseQr = {
+                    faceSession = null
+                    startQrScan()
+                },
+                onCancel = { faceSession = null }
+            )
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Administrar rostros", style = MaterialTheme.typography.titleLarge)
+        Text("Busque y seleccione directamente un participante")
+
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = query,
+            onValueChange = {
+                query = it
+                selectedParticipant = null
+                error = null
+            },
+            enabled = !loading,
+            label = { Text("Código o nombre") },
+            singleLine = true
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                modifier = Modifier.weight(1f),
+                enabled = query.isNotBlank() && !loading,
+                onClick = { search() }
+            ) { Text("Buscar") }
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                enabled = !loading && !scanningQr,
+                onClick = { startQrScan() }
+            ) { Text("Leer QR personal") }
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = query.isNotBlank() && !loading,
+            onClick = { search() }
+        ) {
+            Text("Actualizar participantes desde el servidor")
+        }
+
+        if (scanningQr) {
+            QrScanner(
+                prompt = "Apunte la cámara al QR personal",
+                errorMessage = "No fue posible leer el QR personal.",
+                onQrScanned = {
+                    scanningQr = false
+                    resolveQr(it)
+                },
+                onError = {
+                    scanningQr = false
+                    error = it
+                }
+            )
+        }
+
+        if (loading) {
+            CircularProgressIndicator()
+            Text("Buscando participante…")
+        }
+
+        results.forEach { participant ->
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { chooseParticipant(participant) }
+            ) {
+                Text(
+                    "${participant.nombreCompleto()} · " +
+                        (participant.identificacion_participante ?: participant.id_participante)
+                )
+            }
+        }
+
+        selectedParticipant?.let { participant ->
+            Surface(modifier = Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text("Participante seleccionado", color = MaterialTheme.colorScheme.primary)
+                    Text("Nombre: ${participant.nombreCompleto()}")
+                    Text("Apellido: ${participant.apellido.orEmpty()}")
+                    Text(
+                        "Código: " +
+                            (participant.identificacion_participante ?: participant.id_participante)
+                    )
+                    participant.documento?.takeIf { it.isNotBlank() }?.let {
+                        Text("Documento: $it")
+                    }
+                    Text("Roles/asignaciones: $assignmentsInfo")
+                }
+            }
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = selectedParticipant != null && !loading,
+            onClick = {
+                val participant = selectedParticipant ?: return@Button
+                faceSession = DailyLogFaceSession(
+                    target = DailyLogQrTarget.EMPLEADO,
+                    mode = FaceFlowMode.ENROLLMENT,
+                    enrollmentIdentity = FaceEnrollmentIdentity(
+                        participantId = participant.id_participante,
+                        participantCode = participant.identificacion_participante
+                            ?: participant.id_participante.toString(),
+                        displayName = participant.nombreCompleto()
+                    )
+                )
+            }
+        ) { Text("Enrolar rostro") }
+
+        if (selectedParticipant == null) {
+            Text(
+                "Seleccione primero un participante",
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        diagnostic?.let {
+            Text("Diagnóstico de búsqueda\n$it", style = MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onBack) {
+            Text("Cancelar y regresar")
+        }
+    }
+}
+
+internal val DAILY_LOG_FACE_MODE = FaceFlowMode.IDENTIFICATION
+internal const val ENROLLMENT_IDENTITY_SCOPE = "Participante"
+
+internal fun mainDestinationAfterBack(): AppScreen = AppScreen.Health
+
+internal fun areaMatchesAssignment(selectedAreaId: Int?, assignedAreaId: Int?): Boolean =
+    selectedAreaId != null && assignedAreaId != null && selectedAreaId == assignedAreaId
+
+internal fun roleLabel(cargo: Int?): String = when (cargo) {
+    3 -> "Supervisor"
+    4 -> "Gerente"
+    null -> "Rol no especificado"
+    else -> "Empleado/otro (cargo $cargo)"
+}
+
+internal fun assignmentAllowsTarget(cargo: Int?, target: DailyLogQrTarget): Boolean = when (target) {
+    DailyLogQrTarget.SUPERVISOR -> cargo == 3
+    DailyLogQrTarget.EMPLEADO -> cargo != 3 && cargo != 4
+    DailyLogQrTarget.AREA -> false
+}
+
+internal fun missingRoleMessage(target: DailyLogQrTarget): String =
+    "El participante reconocido no tiene el rol activo requerido: " +
+        if (target == DailyLogQrTarget.SUPERVISOR) "Supervisor" else "Empleado"
+
+@Composable
 fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -433,6 +786,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     var gpsLocation by remember { mutableStateOf<LocationSnapshot?>(null) }
     var gpsLoading by remember { mutableStateOf(false) }
     var gpsError by remember { mutableStateOf<String?>(null) }
+    var faceSession by remember { mutableStateOf<DailyLogFaceSession?>(null) }
 
     fun obtainGps() {
         gpsLocation = null
@@ -570,7 +924,12 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         scope.launch {
             try {
                 val areaConsultada = repository.getAreaByQr(qr)
-                if (areaConsultada.id_area != empleadoActual.asignacion.id_area) {
+                if (
+                    !areaMatchesAssignment(
+                        areaConsultada.id_area,
+                        empleadoActual.asignacion.id_area
+                    )
+                ) {
                     throw IllegalStateException(
                         "El área seleccionada no coincide con la asignación activa del empleado"
                     )
@@ -600,7 +959,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         if (empleado == null) add("Validar empleado")
         if (supervisor == null) add("Validar supervisor")
         if (area == null) add("Validar área administrativa")
-        if (area != null && area?.id_area != empleado?.asignacion?.id_area) {
+        if (
+            area != null &&
+            !areaMatchesAssignment(area?.id_area, empleado?.asignacion?.id_area)
+        ) {
             add("El área debe coincidir con la asignación del empleado")
         }
         if (tipoAnotacion.toIntOrNull() == null) add("Seleccionar un tipo de anotación válido")
@@ -669,9 +1031,55 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         }
     }
 
+    fun startFaceIdentification(target: DailyLogQrTarget) {
+        require(target != DailyLogQrTarget.AREA)
+        faceSession = DailyLogFaceSession(
+            target = target,
+            mode = DAILY_LOG_FACE_MODE
+        )
+    }
+
+    fun confirmFaceCandidate(target: DailyLogQrTarget, candidate: FaceRecognitionCandidate) {
+        faceSession = null
+        validatingTarget = target
+        scope.launch {
+            try {
+                val participant = repository.getParticipanteByQr(candidate.participantCode)
+                val assignments = repository.getAsignacionesActivas(candidate.participantId)
+                val assignment = assignments.firstOrNull {
+                    assignmentAllowsTarget(it.cargo, target)
+                } ?: throw IllegalStateException(missingRoleMessage(target))
+                val validated = ParticipanteValidado(participant, assignment)
+                when (target) {
+                    DailyLogQrTarget.EMPLEADO -> {
+                        qrEmpleado = candidate.participantCode
+                        empleado = validated
+                        empleadoError = null
+                        area = null
+                        areaError = null
+                    }
+                    DailyLogQrTarget.SUPERVISOR -> {
+                        qrSupervisor = candidate.participantCode
+                        supervisor = validated
+                        supervisorError = null
+                    }
+                    DailyLogQrTarget.AREA -> Unit
+                }
+            } catch (error: Exception) {
+                val message = error.httpDetail()
+                    ?: error.message
+                    ?: missingRoleMessage(target)
+                if (target == DailyLogQrTarget.EMPLEADO) empleadoError = message
+                else supervisorError = message
+            } finally {
+                validatingTarget = null
+            }
+        }
+    }
+
     val qrScannerForTarget: @Composable (DailyLogQrTarget) -> Unit = { target ->
         if (scanningTarget == target) {
-            QrAreaScanner(
+            QrScanner(
                 prompt = "Apunte la cámara al QR de ${target.name.lowercase()}",
                 errorMessage = "No fue posible leer el QR de ${target.name.lowercase()}.",
                 onQrScanned = { rawQr ->
@@ -703,6 +1111,35 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         }
     }
 
+    faceSession?.let { session ->
+        val target = if (session.target == DailyLogQrTarget.EMPLEADO) {
+            FaceIdentificationTarget.EMPLEADO
+        } else {
+            FaceIdentificationTarget.SUPERVISOR
+        }
+        key(session.target, session.mode, session.enrollmentIdentity?.participantId) {
+            FaceTechnicalScreen(
+                target = target,
+                mode = session.mode,
+                enrollmentIdentity = session.enrollmentIdentity,
+                onConfirmed = { confirmFaceCandidate(session.target, it) },
+                onEnrollmentComplete = { faceSession = null },
+                onTestRecognition = {
+                    faceSession = session.copy(
+                        mode = FaceFlowMode.IDENTIFICATION,
+                        enrollmentIdentity = null
+                    )
+                },
+                onUseQr = {
+                    faceSession = null
+                    startScan(session.target)
+                },
+                onCancel = { faceSession = null }
+            )
+        }
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -726,6 +1163,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             validated = empleado != null
         ) {
             qrScannerForTarget(DailyLogQrTarget.EMPLEADO)
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { startFaceIdentification(DailyLogQrTarget.EMPLEADO) }
+            ) { Text("Reconocer rostro") }
             empleado?.let {
                 Text("Empleado validado", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
@@ -746,6 +1187,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             validated = supervisor != null
         ) {
             qrScannerForTarget(DailyLogQrTarget.SUPERVISOR)
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { startFaceIdentification(DailyLogQrTarget.SUPERVISOR) }
+            ) { Text("Reconocer rostro") }
             supervisor?.let {
                 Text("Supervisor validado", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
@@ -1005,155 +1450,6 @@ fun SyncScreen(repository: BitacoraRepository) {
 }
 
 @Composable
-fun QrAreaScreen() {
-    val context = LocalContext.current
-    var qrCode by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf<QrAreaState>(QrAreaState.Idle) }
-    var isScanning by remember { mutableStateOf(false) }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            Log.i(TAG_QR_AREA, "Permiso camara concedido")
-            isScanning = true
-        } else {
-            Log.w(TAG_QR_AREA, "Permiso camara rechazado")
-            state = QrAreaState.Error("Se necesita permiso de cámara para leer el QR del área.")
-        }
-    }
-
-    fun applyQrText(rawQr: String) {
-        Log.i(TAG_QR_AREA, "QR leido: $rawQr")
-        qrCode = rawQr
-        val area = parseAreaQr(rawQr)
-        if (area == null) {
-            Log.w(TAG_QR_AREA, "Error de formato QR Area: $rawQr")
-            state = QrAreaState.Error(INVALID_QR_AREA_MESSAGE)
-            return
-        }
-
-        Log.i(TAG_QR_AREA, "Tipo QR detectado: $QR_AREA_TYPE")
-        Log.i(TAG_QR_AREA, "ID area: ${area.id_area}")
-        Log.i(TAG_QR_AREA, "Nombre area: ${area.descripcion}")
-        state = QrAreaState.Success(area)
-    }
-
-    fun validateManualQr() {
-        val qr = qrCode.trim()
-
-        if (qr.isBlank()) {
-            state = QrAreaState.Error("Debe escribir o pegar un codigo QR")
-            return
-        }
-
-        applyQrText(qr)
-    }
-
-    fun startQrScan() {
-        Log.i(TAG_QR_AREA, "Boton escanear presionado")
-        when (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)) {
-            PackageManager.PERMISSION_GRANTED -> {
-                Log.i(TAG_QR_AREA, "Permiso camara concedido")
-                isScanning = true
-            }
-            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "QR Área",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isScanning,
-            onClick = { startQrScan() }
-        ) {
-            Text("Escanear QR Área")
-        }
-
-        if (isScanning) {
-            QrAreaScanner(
-                onQrScanned = { rawQr ->
-                    isScanning = false
-                    applyQrText(rawQr)
-                },
-                onError = { message ->
-                    isScanning = false
-                    state = QrAreaState.Error(message)
-                }
-            )
-        }
-
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = qrCode,
-            onValueChange = { qrCode = it },
-            label = { Text("codigo QR manual para pruebas") },
-            minLines = 2
-        )
-
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state !is QrAreaState.Loading,
-            onClick = { validateManualQr() }
-        ) {
-            Text("Validar QR manual")
-        }
-
-        when (val currentState = state) {
-            QrAreaState.Idle -> Text("Estado: pendiente")
-            QrAreaState.Loading -> {
-                CircularProgressIndicator()
-                Text("Estado: consultando area")
-            }
-            is QrAreaState.Success -> {
-                Text(
-                    text = "Area encontrada",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text("Área seleccionada: ${currentState.area.descripcion}")
-                Text("id_area: ${currentState.area.id_area}")
-                Text("descripcion: ${currentState.area.descripcion}")
-            }
-            is QrAreaState.Error -> {
-                Text(
-                    text = "Error al consultar area",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(currentState.message)
-            }
-        }
-    }
-}
-
-private fun parseAreaQr(rawQr: String): AreaOut? {
-    val parts = rawQr.trim().split("|")
-    if (parts.size != 3) return null
-
-    val type = parts[0].trim()
-    val idArea = parts[1].trim().toIntOrNull()
-    val areaName = parts[2].trim()
-
-    if (type != QR_AREA_TYPE || idArea == null || areaName.isBlank()) return null
-
-    return AreaOut(
-        id_area = idArea,
-        descripcion = areaName
-    )
-}
-
-@Composable
 private fun QrValidationSection(
     title: String,
     scanText: String,
@@ -1212,7 +1508,7 @@ private fun Throwable.httpDetail(): String? {
 }
 
 @Composable
-private fun QrAreaScanner(
+private fun QrScanner(
     onQrScanned: (String) -> Unit,
     onError: (String) -> Unit,
     prompt: String = "Apunte la cámara al QR del área",
@@ -1283,7 +1579,7 @@ private fun QrAreaScanner(
                         analyzer
                     )
                 } catch (e: Exception) {
-                    Log.e(TAG_QR_AREA, "No fue posible abrir la camara", e)
+                    Log.e(TAG_QR_SCANNER, "No fue posible abrir la camara", e)
                     onError(errorMessage)
                 }
             }, ContextCompat.getMainExecutor(viewContext))
@@ -1326,12 +1622,12 @@ private fun processQrImage(
                 .mapNotNull { it.rawValue?.trim() }
                 .firstOrNull { it.isNotEmpty() }
             if (qrValue != null && hasScanned.compareAndSet(false, true)) {
-                Log.i(TAG_QR_AREA, "Código QR detectado")
+                Log.i(TAG_QR_SCANNER, "Código QR detectado")
                 onQrScanned(qrValue)
             }
         }
         .addOnFailureListener(mainExecutor) { e ->
-            Log.e(TAG_QR_AREA, "Error leyendo QR", e)
+            Log.e(TAG_QR_SCANNER, "Error leyendo QR", e)
             if (hasScanned.compareAndSet(false, true)) {
                 onError(errorMessage)
             }

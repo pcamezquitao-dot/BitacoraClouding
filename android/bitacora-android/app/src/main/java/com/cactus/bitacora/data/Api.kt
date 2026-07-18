@@ -13,11 +13,18 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 import retrofit2.http.Multipart
 import retrofit2.http.Part
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import com.cactus.bitacora.model.EvidenciaOut
+import com.cactus.bitacora.model.FaceTemplateAuthorizedOut
+import com.cactus.bitacora.model.FaceTemplateEnrollIn
+import com.cactus.bitacora.model.FaceTemplateMetadataOut
+import com.cactus.bitacora.model.FaceTemplateDeactivateIn
+import retrofit2.http.Header
+import retrofit2.http.PATCH
 
 object ApiConfig {
     val BASE_URL: String
@@ -25,13 +32,38 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @POST("face-templates/enroll")
+    suspend fun enrollFaceTemplate(
+        @Header("Authorization") authorization: String,
+        @Body payload: FaceTemplateEnrollIn
+    ): FaceTemplateMetadataOut
+
+    @GET("face-templates/authorized/active")
+    suspend fun getAuthorizedFaceTemplates(
+        @Header("Authorization") authorization: String
+    ): List<FaceTemplateAuthorizedOut>
+
+    @PATCH("face-templates/{id_face_template}/deactivate")
+    suspend fun deactivateFaceTemplate(
+        @Header("Authorization") authorization: String,
+        @Path("id_face_template") idFaceTemplate: Int,
+        @Body payload: FaceTemplateDeactivateIn
+    )
     @GET("participante/by_qr/{qr}")
     suspend fun getParticipanteByQr(@Path("qr") qr: String): ParticipanteOut
+
+    @GET("participante/search")
+    suspend fun searchParticipantes(@Query("q") query: String): List<ParticipanteOut>
 
     @GET("empleado-area/{id_participante}/activa")
     suspend fun getAsignacionActiva(
         @Path("id_participante") idParticipante: Int
     ): EmpleadoAreaActivaOut
+
+    @GET("empleado-area/{id_participante}/activas")
+    suspend fun getAsignacionesActivas(
+        @Path("id_participante") idParticipante: Int
+    ): List<EmpleadoAreaActivaOut>
 
     @GET("health")
     suspend fun health(): HealthOut

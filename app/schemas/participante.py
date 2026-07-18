@@ -5,3 +5,4 @@ class ParticipanteOut(BaseModel):
     nombre: str | None = None
     apellido: str | None = None
     identificacion_participante: str | None = None
+    documento: str | None = None
