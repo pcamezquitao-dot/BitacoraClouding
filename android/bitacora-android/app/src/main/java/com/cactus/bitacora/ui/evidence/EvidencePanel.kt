@@ -2,12 +2,14 @@ package com.cactus.bitacora.ui.evidence
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -45,6 +47,7 @@ import com.cactus.bitacora.data.local.GpsStatus
 import com.cactus.bitacora.data.local.SyncStatus
 import com.cactus.bitacora.location.BitacoraLocationProvider
 import java.io.File
+import java.io.IOException
 import java.text.DateFormat
 import java.util.Date
 import java.util.UUID
@@ -67,6 +70,14 @@ internal fun shouldPersistEvidence(action: EvidenceReviewAction): Boolean =
 
 internal fun shouldDeleteTemporaryEvidence(localMetadataSaved: Boolean): Boolean =
     localMetadataSaved
+
+internal fun evidenceCaptureErrorMessage(error: Throwable): String = when (error) {
+    is SecurityException -> "No fue posible abrir la cámara por falta de permisos"
+    is ActivityNotFoundException -> "No hay una aplicación de cámara disponible"
+    is IOException -> "No fue posible crear el archivo temporal"
+    is IllegalArgumentException -> "No fue posible compartir el archivo con la cámara"
+    else -> "No fue posible iniciar la captura"
+}
 
 @Composable
 fun EvidencePanel(
@@ -92,8 +103,15 @@ fun EvidencePanel(
     }
 
     fun newTemporaryFile(extension: String): File {
-        val directory = File(context.cacheDir, "evidencias_temporales").apply { mkdirs() }
-        return File(directory, "${UUID.randomUUID()}.$extension")
+        val directory = File(context.cacheDir, "evidencias_temporales")
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw IOException("No se pudo crear el directorio temporal")
+        }
+        return File(directory, "${UUID.randomUUID()}.$extension").apply {
+            if (!createNewFile()) {
+                throw IOException("No se pudo crear el archivo temporal")
+            }
+        }
     }
 
     fun fileUri(file: File): Uri =
@@ -140,6 +158,11 @@ fun EvidencePanel(
                     syncStatus = SyncStatus.PENDIENTE_CREAR
                 )
             )
+            Log.i(
+                EVIDENCE_LOG_TAG,
+                "Metadatos SQLite creados localId=$bitacoraLocalId " +
+                    "tipo=${review.type} ruta=${definitive.absolutePath}"
+            )
             if (shouldDeleteTemporaryEvidence(localMetadataSaved = true)) {
                 review.file.delete()
             }
@@ -149,6 +172,11 @@ fun EvidencePanel(
             refresh()
         } catch (error: Exception) {
             definitive.delete()
+            Log.e(
+                EVIDENCE_LOG_TAG,
+                "Error controlado al guardar evidencia localId=$bitacoraLocalId " +
+                    "tipo=${review.type}: ${error.javaClass.simpleName}"
+            )
             message = "No se pudo guardar la evidencia"
         }
     }
@@ -157,6 +185,10 @@ fun EvidencePanel(
 
     val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val file = pendingFile
+        Log.i(
+            EVIDENCE_LOG_TAG,
+            "Resultado fotografía recibido ok=$ok archivoDisponible=${file?.exists() == true}"
+        )
         if (ok && file != null) {
             preview = PendingEvidencePreview(file, EvidenceType.PHOTO, "image/jpeg")
         } else {
@@ -167,6 +199,10 @@ fun EvidencePanel(
     }
     val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok ->
         val file = pendingFile
+        Log.i(
+            EVIDENCE_LOG_TAG,
+            "Resultado video recibido ok=$ok archivoDisponible=${file?.exists() == true}"
+        )
         if (ok && file != null) {
             preview = PendingEvidencePreview(
                 file,
@@ -208,6 +244,7 @@ fun EvidencePanel(
         } else {
             pendingFile?.delete()
             pendingFile = null
+            pendingType = null
             message = "Permiso rechazado. No se puede capturar la evidencia."
         }
     }
@@ -231,18 +268,50 @@ fun EvidencePanel(
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
         } else {
-            when (type) {
-                EvidenceType.PHOTO -> {
-                    pendingFile = newTemporaryFile("jpg")
-                    photoLauncher.launch(fileUri(requireNotNull(pendingFile)))
+            try {
+                Log.i(EVIDENCE_LOG_TAG, "Inicio de captura tipo=$type")
+                when (type) {
+                    EvidenceType.PHOTO -> {
+                        val file = newTemporaryFile("jpg")
+                        val uri = fileUri(file)
+                        pendingFile = file
+                        Log.i(EVIDENCE_LOG_TAG, "URI temporal creada tipo=$type uri=$uri")
+                        photoLauncher.launch(uri)
+                    }
+                    EvidenceType.VIDEO -> {
+                        val file = newTemporaryFile("mp4")
+                        val uri = fileUri(file)
+                        pendingFile = file
+                        Log.i(EVIDENCE_LOG_TAG, "URI temporal creada tipo=$type uri=$uri")
+                        videoLauncher.launch(uri)
+                    }
+                    EvidenceType.AUDIO ->
+                        audioLauncher.launch(Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION))
+                    else -> Unit
                 }
-                EvidenceType.VIDEO -> {
-                    pendingFile = newTemporaryFile("mp4")
-                    videoLauncher.launch(fileUri(requireNotNull(pendingFile)))
+            } catch (error: Exception) {
+                if (
+                    error !is SecurityException &&
+                    error !is ActivityNotFoundException &&
+                    error !is IOException &&
+                    error !is IllegalArgumentException
+                ) {
+                    Log.e(
+                        EVIDENCE_LOG_TAG,
+                        "Error inesperado controlado al iniciar captura tipo=$type",
+                        error
+                    )
+                } else {
+                    Log.e(
+                        EVIDENCE_LOG_TAG,
+                        "Error controlado al iniciar captura tipo=$type: " +
+                            error.javaClass.simpleName
+                    )
                 }
-                EvidenceType.AUDIO ->
-                    audioLauncher.launch(Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION))
-                else -> Unit
+                pendingFile?.delete()
+                pendingFile = null
+                pendingType = null
+                message = evidenceCaptureErrorMessage(error)
             }
         }
     }
@@ -448,6 +517,8 @@ private fun mediaDurationSeconds(file: File): Int? =
                 ?.let { (it / 1000L).toInt() }
         }
     }.getOrNull()
+
+private const val EVIDENCE_LOG_TAG = "BitacoraEvidence"
 
 private val EvidenceType.label: String
     get() = when (this) {
