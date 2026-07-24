@@ -37,4 +37,11 @@ class BitacoraAreaEvidenciaUpdate(BaseModel):
 
 class BitacoraAreaEvidenciaResponse(BitacoraAreaEvidenciaCreate):
     id_evidencia: int
+    id_evidencia_origen: int | None = None
+    transcripcion_estado: str | None = None
+    transcripcion_motor: str | None = None
+    transcripcion_idioma: str | None = None
+    transcripcion_fecha: datetime | None = None
+    transcripcion_error: str | None = None
+    transcripcion_intentos: int = 0
     created_at: datetime

@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -136,6 +137,7 @@ fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = f
     var detailError by remember { mutableStateOf<String?>(null) }
     var pendingBitacoraDeletion by remember { mutableStateOf<BitacoraLocalEntity?>(null) }
     var pendingEvidenceDeletion by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
+    var pendingOldestDeletion by remember { mutableStateOf(false) }
     var deletionInProgress by remember { mutableStateOf(false) }
     var deletionError by remember { mutableStateOf<String?>(null) }
 
@@ -192,7 +194,15 @@ fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = f
     LaunchedEffect(Unit) { load() }
 
     when (level) {
-        QueryLevel.LIST -> QueryList(state = state, onRetry = ::load, onSelect = ::openDetail)
+        QueryLevel.LIST -> QueryList(
+            state = state,
+            allowDelete = allowDelete,
+            deletionInProgress = deletionInProgress,
+            deletionError = deletionError,
+            onDeleteOldest = { pendingOldestDeletion = true },
+            onRetry = ::load,
+            onSelect = ::openDetail
+        )
         QueryLevel.DETAIL -> selected?.let {
             BitacoraQueryDetail(
                 bitacora = it,
@@ -238,6 +248,32 @@ fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = f
                         load()
                     } catch (error: Exception) {
                         deletionError = error.message ?: "No fue posible eliminar la bitácora"
+                    } finally {
+                        deletionInProgress = false
+                    }
+                }
+            }
+        )
+    }
+    if (pendingOldestDeletion) {
+        DeleteConfirmationDialog(
+            title = "Eliminar las 10 bitácoras más antiguas",
+            message = "Se eliminarán permanentemente hasta 10 bitácoras, comenzando por " +
+                "las más antiguas, junto con todas sus evidencias y archivos asociados. " +
+                "Esta acción no se puede deshacer.",
+            enabled = !deletionInProgress,
+            onDismiss = { pendingOldestDeletion = false },
+            onConfirm = {
+                pendingOldestDeletion = false
+                deletionInProgress = true
+                deletionError = null
+                scope.launch {
+                    try {
+                        repository.deleteOldestBitacoras(10)
+                        load()
+                    } catch (error: Exception) {
+                        deletionError = error.message
+                            ?: "No fue posible eliminar las bitácoras más antiguas"
                     } finally {
                         deletionInProgress = false
                     }
@@ -295,11 +331,32 @@ private fun DeleteConfirmationDialog(
 @Composable
 private fun QueryList(
     state: QueryLoadState,
+    allowDelete: Boolean,
+    deletionInProgress: Boolean,
+    deletionError: String?,
+    onDeleteOldest: () -> Unit,
     onRetry: () -> Unit,
     onSelect: (BitacoraLocalEntity) -> Unit
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Consultar bitácoras", style = MaterialTheme.typography.titleLarge)
+        if (allowDelete) {
+            Button(
+                enabled = !deletionInProgress,
+                onClick = onDeleteOldest,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Borrar las 10 bitácoras más antiguas")
+            }
+            deletionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (deletionInProgress) {
+                CircularProgressIndicator()
+                Text("Eliminando bitácoras y evidencias")
+            }
+        }
         when (state) {
             QueryLoadState.Loading -> {
                 CircularProgressIndicator()

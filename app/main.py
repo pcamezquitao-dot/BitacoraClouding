@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +25,7 @@ from app.routers.bitacora_area_evidencia import router as bitacora_area_evidenci
 from app.routers.face_templates import router as face_templates_router
 from app.routers.catalogos import router as catalogos_router
 from app.services.evidencia_file_service import evidencia_root
+from app.services.audio_transcription_service import recover_pending_transcriptions
 
 # =========================
 # 3) Crear app
@@ -45,6 +47,15 @@ app.include_router(empleado_area_router)
 app.include_router(bitacora_area_evidencia_router)
 app.include_router(face_templates_router)
 app.include_router(catalogos_router)
+
+
+@app.on_event("startup")
+def recover_audio_transcriptions():
+    Thread(
+        target=recover_pending_transcriptions,
+        name="audio-transcription-recovery",
+        daemon=True,
+    ).start()
 
 @app.get("/")
 def root():

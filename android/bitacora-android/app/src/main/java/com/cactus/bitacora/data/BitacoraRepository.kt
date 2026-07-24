@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
 import com.cactus.bitacora.data.local.BitacoraDao
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
+import com.cactus.bitacora.data.local.BitacoraLocalEntity
 import com.cactus.bitacora.data.local.BitacoraQueryHeader
 import com.cactus.bitacora.data.local.EvidenceType
 import com.cactus.bitacora.data.local.GpsStatus
@@ -27,6 +28,8 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+internal fun remoteDeleteAlreadySatisfied(statusCode: Int): Boolean = statusCode == 404
 
 class BitacoraRepository(
     context: Context,
@@ -332,7 +335,17 @@ class BitacoraRepository(
 
     suspend fun deleteEvidence(localId: Long) {
         val evidence = evidenceDao.getById(localId) ?: return
-        evidence.remoteId?.let { api.deleteEvidence(it) }
+        evidence.remoteId?.let { remoteId ->
+            try {
+                api.deleteEvidence(remoteId)
+            } catch (error: HttpException) {
+                if (!remoteDeleteAlreadySatisfied(error.code())) throw error
+                Log.i(
+                    SYNC_TAG,
+                    "evidence remoteId=$remoteId already absent; deleting local copy"
+                )
+            }
+        }
         evidence.localFilePath?.let { path ->
             val file = File(path)
             check(!file.exists() || file.delete()) { "No se pudo eliminar el archivo local" }
@@ -343,7 +356,17 @@ class BitacoraRepository(
     suspend fun deleteBitacora(localId: Long) {
         val bitacora = bitacoraDao.getById(localId) ?: return
         val evidences = evidenceDao.getAllForBitacora(localId, bitacora.backendId)
-        bitacora.backendId?.let { api.deleteBitacora(it) }
+        bitacora.backendId?.let { backendId ->
+            try {
+                api.deleteBitacora(backendId)
+            } catch (error: HttpException) {
+                if (!remoteDeleteAlreadySatisfied(error.code())) throw error
+                Log.i(
+                    SYNC_TAG,
+                    "bitacora backendId=$backendId already absent; deleting local copy"
+                )
+            }
+        }
         evidences.forEach { evidence ->
             evidence.localFilePath?.let { path ->
                 val file = File(path)
@@ -356,6 +379,16 @@ class BitacoraRepository(
             evidenceDao.deleteForBitacora(localId, bitacora.backendId)
             bitacoraDao.deleteById(localId)
         }
+    }
+
+    suspend fun deleteOldestBitacoras(limit: Int = 10): Int {
+        require(limit > 0) { "La cantidad debe ser mayor que cero" }
+        val oldest = bitacoraDao.getAllForQuery()
+            .map { it.bitacora }
+            .sortedWith(compareBy<BitacoraLocalEntity> { it.createdAtMillis }.thenBy { it.localId })
+            .take(limit)
+        oldest.forEach { deleteBitacora(it.localId) }
+        return oldest.size
     }
 
     private suspend fun syncEvidence(evidence: BitacoraEvidenceEntity): SyncItemResult {

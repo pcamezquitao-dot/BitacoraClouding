@@ -3,7 +3,16 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -21,13 +30,20 @@ from app.services.evidencia_file_service import (
     resolve_evidencia_path,
     save_validated_evidence,
 )
+from app.services.audio_transcription_service import (
+    ERROR as TRANSCRIPTION_ERROR,
+    PENDING as TRANSCRIPTION_PENDING,
+    transcribe_audio_evidence,
+)
 
 router = APIRouter(prefix="/bitacora-area-evidencias", tags=["Bitácora área evidencias"])
 
 COLUMNAS = """
-    id_evidencia, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
+    id_evidencia, id_evidencia_origen, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
     archivo_url, contenido_texto, archivo_nombre, archivo_hash, mime_type, duracion_seg,
     tamanio_bytes, orden, latitud, longitud, precision_gps,
+    transcripcion_estado, transcripcion_motor, transcripcion_idioma,
+    transcripcion_fecha, transcripcion_error, transcripcion_intentos,
     uuid_cliente, created_at
 """
 logger = logging.getLogger("bitacora.sync")
@@ -76,15 +92,26 @@ def _insert(db: Session, payload: BitacoraAreaEvidenciaCreate):
     elif not payload.archivo_url:
         raise HTTPException(status_code=422, detail="archivo_url es obligatorio para evidencia multimedia")
     values = payload.model_dump(mode="json")
+    values["transcripcion_estado"] = (
+        TRANSCRIPTION_PENDING if payload.id_tipo_evidencia == 2 else None
+    )
+    values["transcripcion_motor"] = (
+        settings.TRANSCRIPTION_ENGINE if payload.id_tipo_evidencia == 2 else None
+    )
+    values["transcripcion_idioma"] = (
+        settings.TRANSCRIPTION_LANGUAGE if payload.id_tipo_evidencia == 2 else None
+    )
     result = db.execute(text(f"""
         INSERT INTO {settings.BAE_TABLE}
             (id_bitacora, id_area, ts_in_min, id_tipo_evidencia, archivo_url, contenido_texto,
              archivo_nombre, archivo_hash, mime_type, duracion_seg, tamanio_bytes,
-             orden, latitud, longitud, precision_gps, uuid_cliente)
+             orden, latitud, longitud, precision_gps, uuid_cliente,
+             transcripcion_estado, transcripcion_motor, transcripcion_idioma)
         VALUES
             (:id_bitacora, :id_area, :ts_in_min, :id_tipo_evidencia, :archivo_url, :contenido_texto,
              :archivo_nombre, :archivo_hash, :mime_type, :duracion_seg, :tamanio_bytes,
-             :orden, :latitud, :longitud, :precision_gps, :uuid_cliente)
+             :orden, :latitud, :longitud, :precision_gps, :uuid_cliente,
+             :transcripcion_estado, :transcripcion_motor, :transcripcion_idioma)
     """), values)
     return _get(db, int(result.lastrowid))
 
@@ -139,6 +166,7 @@ def crear_metadatos(payload: BitacoraAreaEvidenciaCreate, db: Session = Depends(
 
 @router.post("/upload", response_model=BitacoraAreaEvidenciaResponse, status_code=201)
 def crear_con_archivo(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     id_bitacora: int = Form(...),
     id_area: int = Form(...),
@@ -207,6 +235,8 @@ def crear_con_archivo(
             detected_size,
             row["id_evidencia"],
         )
+        if id_tipo_evidencia == 2:
+            background_tasks.add_task(transcribe_audio_evidence, int(row["id_evidencia"]))
         return row
     except HTTPException:
         db.rollback()
@@ -232,6 +262,38 @@ def crear_con_archivo(
             type(exc).__name__,
         )
         raise HTTPException(status_code=400, detail=f"No se pudo cargar la evidencia: {exc}")
+
+
+@router.post("/{id_evidencia}/transcripcion/reintentar", status_code=202)
+def reintentar_transcripcion(
+    id_evidencia: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    audio = _get(db, id_evidencia)
+    if not audio:
+        raise HTTPException(status_code=404, detail="Evidencia no encontrada")
+    if audio["id_tipo_evidencia"] != 2:
+        raise HTTPException(status_code=422, detail="La evidencia no es un audio")
+    db.execute(
+        text(
+            f"""
+            UPDATE {settings.BAE_TABLE}
+            SET transcripcion_estado=:estado,
+                transcripcion_error=NULL
+            WHERE id_evidencia=:id
+              AND transcripcion_estado=:error
+            """
+        ),
+        {
+            "estado": TRANSCRIPTION_PENDING,
+            "error": TRANSCRIPTION_ERROR,
+            "id": id_evidencia,
+        },
+    )
+    db.commit()
+    background_tasks.add_task(transcribe_audio_evidence, id_evidencia)
+    return {"id_evidencia": id_evidencia, "transcripcion_estado": TRANSCRIPTION_PENDING}
 
 
 @router.patch("/{id_evidencia}", response_model=BitacoraAreaEvidenciaResponse)

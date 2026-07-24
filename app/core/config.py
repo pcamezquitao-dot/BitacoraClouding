@@ -27,4 +27,10 @@ class Settings(BaseSettings):
     FACE_TEMPLATE_API_TOKEN: str = ""
     FACE_TEMPLATE_MASTER_KEY: str = ""
 
+    FFMPEG_PATH: str = "/usr/bin/ffmpeg"
+    WHISPER_CLI_PATH: str = "/srv/bitacora/tools/whisper.cpp/build/bin/whisper-cli"
+    WHISPER_MODEL_PATH: str = "/srv/bitacora/tools/whisper.cpp/models/ggml-base.bin"
+    TRANSCRIPTION_LANGUAGE: str = "es"
+    TRANSCRIPTION_ENGINE: str = "whisper.cpp/base"
+
 settings = Settings()
