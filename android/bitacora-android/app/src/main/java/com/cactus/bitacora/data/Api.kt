@@ -19,10 +19,13 @@ import retrofit2.http.Part
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import com.cactus.bitacora.model.EvidenciaOut
+import com.cactus.bitacora.model.EvidenciaTextoCreate
 import com.cactus.bitacora.model.FaceTemplateAuthorizedOut
 import com.cactus.bitacora.model.FaceTemplateEnrollIn
 import com.cactus.bitacora.model.FaceTemplateMetadataOut
 import com.cactus.bitacora.model.FaceTemplateDeactivateIn
+import com.cactus.bitacora.model.OfflineCatalogOut
+import com.cactus.bitacora.model.BitacoraDiariaSyncOut
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.DELETE
@@ -33,10 +36,31 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("bitacora_diaria")
+    suspend fun getBitacoras(
+        @Query("offset") offset: Int,
+        @Query("limit") limit: Int
+    ): List<BitacoraDiariaSyncOut>
+
+    @GET("catalogos/offline")
+    suspend fun getOfflineCatalogs(): OfflineCatalogOut
+
     @DELETE("bitacora-area-evidencias/{id_evidencia}")
     suspend fun deleteEvidence(
         @Path("id_evidencia") idEvidence: Int
     )
+
+    @DELETE("bitacora_diaria/{id_bitacora}")
+    suspend fun deleteBitacora(
+        @Path("id_bitacora") idBitacora: Int
+    )
+
+    @GET("bitacora-area-evidencias")
+    suspend fun getEvidences(
+        @Query("id_bitacora") idBitacora: Int,
+        @Query("offset") offset: Int,
+        @Query("limit") limit: Int
+    ): List<EvidenciaOut>
 
     @POST("face-templates/enroll")
     suspend fun enrollFaceTemplate(
@@ -86,6 +110,11 @@ interface BitacoraApi {
     suspend fun getBitacoraDiaria(
         @Path("id_bitacora") idBitacora: Int
     ): BitacoraDiariaOut
+
+    @POST("bitacora-area-evidencias")
+    suspend fun createTextEvidence(
+        @Body request: EvidenciaTextoCreate
+    ): EvidenciaOut
 
     @Multipart
     @POST("bitacora-area-evidencias/upload")

@@ -33,3 +33,6 @@ class BitacoraDiariaOut(BaseModel):
     ts_out_min: Optional[int] = None
     tipo_anotacion: Optional[int] = None
     observaciones: Optional[str] = None
+
+class BitacoraDiariaSyncOut(BitacoraDiariaOut):
+    client_uuid: Optional[str] = None

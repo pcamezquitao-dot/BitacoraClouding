@@ -31,26 +31,36 @@ class BitacoraLocationProvider(private val context: Context) {
         check(isLocationEnabled()) { "La ubicación está desactivada" }
 
         return suspendCancellableCoroutine { continuation ->
-            client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                .addOnSuccessListener { location ->
-                    if (location == null) {
-                        continuation.resumeWithException(
-                            IllegalStateException("No fue posible obtener una ubicación actual")
-                        )
-                    } else {
-                        continuation.resume(
-                            LocationSnapshot(
-                                latitude = location.latitude,
-                                longitude = location.longitude,
-                                accuracy = location.accuracy,
-                                altitude = location.altitude.takeIf { location.hasAltitude() },
-                                timestamp = location.time,
-                                provider = location.provider ?: "fused"
+            if (!hasPermission()) {
+                continuation.resumeWithException(
+                    SecurityException("El permiso de ubicación fue revocado")
+                )
+                return@suspendCancellableCoroutine
+            }
+            try {
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener { location ->
+                        if (location == null) {
+                            continuation.resumeWithException(
+                                IllegalStateException("No fue posible obtener una ubicación actual")
                             )
-                        )
+                        } else {
+                            continuation.resume(
+                                LocationSnapshot(
+                                    latitude = location.latitude,
+                                    longitude = location.longitude,
+                                    accuracy = location.accuracy,
+                                    altitude = location.altitude.takeIf { location.hasAltitude() },
+                                    timestamp = location.time,
+                                    provider = location.provider ?: "fused"
+                                )
+                            )
+                        }
                     }
-                }
-                .addOnFailureListener { continuation.resumeWithException(it) }
+                    .addOnFailureListener { continuation.resumeWithException(it) }
+            } catch (error: SecurityException) {
+                continuation.resumeWithException(error)
+            }
         }
     }
 }

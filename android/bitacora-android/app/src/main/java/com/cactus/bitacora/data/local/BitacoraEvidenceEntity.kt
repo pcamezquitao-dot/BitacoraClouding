@@ -9,6 +9,7 @@ import androidx.room.ColumnInfo
     tableName = "bitacora_evidences",
     indices = [
         Index(value = ["bitacoraLocalId"]),
+        Index(value = ["bitacoraServerId"]),
         Index(value = ["syncStatus"]),
         Index(value = ["createdAt"]),
         Index(value = ["clientUuid"], unique = true)
@@ -19,6 +20,7 @@ data class BitacoraEvidenceEntity(
     val localId: Long = 0,
     val remoteId: Int? = null,
     val bitacoraLocalId: Long,
+    val bitacoraServerId: Int? = null,
     @ColumnInfo(defaultValue = "0") val areaId: Int,
     val clientUuid: String,
     val evidenceType: EvidenceType,

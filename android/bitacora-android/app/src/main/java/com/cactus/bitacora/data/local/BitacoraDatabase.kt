@@ -11,15 +11,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         BitacoraLocalEntity::class,
         BitacoraEvidenceEntity::class,
-        FaceTemplateEntity::class
+        FaceTemplateEntity::class,
+        ParticipanteLocalEntity::class,
+        AreaAdministrativaLocalEntity::class,
+        EmpleadoAreaLocalEntity::class,
+        CatalogSyncStateEntity::class
     ],
-    version = 8,
+    version = 11,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun bitacoraDao(): BitacoraDao
     abstract fun evidenceDao(): BitacoraEvidenceDao
     abstract fun faceTemplateDao(): FaceTemplateDao
+    abstract fun referenceCatalogDao(): ReferenceCatalogDao
 
     companion object {
         @Volatile
@@ -38,7 +43,10 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11
                 ).build().also { instance = it }
             }
 
@@ -173,6 +181,128 @@ abstract class BitacoraDatabase : RoomDatabase() {
                         "TEXT NOT NULL DEFAULT ''"
                 )
                 db.execSQL("ALTER TABLE bitacora_evidences ADD COLUMN fileHash TEXT")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS participantes_locales (
+                        idParticipante INTEGER NOT NULL PRIMARY KEY,
+                        codigoQr TEXT NOT NULL,
+                        nombre TEXT,
+                        apellido TEXT,
+                        documento TEXT,
+                        activo INTEGER NOT NULL DEFAULT 1,
+                        updatedAtServer TEXT,
+                        syncedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_participantes_locales_codigoQr " +
+                        "ON participantes_locales(codigoQr)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_participantes_locales_activo " +
+                        "ON participantes_locales(activo)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS areas_administrativas_locales (
+                        idArea INTEGER NOT NULL PRIMARY KEY,
+                        codigoQr TEXT NOT NULL,
+                        nombreArea TEXT NOT NULL,
+                        activo INTEGER NOT NULL DEFAULT 1,
+                        updatedAtServer TEXT,
+                        syncedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_areas_administrativas_locales_codigoQr " +
+                        "ON areas_administrativas_locales(codigoQr)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_areas_administrativas_locales_activo " +
+                        "ON areas_administrativas_locales(activo)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS empleado_area_locales (
+                        idParticipante INTEGER NOT NULL,
+                        idArea INTEGER NOT NULL,
+                        cargo INTEGER,
+                        fechaFinal TEXT,
+                        activo INTEGER NOT NULL DEFAULT 1,
+                        updatedAtServer TEXT,
+                        syncedAtMillis INTEGER NOT NULL,
+                        PRIMARY KEY(idParticipante, idArea)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_empleado_area_locales_idParticipante " +
+                        "ON empleado_area_locales(idParticipante)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_empleado_area_locales_idArea " +
+                        "ON empleado_area_locales(idArea)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_empleado_area_locales_activo " +
+                        "ON empleado_area_locales(activo)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS catalog_sync_state (
+                        catalogKey TEXT NOT NULL PRIMARY KEY,
+                        lastSuccessfulSyncMillis INTEGER,
+                        participantCount INTEGER NOT NULL DEFAULT 0,
+                        areaCount INTEGER NOT NULL DEFAULT 0,
+                        assignmentCount INTEGER NOT NULL DEFAULT 0,
+                        lastError TEXT
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE bitacora_evidences ADD COLUMN bitacoraServerId INTEGER"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "index_bitacora_evidences_bitacoraServerId " +
+                        "ON bitacora_evidences(bitacoraServerId)"
+                )
+                db.execSQL(
+                    """
+                    UPDATE bitacora_evidences
+                    SET bitacoraServerId = (
+                        SELECT backendId FROM bitacoras_locales b
+                        WHERE b.localId = bitacora_evidences.bitacoraLocalId
+                    )
+                    WHERE bitacoraServerId IS NULL
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    UPDATE face_templates
+                    SET active = 1
+                    WHERE active = 0
+                      AND centralSyncState = 'SINCRONIZADO'
+                      AND length(encryptedEmbedding) > 0
+                    """.trimIndent()
+                )
             }
         }
     }

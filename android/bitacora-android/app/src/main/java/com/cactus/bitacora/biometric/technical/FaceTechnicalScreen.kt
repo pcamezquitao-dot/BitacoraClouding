@@ -246,7 +246,17 @@ fun FaceTechnicalScreen(
     }
 
     LaunchedEffect(mode, enrollmentIdentity?.participantId) {
-        activeTemplateCount = repository.activeCount()
+        activeTemplateCount = try {
+            if (mode == FaceFlowMode.IDENTIFICATION) {
+                repository.ensureActiveTemplatesAvailable()
+            } else {
+                repository.activeCount()
+            }
+        } catch (error: Exception) {
+            visibleState = FaceVisibleState.ERROR
+            detail = error.message ?: "No fue posible cargar los enrolamientos"
+            null
+        }
         existingEnrollment = if (mode == FaceFlowMode.ENROLLMENT) {
             enrollmentIdentity?.let { repository.getEnrollment(it.participantId) != null }
         } else {
@@ -480,7 +490,8 @@ fun FaceTechnicalScreen(
                 candidate == null &&
                 !enrollmentSaved &&
                 !enrollmentReady &&
-                (mode == FaceFlowMode.ENROLLMENT || activeTemplateCount != 0),
+                (mode == FaceFlowMode.ENROLLMENT ||
+                    (activeTemplateCount != null && activeTemplateCount != 0)),
             onClick = {
                 operationInProgress = true
                 qualityAccepted = false
@@ -706,6 +717,7 @@ private class FaceTechnicalAnalyzer(
         captureRequested.set(false)
     }
 
+    @androidx.camera.core.ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
         if (!busy.compareAndSet(false, true)) {
             imageProxy.close()

@@ -15,11 +15,34 @@ interface BitacoraEvidenceDao {
     @Update
     suspend fun update(evidence: BitacoraEvidenceEntity)
 
-    @Query("SELECT * FROM bitacora_evidences WHERE bitacoraLocalId = :bitacoraLocalId ORDER BY createdAt ASC")
-    suspend fun getForBitacora(bitacoraLocalId: Long): List<BitacoraEvidenceEntity>
+    @Query(
+        "SELECT * FROM bitacora_evidences WHERE syncStatus != 'PENDIENTE_ELIMINAR' AND (" +
+            "bitacoraLocalId = :bitacoraLocalId " +
+            "OR (:bitacoraServerId IS NOT NULL AND bitacoraServerId = :bitacoraServerId)) " +
+            "ORDER BY createdAt ASC"
+    )
+    suspend fun getForBitacora(
+        bitacoraLocalId: Long,
+        bitacoraServerId: Int? = null
+    ): List<BitacoraEvidenceEntity>
+
+    @Query(
+        "SELECT * FROM bitacora_evidences WHERE bitacoraLocalId = :bitacoraLocalId " +
+            "OR (:bitacoraServerId IS NOT NULL AND bitacoraServerId = :bitacoraServerId)"
+    )
+    suspend fun getAllForBitacora(
+        bitacoraLocalId: Long,
+        bitacoraServerId: Int? = null
+    ): List<BitacoraEvidenceEntity>
 
     @Query("SELECT * FROM bitacora_evidences WHERE localId = :localId LIMIT 1")
     suspend fun getById(localId: Long): BitacoraEvidenceEntity?
+
+    @Query("SELECT * FROM bitacora_evidences WHERE clientUuid = :clientUuid LIMIT 1")
+    suspend fun getByClientUuid(clientUuid: String): BitacoraEvidenceEntity?
+
+    @Query("SELECT * FROM bitacora_evidences WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(remoteId: Int): BitacoraEvidenceEntity?
 
     @Query("SELECT * FROM bitacora_evidences WHERE syncStatus IN (:statuses) ORDER BY createdAt ASC")
     suspend fun getBySyncStatuses(statuses: List<SyncStatus>): List<BitacoraEvidenceEntity>
@@ -40,6 +63,12 @@ interface BitacoraEvidenceDao {
     suspend fun deleteById(localId: Long)
 
     @Query(
+        "DELETE FROM bitacora_evidences WHERE bitacoraLocalId = :bitacoraLocalId " +
+            "OR (:bitacoraServerId IS NOT NULL AND bitacoraServerId = :bitacoraServerId)"
+    )
+    suspend fun deleteForBitacora(bitacoraLocalId: Long, bitacoraServerId: Int? = null)
+
+    @Query(
         """
         UPDATE bitacora_evidences
         SET syncStatus = 'PENDIENTE_ELIMINAR', lastSyncError = NULL
@@ -54,5 +83,26 @@ interface BitacoraEvidenceDao {
             "La evidencia requiere GPS antes de quedar pendiente de sincronización"
         }
         return insert(evidence)
+    }
+
+    @Transaction
+    suspend fun mergeRemoteEvidence(evidence: BitacoraEvidenceEntity) {
+        val existing = getByClientUuid(evidence.clientUuid)
+            ?: evidence.remoteId?.let { getByRemoteId(it) }
+        if (existing == null) {
+            insert(evidence)
+            return
+        }
+        update(
+            evidence.copy(
+                localId = existing.localId,
+                localFilePath = existing.localFilePath,
+                textContent = evidence.textContent ?: existing.textContent,
+                altitude = existing.altitude,
+                gpsTimestamp = existing.gpsTimestamp,
+                locationProvider = existing.locationProvider,
+                syncAttempts = existing.syncAttempts
+            )
+        )
     }
 }

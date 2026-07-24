@@ -50,6 +50,17 @@ data class BitacoraDiariaOut(
     val observaciones: String?
 )
 
+data class BitacoraDiariaSyncOut(
+    val id_bitacora: Int,
+    val id_empleado: Int,
+    val id_supervisor: Int?,
+    val ts_in_min: Int,
+    val ts_out_min: Int?,
+    val tipo_anotacion: Int?,
+    val observaciones: String?,
+    val client_uuid: String?
+)
+
 data class BitacoraAreaObsCreate(
     val id_empleado: Int,
     val qr_area: String,
@@ -72,7 +83,8 @@ data class EvidenciaOut(
     val id_area: Int,
     val ts_in_min: Int,
     val id_tipo_evidencia: Int,
-    val archivo_url: String,
+    val archivo_url: String?,
+    val contenido_texto: String? = null,
     val archivo_nombre: String?,
     val archivo_hash: String?,
     val mime_type: String?,
@@ -84,6 +96,48 @@ data class EvidenciaOut(
     val precision_gps: Double?,
     val uuid_cliente: String,
     val created_at: String
+)
+
+data class EvidenciaTextoCreate(
+    val id_bitacora: Int,
+    val id_area: Int,
+    val ts_in_min: Int,
+    val id_tipo_evidencia: Int = 4,
+    val contenido_texto: String,
+    val uuid_cliente: String
+)
+
+data class CatalogParticipantOut(
+    val id_participante: Int,
+    val identificacion_participante: String,
+    val nombre: String? = null,
+    val apellido: String? = null,
+    val documento: String? = null,
+    val activo: Boolean = true,
+    val updated_at: String? = null
+)
+
+data class CatalogAreaOut(
+    val id_area: Int,
+    val descripcion: String,
+    val activo: Boolean = true,
+    val updated_at: String? = null
+)
+
+data class CatalogAssignmentOut(
+    val id_participante: Int,
+    val id_area: Int,
+    val cargo: Int? = null,
+    val fecha_final: String? = null,
+    val activo: Boolean = true,
+    val updated_at: String? = null
+)
+
+data class OfflineCatalogOut(
+    val generated_at: String,
+    val participantes: List<CatalogParticipantOut>,
+    val areas: List<CatalogAreaOut>,
+    val empleado_areas: List<CatalogAssignmentOut>
 )
 
 data class FaceTemplateEnrollIn(

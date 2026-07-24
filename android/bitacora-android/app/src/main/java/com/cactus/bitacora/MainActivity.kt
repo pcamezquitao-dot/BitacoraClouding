@@ -70,6 +70,7 @@ import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.location.BitacoraLocationProvider
 import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
+import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import com.cactus.bitacora.biometric.FaceIdentificationTarget
 import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
 import com.cactus.bitacora.biometric.technical.FaceFlowMode
@@ -110,6 +111,29 @@ internal enum class AppScreen {
     Sync
 }
 
+internal enum class AppEnvironment(val label: String) {
+    ADMINISTRADOR("Administrador"),
+    CIUDADANO("Ciudadano")
+}
+
+internal const val ADMIN_ONLY_MESSAGE =
+    "Esta función está disponible únicamente para el administrador"
+
+internal fun canAccessEnrollment(environment: AppEnvironment?): Boolean =
+    environment == AppEnvironment.ADMINISTRADOR
+
+internal fun isScreenAllowed(environment: AppEnvironment?, screen: AppScreen): Boolean =
+    screen != AppScreen.FaceEnrollment || canAccessEnrollment(environment)
+
+internal fun environmentMenuScreens(environment: AppEnvironment): List<AppScreen> =
+    buildList {
+        add(AppScreen.Health)
+        if (canAccessEnrollment(environment)) add(AppScreen.FaceEnrollment)
+        add(AppScreen.CreateDailyLog)
+        add(AppScreen.QueryDailyLog)
+        add(AppScreen.Sync)
+    }
+
 private sealed interface ConnectionState {
     data object Idle : ConnectionState
     data object Loading : ConnectionState
@@ -123,13 +147,6 @@ private sealed interface CreateBitacoraState {
     data class Success(val localId: Long, val idBitacora: Int, val areaId: Int) : CreateBitacoraState
     data class Pending(val localId: Long, val areaId: Int, val message: String) : CreateBitacoraState
     data class Error(val message: String) : CreateBitacoraState
-}
-
-private sealed interface QueryBitacoraState {
-    data object Idle : QueryBitacoraState
-    data object Loading : QueryBitacoraState
-    data class Success(val bitacora: BitacoraDiariaOut) : QueryBitacoraState
-    data class Error(val message: String) : QueryBitacoraState
 }
 
 private sealed interface SyncState {
@@ -156,12 +173,37 @@ private data class DailyLogFaceSession(
 fun BitacoraApp() {
     val context = LocalContext.current.applicationContext
     val repository = remember { BitacoraRepository(context) }
+    var activeEnvironment by remember { mutableStateOf<AppEnvironment?>(null) }
     var currentScreen by remember { mutableStateOf(AppScreen.Health) }
+    var navigationMessage by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         OfflineSyncScheduler.schedule(context)
+        OfflineSyncScheduler.enqueueNow(context)
     }
-    BackHandler(enabled = currentScreen != AppScreen.Health) {
+    BackHandler(enabled = activeEnvironment != null && currentScreen != AppScreen.Health) {
         currentScreen = mainDestinationAfterBack()
+    }
+
+    fun selectEnvironment(environment: AppEnvironment) {
+        activeEnvironment = environment
+        currentScreen = AppScreen.Health
+        navigationMessage = null
+    }
+
+    fun changeEnvironment() {
+        currentScreen = AppScreen.Health
+        navigationMessage = null
+        activeEnvironment = null
+    }
+
+    fun openScreen(screen: AppScreen) {
+        if (isScreenAllowed(activeEnvironment, screen)) {
+            currentScreen = screen
+            navigationMessage = null
+        } else {
+            currentScreen = AppScreen.Health
+            navigationMessage = ADMIN_ONLY_MESSAGE
+        }
     }
 
     Scaffold { padding ->
@@ -177,12 +219,32 @@ fun BitacoraApp() {
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            Button(
+            val environment = activeEnvironment
+            if (environment == null) {
+                EnvironmentSelectionScreen(onSelect = ::selectEnvironment)
+                return@Column
+            }
+
+            Text(
+                "Ambiente: ${environment.label}",
+                style = MaterialTheme.typography.titleMedium
+            )
+            OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = currentScreen != AppScreen.FaceEnrollment,
-                onClick = { currentScreen = AppScreen.FaceEnrollment }
-            ) {
-                Text("Enrolamiento facial")
+                onClick = ::changeEnvironment
+            ) { Text("Cambiar ambiente") }
+            navigationMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            if (canAccessEnrollment(environment)) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = currentScreen != AppScreen.FaceEnrollment,
+                    onClick = { openScreen(AppScreen.FaceEnrollment) }
+                ) {
+                    Text("Enrolamiento facial")
+                }
             }
 
             Row(
@@ -192,7 +254,7 @@ fun BitacoraApp() {
                 Button(
                     modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.Health,
-                    onClick = { currentScreen = AppScreen.Health }
+                    onClick = { openScreen(AppScreen.Health) }
                 ) {
                     Text("Health")
                 }
@@ -200,15 +262,15 @@ fun BitacoraApp() {
                 Button(
                     modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.CreateDailyLog,
-                    onClick = { currentScreen = AppScreen.CreateDailyLog }
+                    onClick = { openScreen(AppScreen.CreateDailyLog) }
                 ) {
-                    Text("Crear")
+                    Text("Crear bitácora")
                 }
 
                 Button(
                     modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.QueryDailyLog,
-                    onClick = { currentScreen = AppScreen.QueryDailyLog }
+                    onClick = { openScreen(AppScreen.QueryDailyLog) }
                 ) {
                     Text("Consultar")
                 }
@@ -216,25 +278,60 @@ fun BitacoraApp() {
                 Button(
                     modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.Sync,
-                    onClick = { currentScreen = AppScreen.Sync }
+                    onClick = { openScreen(AppScreen.Sync) }
                 ) {
-                    Text("Sync")
+                    Text("Sincronizar")
                 }
             }
 
             Box(modifier = Modifier.weight(1f)) {
                 when (currentScreen) {
                     AppScreen.Health -> BackendStatusScreen(repository)
-                    AppScreen.FaceEnrollment -> FaceEnrollmentAdminScreen(
-                        repository = repository,
-                        onBack = { currentScreen = mainDestinationAfterBack() }
-                    )
+                    AppScreen.FaceEnrollment -> if (canAccessEnrollment(environment)) {
+                        FaceEnrollmentAdminScreen(
+                            repository = repository,
+                            onBack = { currentScreen = mainDestinationAfterBack() }
+                        )
+                    } else {
+                        RestrictedEnrollmentScreen(
+                            onBack = { currentScreen = mainDestinationAfterBack() }
+                        )
+                    }
                     AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
-                    AppScreen.QueryDailyLog -> ConsultarBitacoraScreen(repository)
+                    AppScreen.QueryDailyLog -> BitacoraQueryScreen(
+                        repository = repository,
+                        allowDelete = environment == AppEnvironment.ADMINISTRADOR
+                    )
                     AppScreen.Sync -> SyncScreen(repository)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Text("Seleccione el ambiente", style = MaterialTheme.typography.headlineSmall)
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.ADMINISTRADOR) }
+        ) { Text("Administrador") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.CIUDADANO) }
+        ) { Text("Ciudadano") }
+    }
+}
+
+@Composable
+private fun RestrictedEnrollmentScreen(onBack: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(ADMIN_ONLY_MESSAGE, color = MaterialTheme.colorScheme.error)
+        Button(onClick = onBack) { Text("Volver") }
     }
 }
 
@@ -310,101 +407,6 @@ fun BackendStatusScreen(repository: BitacoraRepository) {
                 Text(currentState.message)
             }
         }
-    }
-}
-
-@Composable
-fun ConsultarBitacoraScreen(repository: BitacoraRepository) {
-    val scope = rememberCoroutineScope()
-    var idBitacora by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf<QueryBitacoraState>(QueryBitacoraState.Idle) }
-
-    fun queryDailyLog() {
-        val id = idBitacora.toIntOrNull()
-
-        if (id == null) {
-            state = QueryBitacoraState.Error("id_bitacora debe ser numerico")
-            return
-        }
-
-        state = QueryBitacoraState.Loading
-        scope.launch {
-            state = try {
-                val response = repository.getBitacoraDiaria(id)
-                QueryBitacoraState.Success(response)
-            } catch (e: Exception) {
-                QueryBitacoraState.Error(e.message ?: "No fue posible consultar la bitacora")
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "Consultar Bitacora",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = idBitacora,
-            onValueChange = { idBitacora = it },
-            label = { Text("id_bitacora") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true
-        )
-
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state !is QueryBitacoraState.Loading,
-            onClick = { queryDailyLog() }
-        ) {
-            Text("Consultar bitacora")
-        }
-
-        when (val currentState = state) {
-            QueryBitacoraState.Idle -> Text("Estado: pendiente")
-            QueryBitacoraState.Loading -> {
-                CircularProgressIndicator()
-                Text("Estado: consultando bitacora")
-            }
-            is QueryBitacoraState.Success -> {
-                Text(
-                    text = "Bitacora encontrada",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                BitacoraDetail(currentState.bitacora)
-            }
-            is QueryBitacoraState.Error -> {
-                Text(
-                    text = "Error al consultar bitacora",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(currentState.message)
-            }
-        }
-    }
-}
-
-@Composable
-fun BitacoraDetail(bitacora: BitacoraDiariaOut) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text("id_bitacora: ${bitacora.id_bitacora}")
-        Text("id_empleado: ${bitacora.id_empleado}")
-        Text("id_supervisor: ${bitacora.id_supervisor ?: "null"}")
-        Text("ts_in_min: ${bitacora.ts_in_min}")
-        Text("ts_out_min: ${bitacora.ts_out_min ?: "null"}")
-        Text("tipo_anotacion: ${bitacora.tipo_anotacion ?: "null"}")
-        Text("observaciones: ${bitacora.observaciones ?: "null"}")
     }
 }
 
@@ -848,19 +850,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         scope.launch {
             try {
                 val participante = repository.getParticipanteByQr(qr)
-                val asignacion = try {
-                    repository.getAsignacionActiva(participante.id_participante)
-                } catch (e: Exception) {
-                    val detail = e.httpDetail()
-                    if (detail == "Not Found") {
-                        throw IllegalStateException(
-                            "El backend desplegado no incluye el endpoint de empleado_area activa"
-                        )
-                    }
-                    throw IllegalStateException(
-                        detail ?: "El empleado no tiene una asignación de área activa"
-                    )
-                }
+                val asignacion = repository.getAsignacionParaRol(
+                    participante.id_participante,
+                    supervisor = false
+                )
                 empleado = ParticipanteValidado(participante, asignacion)
             } catch (e: Exception) {
                 empleadoError = e.httpDetail()
@@ -884,19 +877,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         scope.launch {
             try {
                 val participante = repository.getParticipanteByQr(qr)
-                val asignacion = try {
-                    repository.getAsignacionActiva(participante.id_participante)
-                } catch (e: Exception) {
-                    val detail = e.httpDetail()
-                    if (detail == "Not Found") {
-                        throw IllegalStateException(
-                            "El backend desplegado no incluye el endpoint de empleado_area activa"
-                        )
-                    }
-                    throw IllegalStateException(
-                        detail ?: "El supervisor no tiene una asignación de área activa"
-                    )
-                }
+                val asignacion = repository.getAsignacionParaRol(
+                    participante.id_participante,
+                    supervisor = true
+                )
                 supervisor = ParticipanteValidado(participante, asignacion)
             } catch (e: Exception) {
                 supervisorError = e.httpDetail()
@@ -935,6 +919,10 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         "El área seleccionada no coincide con la asignación activa del empleado"
                     )
                 }
+                repository.validarAsignacionArea(
+                    empleadoActual.participante.id_participante,
+                    areaConsultada.id_area
+                )
                 area = areaConsultada
             } catch (e: Exception) {
                 areaError = e.httpDetail()
@@ -1169,7 +1157,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 onClick = { startFaceIdentification(DailyLogQrTarget.EMPLEADO) }
             ) { Text("Reconocer rostro") }
             empleado?.let {
-                Text("Empleado validado", color = MaterialTheme.colorScheme.primary)
+                Text("Empleado validado localmente", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
                 Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
                 Text("Área asignada: ${it.asignacion.area_descripcion ?: it.asignacion.id_area}")
@@ -1193,7 +1181,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 onClick = { startFaceIdentification(DailyLogQrTarget.SUPERVISOR) }
             ) { Text("Reconocer rostro") }
             supervisor?.let {
-                Text("Supervisor validado", color = MaterialTheme.colorScheme.primary)
+                Text("Supervisor validado localmente", color = MaterialTheme.colorScheme.primary)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
                 Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
             }
@@ -1212,7 +1200,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         ) {
             qrScannerForTarget(DailyLogQrTarget.AREA)
             area?.let {
-                Text("Área validada", color = MaterialTheme.colorScheme.primary)
+                Text("Área validada localmente", color = MaterialTheme.colorScheme.primary)
                 Text("Descripción: ${it.descripcion}")
             }
         }
@@ -1367,7 +1355,6 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
 
 @Composable
 fun SyncScreen(repository: BitacoraRepository) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<SyncState>(SyncState.Idle) }
 
@@ -1383,8 +1370,27 @@ fun SyncScreen(repository: BitacoraRepository) {
     }
 
     fun syncNow() {
-        OfflineSyncScheduler.enqueueNow(context.applicationContext)
-        loadSummary()
+        state = SyncState.Loading
+        scope.launch {
+            state = try {
+                val result = repository.sincronizarPendientes()
+                SyncState.Ready(repository.getSyncSummary(), result)
+            } catch (e: Exception) {
+                SyncState.Error(e.message ?: "No fue posible ejecutar la sincronización")
+            }
+        }
+    }
+
+    fun refreshCatalogs() {
+        state = SyncState.Loading
+        scope.launch {
+            val result = repository.syncReferenceCatalogs()
+            state = if (result.success) {
+                SyncState.Ready(repository.getSyncSummary(), null)
+            } else {
+                SyncState.Error(result.error ?: "No fue posible actualizar los catálogos")
+            }
+        }
     }
 
     Column(
@@ -1414,6 +1420,14 @@ fun SyncScreen(repository: BitacoraRepository) {
             Text("Sincronizar ahora")
         }
 
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state !is SyncState.Loading,
+            onClick = { refreshCatalogs() }
+        ) {
+            Text("Actualizar catálogos")
+        }
+
         when (val currentState = state) {
             SyncState.Idle -> Text("Estado: pendiente")
             SyncState.Loading -> {
@@ -1427,6 +1441,19 @@ fun SyncScreen(repository: BitacoraRepository) {
                 Text("enrolamientos pendientes: ${currentState.summary.enrolamientosPendientes}")
                 Text("total sincronizados: ${currentState.summary.sincronizados}")
                 Text("total con error: ${currentState.summary.errores}")
+                Text("participantes locales: ${currentState.summary.catalogParticipants}")
+                Text("áreas locales: ${currentState.summary.catalogAreas}")
+                Text("relaciones empleado-área: ${currentState.summary.catalogAssignments}")
+                Text(
+                    "última actualización de catálogos: " +
+                        (currentState.summary.catalogLastSyncMillis?.let {
+                            java.text.DateFormat.getDateTimeInstance()
+                                .format(java.util.Date(it))
+                        } ?: "nunca descargado")
+                )
+                currentState.summary.catalogLastError?.let {
+                    Text("estado de catálogos: $it", color = MaterialTheme.colorScheme.error)
+                }
 
                 currentState.lastRun?.let {
                     Spacer(Modifier.height(4.dp))
@@ -1434,6 +1461,10 @@ fun SyncScreen(repository: BitacoraRepository) {
                     Text("revisados: ${it.revisados}")
                     Text("sincronizados: ${it.sincronizados}")
                     Text("errores: ${it.errores}")
+                    Text("errores reintentables: ${it.erroresReintentables}")
+                    it.mensajes.forEach { message ->
+                        Text(message, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
             is SyncState.Error -> {

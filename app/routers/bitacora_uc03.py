@@ -9,12 +9,14 @@ from app.core.config import settings
 from app.services.qr_service import parse_area_qr
 from app.services.jerarquia_service import get_supervisor_for_empleado
 from app.services.storage_service import save_upload
+from app.services.evidencia_file_service import candidate_evidence_paths
 from app.services.empleado_area_service import require_asignacion_activa
 from app.schemas.bitacora import (
     BitacoraAreaObsCreate,
     BitacoraAreaObsOut,
     BitacoraDiariaCreate,
     BitacoraDiariaOut,
+    BitacoraDiariaSyncOut,
 )
 from app.schemas.evidencia import EvidenciaOut, BitacoraCompletaOut
 
@@ -124,6 +126,10 @@ def _crear_bitacora_diaria(
             "hora_out": hora_out,
             "client_uuid": client_uuid,
         })
+    except IntegrityError:
+        # El endpoint exterior resuelve la carrera idempotente consultando
+        # client_uuid después del rollback.
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo insertar en bitacora_diaria: {e}")
 
@@ -323,6 +329,30 @@ def crear_bitacora_diaria(payload: BitacoraDiariaCreate, db: Session = Depends(g
         raise HTTPException(status_code=400, detail=f"No se pudo crear bitácora diaria: {e}")
 
 
+@router.get("/bitacora_diaria", response_model=list[BitacoraDiariaSyncOut])
+def listar_bitacoras_diarias(
+    offset: int = 0,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+):
+    if offset < 0 or limit < 1 or limit > 200:
+        raise HTTPException(status_code=422, detail="offset o limit invalido")
+    bd = settings.BITACORA_DIARIA_TABLE
+    rows = db.execute(
+        text(
+            f"""
+            SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min,
+                   ts_out_min, tipo_anotacion, observaciones, client_uuid
+            FROM {bd}
+            ORDER BY id_bitacora ASC
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"offset": offset, "limit": limit},
+    ).mappings().all()
+    return [BitacoraDiariaSyncOut(**dict(row)) for row in rows]
+
+
 @router.post("/bitacora_area_observacion", response_model=BitacoraAreaObsOut)
 def crear_bitacora_area_observacion(payload: BitacoraAreaObsCreate, db: Session = Depends(get_db)):
     try:
@@ -464,3 +494,70 @@ def obtener_bitacora_diaria(id_bitacora: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Bitácora no encontrada")
     return BitacoraDiariaOut(**dict(row))
+
+
+@router.delete("/bitacora_diaria/{id_bitacora}")
+def eliminar_bitacora_diaria(id_bitacora: int, db: Session = Depends(get_db)):
+    bd = settings.BITACORA_DIARIA_TABLE
+    bae = settings.BAE_TABLE
+    configured_bao_exists = db.execute(
+        text(
+            """
+            SELECT 1
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA=:schema AND TABLE_NAME=:table
+            LIMIT 1
+            """
+        ),
+        {"schema": settings.DB_NAME, "table": settings.BAO_TABLE},
+    ).first()
+    bao = settings.BAO_TABLE if configured_bao_exists else "bitacora_area_observacion"
+    bitacora = db.execute(
+        text(f"SELECT id_bitacora FROM {bd} WHERE id_bitacora=:id LIMIT 1"),
+        {"id": id_bitacora},
+    ).mappings().first()
+    if not bitacora:
+        raise HTTPException(status_code=404, detail="Bitácora no encontrada")
+
+    evidences = db.execute(
+        text(f"SELECT id_evidencia, archivo_url FROM {bae} WHERE id_bitacora=:id"),
+        {"id": id_bitacora},
+    ).mappings().all()
+    try:
+        db.execute(text(f"DELETE FROM {bae} WHERE id_bitacora=:id"), {"id": id_bitacora})
+        db.execute(text(f"DELETE FROM {bao} WHERE id_bitacora=:id"), {"id": id_bitacora})
+        result = db.execute(text(f"DELETE FROM {bd} WHERE id_bitacora=:id"), {"id": id_bitacora})
+        if result.rowcount != 1:
+            raise RuntimeError("La bitácora no pudo ser eliminada")
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"No se pudo eliminar la bitácora: {exc}")
+
+    deleted_files = 0
+    file_errors: list[str] = []
+    for evidence in evidences:
+        existing = next(
+            (path for path in candidate_evidence_paths(evidence["archivo_url"]) if path.is_file()),
+            None,
+        )
+        if existing is None:
+            continue
+        try:
+            existing.unlink()
+            deleted_files += 1
+        except OSError:
+            file_errors.append(str(evidence["id_evidencia"]))
+    if file_errors:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "La bitácora fue eliminada, pero no se pudieron borrar los archivos "
+                f"de las evidencias: {', '.join(file_errors)}"
+            ),
+        )
+    return {
+        "id_bitacora": id_bitacora,
+        "evidencias_eliminadas": len(evidences),
+        "archivos_eliminados": deleted_files,
+    }

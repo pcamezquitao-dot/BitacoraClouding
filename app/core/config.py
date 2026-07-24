@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     DB_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
-    DB_NAME: str = "novedades"
+    DB_NAME: str = "bitacora"
 
     PARTICIPANTE_TABLE: str = "participante"
     EMPLEADO_AREA_TABLE: str = "empleado_area"

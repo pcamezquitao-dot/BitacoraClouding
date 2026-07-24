@@ -16,13 +16,17 @@ from app.schemas.bitacora_area_evidencia import (
     BitacoraAreaEvidenciaResponse,
     BitacoraAreaEvidenciaUpdate,
 )
-from app.services.evidencia_file_service import resolve_evidencia_path, save_validated_evidence
+from app.services.evidencia_file_service import (
+    candidate_evidence_paths,
+    resolve_evidencia_path,
+    save_validated_evidence,
+)
 
 router = APIRouter(prefix="/bitacora-area-evidencias", tags=["Bitácora área evidencias"])
 
 COLUMNAS = """
     id_evidencia, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
-    archivo_url, archivo_nombre, archivo_hash, mime_type, duracion_seg,
+    archivo_url, contenido_texto, archivo_nombre, archivo_hash, mime_type, duracion_seg,
     tamanio_bytes, orden, latitud, longitud, precision_gps,
     uuid_cliente, created_at
 """
@@ -57,14 +61,28 @@ def _insert(db: Session, payload: BitacoraAreaEvidenciaCreate):
     if existing:
         return existing
     _validate_parent(db, payload.id_bitacora)
+    if payload.id_tipo_evidencia == 4:
+        if not payload.contenido_texto or not payload.contenido_texto.strip():
+            raise HTTPException(status_code=422, detail="contenido_texto es obligatorio para TEXTO")
+        payload = payload.model_copy(update={
+            "contenido_texto": payload.contenido_texto.strip(),
+            "archivo_url": None,
+            "archivo_nombre": None,
+            "archivo_hash": None,
+            "mime_type": None,
+            "duracion_seg": None,
+            "tamanio_bytes": None,
+        })
+    elif not payload.archivo_url:
+        raise HTTPException(status_code=422, detail="archivo_url es obligatorio para evidencia multimedia")
     values = payload.model_dump(mode="json")
     result = db.execute(text(f"""
         INSERT INTO {settings.BAE_TABLE}
-            (id_bitacora, id_area, ts_in_min, id_tipo_evidencia, archivo_url,
+            (id_bitacora, id_area, ts_in_min, id_tipo_evidencia, archivo_url, contenido_texto,
              archivo_nombre, archivo_hash, mime_type, duracion_seg, tamanio_bytes,
              orden, latitud, longitud, precision_gps, uuid_cliente)
         VALUES
-            (:id_bitacora, :id_area, :ts_in_min, :id_tipo_evidencia, :archivo_url,
+            (:id_bitacora, :id_area, :ts_in_min, :id_tipo_evidencia, :archivo_url, :contenido_texto,
              :archivo_nombre, :archivo_hash, :mime_type, :duracion_seg, :tamanio_bytes,
              :orden, :latitud, :longitud, :precision_gps, :uuid_cliente)
     """), values)
@@ -139,11 +157,14 @@ def crear_con_archivo(
     db: Session = Depends(get_db),
 ):
     logger.info(
-        "evidence upload local_uuid=%s bitacora_id=%s original_name=%s declared_size=%s",
+        "evidence upload local_uuid=%s bitacora_id=%s filename=%s content_type=%s "
+        "id_tipo_evidencia=%s size=%s",
         uuid_cliente,
         id_bitacora,
         Path(file.filename or "").name,
-        tamanio_bytes,
+        file.content_type,
+        id_tipo_evidencia,
+        getattr(file, "size", None) or tamanio_bytes,
     )
     existing = _get_by_uuid(db, uuid_cliente)
     if existing:
@@ -252,7 +273,8 @@ def eliminar_evidencia(id_evidencia: int, db: Session = Depends(get_db)):
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"No se pudo eliminar la evidencia: {exc}")
-    resolve_evidencia_path(row["archivo_url"]).unlink(missing_ok=True)
+    for path in candidate_evidence_paths(row["archivo_url"]):
+        path.unlink(missing_ok=True)
     return Response(status_code=204)
 
 

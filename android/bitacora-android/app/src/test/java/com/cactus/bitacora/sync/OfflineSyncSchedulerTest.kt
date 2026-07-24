@@ -28,6 +28,14 @@ class OfflineSyncSchedulerTest {
     }
 
     @Test
+    fun `una solicitud manual no necesita reemplazar un worker activo`() {
+        assertEquals(
+            androidx.work.ExistingWorkPolicy.KEEP,
+            OfflineSyncScheduler.manualWorkPolicy()
+        )
+    }
+
+    @Test
     fun `sincronizacion exitosa finaliza y error transitorio reintenta`() {
         assertEquals(WorkerDecision.SUCCESS, workerDecision(retryableErrors = 0))
         assertEquals(WorkerDecision.RETRY, workerDecision(retryableErrors = 1))

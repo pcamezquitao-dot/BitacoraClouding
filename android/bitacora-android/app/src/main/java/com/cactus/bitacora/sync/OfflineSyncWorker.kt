@@ -67,6 +67,8 @@ object OfflineSyncScheduler {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
+    internal fun manualWorkPolicy(): ExistingWorkPolicy = ExistingWorkPolicy.KEEP
+
     fun schedule(context: Context) {
         val request = PeriodicWorkRequestBuilder<OfflineSyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(connectedConstraints())
@@ -94,7 +96,7 @@ object OfflineSyncScheduler {
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             MANUAL_WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            manualWorkPolicy(),
             request
         )
     }

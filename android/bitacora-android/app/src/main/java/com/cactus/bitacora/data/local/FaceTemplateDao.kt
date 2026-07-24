@@ -3,11 +3,17 @@ package com.cactus.bitacora.data.local
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
+import androidx.room.Transaction
 
 @Dao
 interface FaceTemplateDao {
     @Upsert
     suspend fun upsert(template: FaceTemplateEntity)
+
+    @Transaction
+    suspend fun replaceCentralCopiesAtomically(templates: List<FaceTemplateEntity>) {
+        templates.forEach { upsert(it) }
+    }
 
     @Query("SELECT * FROM face_templates WHERE participantId = :participantId LIMIT 1")
     suspend fun getByParticipantId(participantId: Int): FaceTemplateEntity?

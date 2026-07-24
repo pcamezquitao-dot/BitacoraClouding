@@ -13,13 +13,21 @@ class OfflineSyncPolicyTest {
     @Test
     fun `falta de red y error servidor requieren reintento`() {
         assertTrue(IOException("sin red").isRetryableSyncError())
+        assertTrue(httpError(408).isRetryableSyncError())
         assertTrue(httpError(503).isRetryableSyncError())
+        assertTrue(httpError(500).isRetryableSyncError())
         assertTrue(httpError(429).isRetryableSyncError())
     }
 
     @Test
     fun `rechazo funcional del servidor queda como error permanente`() {
         assertFalse(httpError(400).isRetryableSyncError())
+        assertFalse(httpError(401).isRetryableSyncError())
+        assertFalse(httpError(403).isRetryableSyncError())
+        assertFalse(httpError(404).isRetryableSyncError())
+        assertFalse(httpError(409).isRetryableSyncError())
+        assertFalse(httpError(413).isRetryableSyncError())
+        assertFalse(httpError(415).isRetryableSyncError())
         assertFalse(httpError(422).isRetryableSyncError())
     }
 

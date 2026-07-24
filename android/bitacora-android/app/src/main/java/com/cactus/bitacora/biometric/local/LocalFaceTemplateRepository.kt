@@ -37,26 +37,27 @@ data class FaceEnrollmentRecord(
 data class FaceCentralSyncResult(
     val uploaded: Int,
     val downloaded: Int,
-    val errors: Int
+    val errors: Int,
+    val retryableErrors: Int = 0,
+    val errorMessages: List<String> = emptyList()
 )
 
 class LocalFaceTemplateRepository(
-    context: Context,
-    private val api: BitacoraApi = Api.create()
+    context: Context?,
+    private val api: BitacoraApi = Api.create(),
+    private val dao: com.cactus.bitacora.data.local.FaceTemplateDao =
+        BitacoraDatabase.getInstance(requireNotNull(context)).faceTemplateDao(),
+    private val crypto: FaceTemplateCipher = FaceTemplateCrypto(),
+    private val authorization: String = AppConfig.FACE_TEMPLATE_AUTHORIZATION,
+    private val deviceId: String = context?.let {
+        Settings.Secure.getString(it.contentResolver, Settings.Secure.ANDROID_ID)
+    } ?: "unknown-device"
 ) {
     companion object {
         const val REQUIRED_ENROLLMENT_CAPTURES = 3
         const val MATCH_THRESHOLD = 0.65f
         private const val SYNC_TAG = "OfflineSync"
     }
-
-    private val dao = BitacoraDatabase.getInstance(context).faceTemplateDao()
-    private val crypto = FaceTemplateCrypto()
-    private val authorization = AppConfig.FACE_TEMPLATE_AUTHORIZATION
-    private val deviceId = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ANDROID_ID
-    )
 
     suspend fun enroll(
         participantId: Int,
@@ -104,26 +105,77 @@ class LocalFaceTemplateRepository(
 
     suspend fun identify(embedding: FloatArray): EnrolledParticipant? =
         withContext(Dispatchers.IO) {
-            dao.getActive()
+            val active = dao.getActive()
+            Log.i(SYNC_TAG, "face recognition templates found=${active.size}")
+            active
                 .asSequence()
-                .filter { it.modelVersion == "FaceNet-160/128" }
-                .map { entity ->
-                    val similarity = FaceTechnicalMath.cosineSimilarity(
-                        normalize(embedding),
-                        crypto.decrypt(entity.encryptedEmbedding)
-                    )
-                    EnrolledParticipant(
-                        entity.participantId,
-                        entity.participantCode,
-                        entity.displayName,
-                        similarity
-                    )
+                .mapNotNull { entity ->
+                    if (entity.modelVersion != "FaceNet-160/128") {
+                        Log.w(
+                            SYNC_TAG,
+                            "face recognition skipped participantId=${entity.participantId} " +
+                                "state=${entity.centralSyncState} reason=model_version"
+                        )
+                        return@mapNotNull null
+                    }
+                    runCatching {
+                        val similarity = FaceTechnicalMath.cosineSimilarity(
+                            normalize(embedding),
+                            crypto.decrypt(entity.encryptedEmbedding)
+                        )
+                        EnrolledParticipant(
+                            entity.participantId,
+                            entity.participantCode,
+                            entity.displayName,
+                            similarity
+                        )
+                    }.onFailure {
+                        Log.e(
+                            SYNC_TAG,
+                            "face recognition skipped participantId=${entity.participantId} " +
+                                "state=${entity.centralSyncState} reason=decrypt_error"
+                        )
+                    }.getOrNull()
                 }
                 .maxByOrNull { it.similarity }
                 ?.takeIf { it.similarity >= MATCH_THRESHOLD }
         }
 
-    suspend fun activeCount(): Int = withContext(Dispatchers.IO) { dao.countActive() }
+    suspend fun activeCount(): Int = withContext(Dispatchers.IO) {
+        val active = dao.getActive()
+        if (active.isEmpty()) return@withContext 0
+        val usable = active.count { entity ->
+            entity.modelVersion == "FaceNet-160/128" &&
+                runCatching { crypto.decrypt(entity.encryptedEmbedding) }
+                    .onFailure {
+                        Log.e(
+                            SYNC_TAG,
+                            "face load failed participantId=${entity.participantId} " +
+                                "state=${entity.centralSyncState} reason=decrypt_error"
+                        )
+                    }
+                    .isSuccess
+        }
+        Log.i(SYNC_TAG, "face templates found=${active.size} usable=$usable")
+        check(usable > 0) { "No fue posible cargar los enrolamientos locales" }
+        usable
+    }
+
+    suspend fun ensureActiveTemplatesAvailable(): Int {
+        val localCount = activeCount()
+        if (localCount > 0) return localCount
+
+        Log.i(SYNC_TAG, "face local catalog empty; downloading central templates")
+        val result = syncWithCentral()
+        val downloadedCount = activeCount()
+        if (downloadedCount == 0 && result.errors > 0) {
+            throw IllegalStateException(
+                result.errorMessages.firstOrNull()
+                    ?: "No fue posible descargar los enrolamientos centrales"
+            )
+        }
+        return downloadedCount
+    }
 
     suspend fun pendingCount(): Int = withContext(Dispatchers.IO) { dao.countPending() }
 
@@ -160,46 +212,80 @@ class LocalFaceTemplateRepository(
     }
 
     suspend fun syncWithCentral(): FaceCentralSyncResult = withContext(Dispatchers.IO) {
-        if (authorization.isBlank()) return@withContext FaceCentralSyncResult(0, 0, 1)
+        if (authorization.isBlank()) {
+            val message = "Token de sincronización facial no configurado"
+            return@withContext FaceCentralSyncResult(
+                uploaded = 0,
+                downloaded = 0,
+                errors = 1,
+                retryableErrors = 0,
+                errorMessages = listOf(message)
+            )
+        }
         var uploaded = 0
         var errors = 0
+        var retryableErrors = 0
+        val errorMessages = mutableListOf<String>()
         dao.getPendingCentralSync().forEach {
-            if (uploadPending(it)) uploaded++ else errors++
+            if (uploadPending(it)) {
+                uploaded++
+            } else {
+                errors++
+                val lastError = dao.getByParticipantId(it.participantId)
+                    ?.lastSyncError
+                    ?: "No fue posible sincronizar la plantilla de ${it.participantCode}"
+                errorMessages += lastError
+                if (lastError.isRetryableDiagnostic()) retryableErrors++
+            }
         }
         val remote = try {
             api.getAuthorizedFaceTemplates(authorization)
-        } catch (_: Exception) {
-            return@withContext FaceCentralSyncResult(uploaded, 0, errors + 1)
+        } catch (error: Exception) {
+            val diagnostic = error.safeSyncDiagnostic()
+            return@withContext FaceCentralSyncResult(
+                uploaded = uploaded,
+                downloaded = 0,
+                errors = errors + 1,
+                retryableErrors = retryableErrors +
+                    if (error.isRetryableCentralError()) 1 else 0,
+                errorMessages = errorMessages + diagnostic
+            )
         }
         val pendingParticipantIds = dao.getPendingCentralSync()
             .mapTo(mutableSetOf()) { it.participantId }
-        dao.deactivateCentralCopies()
-        remote.filterNot { it.id_participante in pendingParticipantIds }.forEach { template ->
+        val centralCopies = remote.filterNot {
+            it.id_participante in pendingParticipantIds
+        }.map { template ->
             val raw = Base64.decode(template.embedding_base64, Base64.DEFAULT)
             require(raw.sha256() == template.embedding_sha256.lowercase()) {
                 "Hash inválido para participante ${template.id_participante}"
             }
-            dao.upsert(
-                FaceTemplateEntity(
-                    participantId = template.id_participante,
-                    localSyncUuid = UUID.randomUUID().toString(),
-                    participantCode = template.participant_code,
-                    displayName = template.display_name,
-                    encryptedEmbedding = crypto.encrypt(raw.toFloatArray()),
-                    enrolledAtMillis = System.currentTimeMillis(),
-                    modelVersion = template.model_version,
-                    active = template.active,
-                    remoteTemplateId = template.id_face_template,
-                    embeddingSha256 = template.embedding_sha256,
-                    encryptionVersion = "local-keystore-aesgcm-v1",
-                    centralSyncState = "SINCRONIZADO"
-                )
+            FaceTemplateEntity(
+                participantId = template.id_participante,
+                localSyncUuid = UUID.randomUUID().toString(),
+                participantCode = template.participant_code,
+                displayName = template.display_name,
+                encryptedEmbedding = crypto.encrypt(raw.toFloatArray()),
+                enrolledAtMillis = System.currentTimeMillis(),
+                modelVersion = template.model_version,
+                active = template.active,
+                remoteTemplateId = template.id_face_template,
+                embeddingSha256 = template.embedding_sha256,
+                encryptionVersion = "local-keystore-aesgcm-v1",
+                centralSyncState = "SINCRONIZADO"
             )
+        }
+        if (centralCopies.isNotEmpty()) {
+            dao.replaceCentralCopiesAtomically(centralCopies)
+        } else {
+            Log.i(SYNC_TAG, "face remote catalog empty; local templates preserved")
         }
         FaceCentralSyncResult(
             uploaded,
             remote.count { it.id_participante !in pendingParticipantIds },
-            errors
+            errors,
+            retryableErrors,
+            errorMessages
         )
     }
 
@@ -210,8 +296,12 @@ class LocalFaceTemplateRepository(
             ).toString().also { dao.updateLocalSyncUuid(entity.participantId, it) }
         }
         val endpoint = "POST ${AppConfig.BASE_URL}face-templates/enroll"
+        Log.i(SYNC_TAG, "FACE_SYNC_START participantCode=${entity.participantCode}")
+        Log.i(SYNC_TAG, "FACE_SYNC_URL=$endpoint")
         if (authorization.isBlank()) {
             val message = "Token de sincronización facial no configurado"
+            Log.e(SYNC_TAG, "FACE_SYNC_HTTP=NO_ENVIADO")
+            Log.e(SYNC_TAG, "FACE_SYNC_ERROR=$message")
             Log.e(
                 SYNC_TAG,
                 "face localUuid=$localUuid participantId=${entity.participantId} " +
@@ -256,6 +346,8 @@ class LocalFaceTemplateRepository(
                 )
             )
             dao.markCentralSynced(entity.participantId, response.id_face_template, digest)
+            Log.i(SYNC_TAG, "FACE_SYNC_HTTP=200")
+            Log.i(SYNC_TAG, "FACE_SYNC_SUCCESS participantCode=${entity.participantCode}")
             Log.i(
                 SYNC_TAG,
                 "face localUuid=$localUuid participantId=${entity.participantId} " +
@@ -265,6 +357,11 @@ class LocalFaceTemplateRepository(
             true
         } catch (error: Exception) {
             val diagnostic = error.safeSyncDiagnostic()
+            Log.e(
+                SYNC_TAG,
+                "FACE_SYNC_HTTP=${(error as? HttpException)?.code() ?: "SIN_RESPUESTA"}"
+            )
+            Log.e(SYNC_TAG, "FACE_SYNC_ERROR=$diagnostic")
             Log.e(
                 SYNC_TAG,
                 "face localUuid=$localUuid participantId=${entity.participantId} " +
@@ -313,9 +410,20 @@ class LocalFaceTemplateRepository(
 
     private fun Throwable.safeSyncDiagnostic(): String =
         if (this is HttpException) {
-            "http=${code()} message=${message().take(200)}"
+            val serverDetail = response()?.errorBody()?.string()
+                ?.replace(Regex("\\s+"), " ")
+                ?.take(300)
+            "http=${code()} message=${serverDetail?.takeIf { it.isNotBlank() } ?: message().take(200)}"
         } else {
             "http=NO_DISPONIBLE message=${message?.take(200) ?: javaClass.simpleName}"
         }
 
+    private fun Throwable.isRetryableCentralError(): Boolean =
+        this !is HttpException || code() == 408 || code() == 429 || code() >= 500
+
+    private fun String.isRetryableDiagnostic(): Boolean =
+        startsWith("http=NO_DISPONIBLE") ||
+            startsWith("http=408") ||
+            startsWith("http=429") ||
+            Regex("^http=5\\d\\d").containsMatchIn(this)
 }

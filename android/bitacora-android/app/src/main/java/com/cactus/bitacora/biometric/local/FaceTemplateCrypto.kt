@@ -9,7 +9,12 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class FaceTemplateCrypto {
+interface FaceTemplateCipher {
+    fun encrypt(embedding: FloatArray): ByteArray
+    fun decrypt(payload: ByteArray): FloatArray
+}
+
+class FaceTemplateCrypto : FaceTemplateCipher {
     companion object {
         private const val KEY_ALIAS = "bitacora_face_template_key_v1"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -17,7 +22,7 @@ class FaceTemplateCrypto {
         private const val TAG_BITS = 128
     }
 
-    fun encrypt(embedding: FloatArray): ByteArray {
+    override fun encrypt(embedding: FloatArray): ByteArray {
         val plain = ByteBuffer.allocate(embedding.size * Float.SIZE_BYTES)
         embedding.forEach(plain::putFloat)
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -26,7 +31,7 @@ class FaceTemplateCrypto {
         return cipher.iv + encrypted
     }
 
-    fun decrypt(payload: ByteArray): FloatArray {
+    override fun decrypt(payload: ByteArray): FloatArray {
         require(payload.size > IV_SIZE)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(

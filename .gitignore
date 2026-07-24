@@ -38,6 +38,12 @@ android/app/build/
 android/local.properties
 *.keystore
 *.jks
+*.apk
+*.hprof
+
+# Credenciales y resultados locales de automatización
+.susy6_ssh/
+.susy6_logs/
 
 # Paquetes locales de despliegue (las fuentes canónicas viven en app/)
 despliegue_evidencias/

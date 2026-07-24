@@ -27,6 +27,7 @@ class FaceTemplateMetadataOut(BaseModel):
     enrolled_at: datetime
     active: bool
     device_id: str | None = None
+    updated_at: datetime | None = None
 
 
 class FaceTemplateAuthorizedOut(FaceTemplateMetadataOut):

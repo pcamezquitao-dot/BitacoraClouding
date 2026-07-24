@@ -9,7 +9,8 @@ class BitacoraAreaEvidenciaCreate(BaseModel):
     id_area: int
     ts_in_min: int = Field(ge=0)
     id_tipo_evidencia: int = Field(ge=1, le=255)
-    archivo_url: str = Field(min_length=1, max_length=500)
+    archivo_url: str | None = Field(default=None, min_length=1, max_length=500)
+    contenido_texto: str | None = Field(default=None, min_length=1)
     archivo_nombre: str | None = Field(default=None, max_length=255)
     archivo_hash: str | None = Field(default=None, max_length=64)
     mime_type: str | None = Field(default=None, max_length=100)

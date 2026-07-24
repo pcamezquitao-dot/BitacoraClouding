@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from app.services.face_template_service import (
     enroll_or_replace,
     get_active_for_participant,
     list_authorized_active,
+    list_sync_since,
     sync_status,
 )
 
@@ -26,6 +28,11 @@ router = APIRouter(
     dependencies=[Depends(require_face_sync_access)],
 )
 logger = logging.getLogger("bitacora.sync")
+
+
+def create_templates_router() -> APIRouter:
+    """Compatibilidad con despliegues que todavía importan la fábrica anterior."""
+    return router
 
 
 @router.post("/enroll", response_model=FaceTemplateMetadataOut)
@@ -62,6 +69,11 @@ def enroll(payload: FaceTemplateEnrollIn, db: Session = Depends(get_db)):
         raise
 
 
+@router.post("", response_model=FaceTemplateMetadataOut)
+def enroll_compatible(payload: FaceTemplateEnrollIn, db: Session = Depends(get_db)):
+    return enroll(payload, db)
+
+
 @router.get(
     "/participant/{id_participante}/active",
     response_model=FaceTemplateMetadataOut,
@@ -73,9 +85,28 @@ def active_for_participant(id_participante: int, db: Session = Depends(get_db)):
     return row
 
 
+@router.get(
+    "/by-participante/{id_participante}",
+    response_model=FaceTemplateMetadataOut,
+)
+def active_for_participant_compatible(
+    id_participante: int,
+    db: Session = Depends(get_db),
+):
+    return active_for_participant(id_participante, db)
+
+
 @router.get("/authorized/active", response_model=list[FaceTemplateAuthorizedOut])
 def authorized_active(db: Session = Depends(get_db)):
     return list_authorized_active(db)
+
+
+@router.get("/sync", response_model=list[FaceTemplateAuthorizedOut])
+def incremental_sync(
+    since: datetime | None = None,
+    db: Session = Depends(get_db),
+):
+    return list_sync_since(db, since)
 
 
 @router.patch("/{id_face_template}/deactivate", status_code=status.HTTP_204_NO_CONTENT)

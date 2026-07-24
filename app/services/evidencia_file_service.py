@@ -14,19 +14,21 @@ TIPOS = {
         "max": lambda: settings.EVIDENCIA_FOTO_MAX_BYTES,
     },
     2: {
-        "mimes": {"audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav"},
-        "extensions": {".mp3", ".m4a", ".mp4", ".wav"},
+        "mimes": {
+            "audio/mpeg",
+            "audio/mp4",
+            "audio/3gpp",
+            "audio/amr",
+            "audio/wav",
+            "audio/x-wav",
+        },
+        "extensions": {".mp3", ".m4a", ".mp4", ".3gp", ".amr", ".wav"},
         "max": lambda: settings.EVIDENCIA_AUDIO_MAX_BYTES,
     },
     3: {
         "mimes": {"video/mp4"},
         "extensions": {".mp4"},
         "max": lambda: settings.EVIDENCIA_VIDEO_MAX_BYTES,
-    },
-    4: {
-        "mimes": {"text/plain"},
-        "extensions": {".txt"},
-        "max": lambda: settings.EVIDENCIA_TEXTO_MAX_BYTES,
     },
 }
 
@@ -46,8 +48,10 @@ def _matches_signature(header: bytes, mime: str, extension: str) -> bool:
         )
     if mime in {"audio/mp4", "video/mp4"} and extension in {".m4a", ".mp4"}:
         return len(header) >= 12 and header[4:8] == b"ftyp"
-    if mime == "text/plain" and extension == ".txt":
-        return b"\x00" not in header
+    if mime == "audio/3gpp" and extension == ".3gp":
+        return len(header) >= 12 and header[4:8] == b"ftyp"
+    if mime == "audio/amr" and extension == ".amr":
+        return header.startswith(b"#!AMR\n")
     return False
 
 
@@ -63,6 +67,21 @@ def resolve_evidencia_path(relative_path: str) -> Path:
     if candidate != root and root not in candidate.parents:
         raise HTTPException(status_code=400, detail="Ruta de evidencia inválida")
     return candidate
+
+
+def candidate_evidence_paths(relative_path: str | None) -> list[Path]:
+    if not relative_path:
+        return []
+    candidates: list[Path] = []
+    try:
+        candidates.append(resolve_evidencia_path(relative_path))
+    except HTTPException:
+        pass
+    upload_root = Path(settings.UPLOAD_DIR).resolve()
+    upload_candidate = (upload_root / relative_path).resolve()
+    if upload_candidate == upload_root or upload_root in upload_candidate.parents:
+        candidates.append(upload_candidate)
+    return list(dict.fromkeys(candidates))
 
 
 def save_validated_evidence(file: UploadFile, id_tipo_evidencia: int):

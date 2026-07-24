@@ -15,6 +15,13 @@ def _table() -> str:
     return settings.FACE_TEMPLATE_TABLE
 
 
+def _actor_id(value) -> int | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return int(normalized) if normalized.isdigit() else None
+
+
 def _master_key() -> bytes:
     try:
         key = base64.b64decode(settings.FACE_TEMPLATE_MASTER_KEY, validate=True)
@@ -83,7 +90,7 @@ def enroll_or_replace(db: Session, payload: FaceTemplateEnrollIn):
         ),
         {
             "id_participante": payload.id_participante,
-            "revoked_by": payload.created_by,
+            "revoked_by": _actor_id(payload.created_by),
             "reason": "Reemplazo de enrolamiento",
         },
     )
@@ -111,7 +118,7 @@ def enroll_or_replace(db: Session, payload: FaceTemplateEnrollIn):
             "embedding_sha256": digest,
             "model_version": payload.model_version,
             "encryption_version": payload.encryption_version,
-            "created_by": payload.created_by,
+            "created_by": _actor_id(payload.created_by),
             "device_id": payload.device_id,
         },
     )
@@ -124,7 +131,7 @@ def get_metadata_by_id(db: Session, id_face_template: int):
             f"""
             SELECT id_face_template, id_participante, participant_code,
                    display_name, embedding_sha256, model_version,
-                   encryption_version, enrolled_at, active, device_id
+                   encryption_version, enrolled_at, active, device_id, updated_at
             FROM {_table()}
             WHERE id_face_template = :id_face_template
             """
@@ -139,7 +146,7 @@ def get_active_for_participant(db: Session, id_participante: int):
             f"""
             SELECT id_face_template, id_participante, participant_code,
                    display_name, embedding_sha256, model_version,
-                   encryption_version, enrolled_at, active, device_id
+                   encryption_version, enrolled_at, active, device_id, updated_at
             FROM {_table()}
             WHERE id_participante = :id_participante AND active = 1
             ORDER BY id_face_template DESC LIMIT 1
@@ -156,12 +163,38 @@ def list_authorized_active(db: Session):
             SELECT id_face_template, id_participante, participant_code,
                    display_name, encrypted_embedding, embedding_sha256,
                    model_version, encryption_version, enrolled_at,
-                   active, device_id
+                   active, device_id, updated_at
             FROM {_table()}
             WHERE active = 1
             ORDER BY id_participante
             """
         )
+    ).mappings().all()
+    return [
+        {
+            **{key: value for key, value in row.items() if key != "encrypted_embedding"},
+            "embedding_base64": base64.b64encode(
+                decrypt_embedding(row["encrypted_embedding"])
+            ).decode("ascii"),
+        }
+        for row in rows
+    ]
+
+
+def list_sync_since(db: Session, since):
+    rows = db.execute(
+        text(
+            f"""
+            SELECT id_face_template, id_participante, participant_code,
+                   display_name, encrypted_embedding, embedding_sha256,
+                   model_version, encryption_version, enrolled_at,
+                   active, device_id, updated_at
+            FROM {_table()}
+            WHERE (:since IS NULL OR updated_at > :since)
+            ORDER BY updated_at, id_face_template
+            """
+        ),
+        {"since": since},
     ).mappings().all()
     return [
         {
@@ -191,7 +224,7 @@ def deactivate(
         ),
         {
             "id_face_template": id_face_template,
-            "revoked_by": revoked_by,
+            "revoked_by": _actor_id(revoked_by),
             "reason": reason,
         },
     )

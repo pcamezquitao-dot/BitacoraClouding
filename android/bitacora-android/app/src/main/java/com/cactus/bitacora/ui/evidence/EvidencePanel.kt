@@ -13,6 +13,8 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.cactus.bitacora.data.BitacoraRepository
+import com.cactus.bitacora.data.evidenceErrorDiagnostic
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
 import com.cactus.bitacora.data.local.EvidenceType
 import com.cactus.bitacora.data.local.GpsStatus
@@ -63,6 +66,28 @@ internal data class PendingEvidencePreview(
     val text: String? = null
 )
 
+internal data class AudioCaptureFormat(val extension: String, val mime: String)
+
+internal fun audioCaptureFormat(
+    declaredMime: String?,
+    header: ByteArray = byteArrayOf()
+): AudioCaptureFormat? {
+    val amrSignature = "#!AMR\n".toByteArray()
+    if (
+        header.size >= amrSignature.size &&
+        header.copyOfRange(0, amrSignature.size).contentEquals(amrSignature)
+    ) {
+        return AudioCaptureFormat("amr", "audio/amr")
+    }
+    return when (declaredMime?.lowercase()?.substringBefore(';')?.trim()) {
+        "audio/mpeg" -> AudioCaptureFormat("mp3", "audio/mpeg")
+        "audio/mp4" -> AudioCaptureFormat("m4a", "audio/mp4")
+        "audio/3gpp" -> AudioCaptureFormat("3gp", "audio/3gpp")
+        "audio/wav", "audio/x-wav" -> AudioCaptureFormat("wav", "audio/wav")
+        else -> null
+    }
+}
+
 internal enum class EvidenceReviewAction { CANCEL, REPEAT, SAVE }
 
 internal fun shouldPersistEvidence(action: EvidenceReviewAction): Boolean =
@@ -70,6 +95,11 @@ internal fun shouldPersistEvidence(action: EvidenceReviewAction): Boolean =
 
 internal fun shouldDeleteTemporaryEvidence(localMetadataSaved: Boolean): Boolean =
     localMetadataSaved
+
+internal fun normalizedTextEvidence(value: String): String = value.trim()
+
+internal fun canSaveTextEvidence(value: String): Boolean =
+    normalizedTextEvidence(value).isNotEmpty()
 
 internal fun evidenceCaptureErrorMessage(error: Throwable): String = when (error) {
     is SecurityException -> "No fue posible abrir la cámara por falta de permisos"
@@ -92,6 +122,7 @@ fun EvidencePanel(
     var evidences by remember { mutableStateOf(emptyList<BitacoraEvidenceEntity>()) }
     var menu by remember { mutableStateOf(false) }
     var textDialog by remember { mutableStateOf(false) }
+    var selectedText by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
     var observation by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
@@ -100,6 +131,33 @@ fun EvidencePanel(
 
     fun refresh() {
         scope.launch { evidences = repository.getEvidences(bitacoraLocalId) }
+    }
+
+    fun saveText() {
+        val value = normalizedTextEvidence(observation)
+        if (!canSaveTextEvidence(observation)) return
+        scope.launch {
+            try {
+                repository.saveEvidence(
+                    BitacoraEvidenceEntity(
+                        bitacoraLocalId = bitacoraLocalId,
+                        bitacoraServerId = remoteId,
+                        areaId = areaId,
+                        clientUuid = UUID.randomUUID().toString(),
+                        evidenceType = EvidenceType.TEXT,
+                        textContent = value,
+                        gpsStatus = GpsStatus.UNAVAILABLE,
+                        syncStatus = SyncStatus.PENDIENTE_CREAR
+                    )
+                )
+                observation = ""
+                textDialog = false
+                message = "Evidencia de texto guardada localmente"
+                refresh()
+            } catch (_: Exception) {
+                message = "No se pudo guardar la evidencia de texto"
+            }
+        }
     }
 
     fun newTemporaryFile(extension: String): File {
@@ -118,10 +176,12 @@ fun EvidencePanel(
         FileProvider.getUriForFile(context, "${context.packageName}.files", file)
 
     fun openFile(review: PendingEvidencePreview) {
-        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(fileUri(review.file), review.mime)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        })
+        message = openEvidenceSafely(
+            context = context,
+            file = review.file,
+            mime = review.mime,
+            uriFactory = ::fileUri
+        )
     }
 
     suspend fun savePreview(review: PendingEvidencePreview) {
@@ -221,17 +281,45 @@ fun EvidencePanel(
     ) { result ->
         val source = result.data?.data
         if (result.resultCode == Activity.RESULT_OK && source != null) {
-            val file = newTemporaryFile("m4a")
-            context.contentResolver.openInputStream(source)?.use { input ->
-                file.outputStream().use(input::copyTo)
+            var file: File? = null
+            try {
+                file = newTemporaryFile("audio")
+                val copied = context.contentResolver.openInputStream(source)?.use { input ->
+                    file.outputStream().use(input::copyTo)
+                } ?: throw IOException("No fue posible leer el audio capturado")
+                if (copied <= 0L || file.length() <= 0L) {
+                    throw IOException("La grabación de audio está vacía")
+                }
+                val header = file.inputStream().use { input ->
+                    val buffer = ByteArray(32)
+                    val count = input.read(buffer).coerceAtLeast(0)
+                    buffer.copyOf(count)
+                }
+                val format = audioCaptureFormat(
+                    context.contentResolver.getType(source),
+                    header
+                ) ?: throw IOException("El grabador devolvió un formato de audio no permitido")
+                val typedFile = newTemporaryFile(format.extension)
+                file.copyTo(typedFile, overwrite = true)
+                file.delete()
+                file = typedFile
+                pendingFile = typedFile
+                preview = PendingEvidencePreview(
+                    typedFile,
+                    EvidenceType.AUDIO,
+                    format.mime,
+                    mediaDurationSeconds(typedFile)
+                )
+            } catch (error: Exception) {
+                file?.delete()
+                pendingFile = null
+                message = "No fue posible importar la grabación de audio"
+                Log.e(
+                    EVIDENCE_LOG_TAG,
+                    "Error controlado al importar audio: ${error.javaClass.simpleName}: " +
+                        (error.message ?: "sin detalle")
+                )
             }
-            pendingFile = file
-            preview = PendingEvidencePreview(
-                file,
-                EvidenceType.AUDIO,
-                "audio/mp4",
-                mediaDurationSeconds(file)
-            )
         } else {
             message = "Grabación de audio cancelada"
         }
@@ -343,20 +431,31 @@ fun EvidencePanel(
                         Text("${evidence.evidenceType.label} — ${evidence.syncStatus.uiLabel}")
                         Text(evidence.textContent ?: evidence.originalName.orEmpty())
                         Text(DateFormat.getDateTimeInstance().format(Date(evidence.createdAt)))
-                        evidence.lastSyncError?.let {
-                            Text(it, color = MaterialTheme.colorScheme.error)
+                        if (evidence.syncStatus == SyncStatus.ERROR) {
+                            Text(
+                                evidenceErrorDiagnostic(evidence, remoteId),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            evidence.lastSyncError?.let {
+                                Text(it, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (evidence.evidenceType == EvidenceType.TEXT) {
+                                OutlinedButton(onClick = {
+                                    selectedText = evidence
+                                }) { Text("Abrir") }
+                            }
                             evidence.localFilePath?.let { path ->
                                 OutlinedButton(onClick = {
                                     val file = File(path)
-                                    context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(
-                                            fileUri(file),
-                                            evidence.mimeType ?: "*/*"
-                                        )
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    })
+                                    message = openEvidenceSafely(
+                                        context = context,
+                                        file = file,
+                                        mime = evidence.mimeType ?: "*/*",
+                                        uriFactory = ::fileUri
+                                    )
                                 }) {
                                     Text(if (evidence.evidenceType == EvidenceType.AUDIO) {
                                         "Escuchar"
@@ -460,9 +559,13 @@ fun EvidencePanel(
                         Modifier.fillMaxWidth()
                     ) { Text("Grabar audio") }
                     Button(
-                        { menu = false; textDialog = true },
+                        {
+                            menu = false
+                            observation = ""
+                            textDialog = true
+                        },
                         Modifier.fillMaxWidth()
-                    ) { Text("Escribir observación textual") }
+                    ) { Text("Agregar texto") }
                     OutlinedButton(
                         { menu = false },
                         Modifier.fillMaxWidth()
@@ -475,34 +578,48 @@ fun EvidencePanel(
     if (textDialog) {
         AlertDialog(
             onDismissRequest = { textDialog = false },
-            title = { Text("Observación textual") },
+            title = { Text("Evidencia de texto") },
             text = {
                 OutlinedTextField(
                     observation,
                     { observation = it },
-                    label = { Text("Descripción") }
+                    label = { Text("Texto") },
+                    minLines = 4,
+                    maxLines = 10,
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 )
             },
             confirmButton = {
                 Button(
-                    enabled = observation.isNotBlank(),
-                    onClick = {
-                        val value = observation.trim()
-                        textDialog = false
-                        observation = ""
-                        val file = newTemporaryFile("txt").apply { writeText(value) }
-                        pendingFile = file
-                        preview = PendingEvidencePreview(
-                            file,
-                            EvidenceType.TEXT,
-                            "text/plain",
-                            text = value
-                        )
-                    }
-                ) { Text("Revisar") }
+                    enabled = canSaveTextEvidence(observation),
+                    onClick = ::saveText
+                ) { Text("Guardar texto") }
             },
             dismissButton = {
-                OutlinedButton({ textDialog = false }) { Text("Cancelar") }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton({ textDialog = false }) { Text("Cancelar") }
+                    OutlinedButton({ observation = "" }) { Text("Limpiar") }
+                }
+            }
+        )
+    }
+
+    selectedText?.let { evidence ->
+        AlertDialog(
+            onDismissRequest = { selectedText = null },
+            title = { Text("Evidencia de texto") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(evidence.textContent.orEmpty())
+                    Text(DateFormat.getDateTimeInstance().format(Date(evidence.createdAt)))
+                    Text(evidence.syncStatus.uiLabel)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { selectedText = null }) { Text("Volver") }
             }
         )
     }
@@ -510,13 +627,45 @@ fun EvidencePanel(
 
 private fun mediaDurationSeconds(file: File): Int? =
     runCatching {
-        MediaMetadataRetriever().use { retriever ->
+        val retriever = MediaMetadataRetriever()
+        try {
             retriever.setDataSource(file.absolutePath)
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull()
                 ?.let { (it / 1000L).toInt() }
+        } finally {
+            retriever.release()
         }
     }.getOrNull()
+
+internal fun openEvidenceSafely(
+    context: android.content.Context,
+    file: File,
+    mime: String,
+    uriFactory: (File) -> Uri
+): String? {
+    evidenceFileProblem(file)?.let { return it }
+    return try {
+        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uriFactory(file), mime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
+        null
+    } catch (_: ActivityNotFoundException) {
+        "No hay una aplicación disponible para abrir esta evidencia"
+    } catch (_: SecurityException) {
+        "No fue posible conceder acceso seguro a la evidencia"
+    } catch (_: IllegalArgumentException) {
+        "La ruta de la evidencia no es válida"
+    }
+}
+
+internal fun evidenceFileProblem(file: File): String? =
+    if (!file.isFile || file.length() <= 0L) {
+        "El archivo de evidencia no existe o está vacío"
+    } else {
+        null
+    }
 
 private const val EVIDENCE_LOG_TAG = "BitacoraEvidence"
 

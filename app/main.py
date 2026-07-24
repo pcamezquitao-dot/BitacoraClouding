@@ -22,6 +22,7 @@ from app.routers.bitacora_uc03 import router as bitacora_uc03_router
 from app.routers.empleado_area import router as empleado_area_router
 from app.routers.bitacora_area_evidencia import router as bitacora_area_evidencia_router
 from app.routers.face_templates import router as face_templates_router
+from app.routers.catalogos import router as catalogos_router
 from app.services.evidencia_file_service import evidencia_root
 
 # =========================
@@ -43,6 +44,7 @@ app.include_router(bitacora_uc03_router)
 app.include_router(empleado_area_router)
 app.include_router(bitacora_area_evidencia_router)
 app.include_router(face_templates_router)
+app.include_router(catalogos_router)
 
 @app.get("/")
 def root():
