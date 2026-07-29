@@ -11,7 +11,7 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
         self.assertIn("/catalogos/offline", schema["paths"])
         self.assertIn("get", schema["paths"]["/catalogos/offline"])
 
-    def test_catalogo_retorna_tres_colecciones_sin_escribir(self):
+    def test_catalogo_retorna_colecciones_jerarquicas_sin_escribir(self):
         db = MagicMock()
         db.bind = None
         participant_result = MagicMock()
@@ -30,6 +30,8 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
         area_result.mappings.return_value.all.return_value = [
             {
                 "id_area": 3,
+                "nombre_corto": "ADM",
+                "nodo_padre": 1,
                 "descripcion": "Administración",
                 "activo": True,
                 "updated_at": None,
@@ -41,12 +43,27 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
                 "id_participante": 2,
                 "id_area": 3,
                 "cargo": 1,
+                "fecha_inicia": None,
                 "fecha_final": None,
                 "activo": True,
                 "updated_at": None,
             }
         ]
-        db.execute.side_effect = [participant_result, area_result, assignment_result]
+        type_result = MagicMock()
+        type_result.mappings.return_value.all.return_value = [
+            {
+                "codigo": 1,
+                "descripcion": "operario",
+                "activo": True,
+                "capacidades": "EMPLEADO",
+            }
+        ]
+        db.execute.side_effect = [
+            participant_result,
+            area_result,
+            assignment_result,
+            type_result,
+        ]
 
         with patch(
             "app.routers.catalogos.participant_document_expression",
@@ -57,9 +74,15 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
         self.assertEqual("P0002", result["participantes"][0]["identificacion_participante"])
         self.assertEqual(3, result["areas"][0]["id_area"])
         self.assertEqual(2, result["empleado_areas"][0]["id_participante"])
-        self.assertEqual(3, db.execute.call_count)
+        self.assertEqual(1, result["tipos_participante"][0]["codigo"])
+        self.assertEqual(
+            ["EMPLEADO"],
+            result["tipos_participante"][0]["capacidades"],
+        )
+        self.assertEqual(4, db.execute.call_count)
         db.commit.assert_not_called()
 
         assignment_sql = str(db.execute.call_args_list[2].args[0]).upper()
+        self.assertIn("FECHA_INICIA <= CURDATE()", assignment_sql)
         self.assertIn("FECHA_FINAL IS NULL", assignment_sql)
         self.assertNotIn("GROUP BY", assignment_sql)

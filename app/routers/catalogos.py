@@ -34,6 +34,7 @@ def catalogos_offline(db: Session = Depends(get_db)):
         text(
             f"""
             SELECT id_Area_Administrativa AS id_area, descripcion,
+                   nombre_corto, nodo_padre,
                    TRUE AS activo, NULL AS updated_at
             FROM {areas}
             ORDER BY id_Area_Administrativa
@@ -44,10 +45,27 @@ def catalogos_offline(db: Session = Depends(get_db)):
         text(
             f"""
             SELECT id_participante, id_area, cargo,
-                   fecha_final, TRUE AS activo, NULL AS updated_at
+                   fecha_inicia, fecha_final,
+                   TRUE AS activo, NULL AS updated_at
             FROM {empleado_area}
-            WHERE fecha_final IS NULL OR fecha_final >= CURDATE()
+            WHERE activo = TRUE
+              AND fecha_inicia <= CURDATE()
+              AND (fecha_final IS NULL OR fecha_final >= CURDATE())
             ORDER BY id_participante, id_area, cargo
+            """
+        )
+    ).mappings().all()
+    tipos_rows = db.execute(
+        text(
+            """
+            SELECT tp.codigo, tp.descripcion, tp.activo,
+                   GROUP_CONCAT(tpc.codigo_capacidad
+                       ORDER BY tpc.codigo_capacidad) AS capacidades
+            FROM tipos_participante AS tp
+            LEFT JOIN tipo_participante_capacidad AS tpc
+              ON tpc.codigo_tipo = tp.codigo
+            GROUP BY tp.codigo, tp.descripcion, tp.activo
+            ORDER BY tp.codigo
             """
         )
     ).mappings().all()
@@ -56,4 +74,16 @@ def catalogos_offline(db: Session = Depends(get_db)):
         "participantes": participantes,
         "areas": areas_rows,
         "empleado_areas": asignaciones,
+        "tipos_participante": [
+            {
+                **dict(row),
+                "activo": bool(row["activo"]),
+                "capacidades": (
+                    row["capacidades"].split(",")
+                    if row["capacidades"]
+                    else []
+                ),
+            }
+            for row in tipos_rows
+        ],
     }

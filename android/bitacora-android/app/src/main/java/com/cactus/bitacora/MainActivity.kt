@@ -84,6 +84,7 @@ import com.cactus.bitacora.location.BitacoraLocationProvider
 import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
+import com.cactus.bitacora.ui.admin.AdminCatalogScreen
 import com.cactus.bitacora.biometric.FaceIdentificationTarget
 import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
 import com.cactus.bitacora.biometric.technical.FaceFlowMode
@@ -122,6 +123,7 @@ class MainActivity : ComponentActivity() {
 internal enum class AppScreen {
     Health,
     FaceEnrollment,
+    AdminCatalog,
     CreateDailyLog,
     QueryDailyLog,
     Sync
@@ -161,12 +163,17 @@ internal fun canAccessEnrollment(environment: AppEnvironment?): Boolean =
     environment == AppEnvironment.ADMINISTRADOR
 
 internal fun isScreenAllowed(environment: AppEnvironment?, screen: AppScreen): Boolean =
-    screen != AppScreen.FaceEnrollment || canAccessEnrollment(environment)
+    when (screen) {
+        AppScreen.FaceEnrollment, AppScreen.AdminCatalog ->
+            environment == AppEnvironment.ADMINISTRADOR
+        else -> environment != null
+    }
 
 internal fun environmentMenuScreens(environment: AppEnvironment): List<AppScreen> =
     buildList {
         add(AppScreen.Health)
         if (canAccessEnrollment(environment)) add(AppScreen.FaceEnrollment)
+        if (environment == AppEnvironment.ADMINISTRADOR) add(AppScreen.AdminCatalog)
         add(AppScreen.CreateDailyLog)
         add(AppScreen.QueryDailyLog)
         add(AppScreen.Sync)
@@ -258,12 +265,23 @@ fun BitacoraApp() {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val environment = activeEnvironment
+            if (
+                environment == AppEnvironment.ADMINISTRADOR &&
+                currentScreen == AppScreen.AdminCatalog
+            ) {
+                AdminCatalogScreen(
+                    repository = repository,
+                    onBack = { currentScreen = mainDestinationAfterBack() }
+                )
+                return@Column
+            }
+
             Text(
                 text = "BitacoraClouding",
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            val environment = activeEnvironment
             if (environment == null) {
                 EnvironmentSelectionScreen(onSelect = ::selectEnvironment)
                 return@Column
@@ -292,6 +310,13 @@ fun BitacoraApp() {
             }
 
             if (environment == AppEnvironment.ADMINISTRADOR) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = currentScreen != AppScreen.AdminCatalog,
+                    onClick = { openScreen(AppScreen.AdminCatalog) }
+                ) {
+                    Text("Administrar maestros")
+                }
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !deletingOldest,
@@ -360,6 +385,18 @@ fun BitacoraApp() {
                     }
                     AppScreen.FaceEnrollment -> if (canAccessEnrollment(environment)) {
                         FaceEnrollmentAdminScreen(
+                            repository = repository,
+                            onBack = { currentScreen = mainDestinationAfterBack() }
+                        )
+                    } else {
+                        RestrictedEnrollmentScreen(
+                            onBack = { currentScreen = mainDestinationAfterBack() }
+                        )
+                    }
+                    AppScreen.AdminCatalog -> if (
+                        environment == AppEnvironment.ADMINISTRADOR
+                    ) {
+                        AdminCatalogScreen(
                             repository = repository,
                             onBack = { currentScreen = mainDestinationAfterBack() }
                         )

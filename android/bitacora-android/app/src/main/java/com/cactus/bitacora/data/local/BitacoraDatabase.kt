@@ -15,9 +15,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ParticipanteLocalEntity::class,
         AreaAdministrativaLocalEntity::class,
         EmpleadoAreaLocalEntity::class,
+        TipoParticipanteLocalEntity::class,
         CatalogSyncStateEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -46,7 +47,8 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
-                    MIGRATION_10_11
+                    MIGRATION_10_11,
+                    MIGRATION_11_12
                 ).build().also { instance = it }
             }
 
@@ -302,6 +304,43 @@ abstract class BitacoraDatabase : RoomDatabase() {
                       AND centralSyncState = 'SINCRONIZADO'
                       AND length(encryptedEmbedding) > 0
                     """.trimIndent()
+                )
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE areas_administrativas_locales " +
+                        "ADD COLUMN nombreCorto TEXT"
+                )
+                db.execSQL(
+                    "ALTER TABLE areas_administrativas_locales " +
+                        "ADD COLUMN idPadre INTEGER"
+                )
+                db.execSQL(
+                    "ALTER TABLE empleado_area_locales " +
+                        "ADD COLUMN fechaInicia TEXT"
+                )
+                db.execSQL(
+                    "ALTER TABLE catalog_sync_state " +
+                        "ADD COLUMN participantTypeCount INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS tipos_participante_locales (
+                        codigo INTEGER NOT NULL PRIMARY KEY,
+                        descripcion TEXT NOT NULL,
+                        capacidadesCsv TEXT NOT NULL,
+                        activo INTEGER NOT NULL DEFAULT 1,
+                        syncedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "index_tipos_participante_locales_activo " +
+                        "ON tipos_participante_locales(activo)"
                 )
             }
         }

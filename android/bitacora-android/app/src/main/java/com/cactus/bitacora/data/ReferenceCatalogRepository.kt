@@ -7,6 +7,7 @@ import com.cactus.bitacora.data.local.CatalogSyncStateEntity
 import com.cactus.bitacora.data.local.EmpleadoAreaLocalEntity
 import com.cactus.bitacora.data.local.ParticipanteLocalEntity
 import com.cactus.bitacora.data.local.ReferenceCatalogDao
+import com.cactus.bitacora.data.local.TipoParticipanteLocalEntity
 import com.cactus.bitacora.model.AreaOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
@@ -88,6 +89,8 @@ class ReferenceCatalogRepository(
                     idArea = it.id_area,
                     codigoQr = canonicalAreaCode(it.id_area, it.descripcion),
                     nombreArea = it.descripcion,
+                    nombreCorto = it.nombre_corto,
+                    idPadre = it.nodo_padre,
                     activo = it.activo,
                     updatedAtServer = it.updated_at,
                     syncedAtMillis = now
@@ -98,9 +101,23 @@ class ReferenceCatalogRepository(
                     idParticipante = it.id_participante,
                     idArea = it.id_area,
                     cargo = it.cargo,
+                    fechaInicia = it.fecha_inicia,
                     fechaFinal = it.fecha_final,
                     activo = it.activo,
                     updatedAtServer = it.updated_at,
+                    syncedAtMillis = now
+                )
+            }
+            val participantTypes = remote.tipos_participante.map {
+                TipoParticipanteLocalEntity(
+                    codigo = it.codigo,
+                    descripcion = it.descripcion,
+                    capacidadesCsv = it.capacidades
+                        .map(String::uppercase)
+                        .distinct()
+                        .sorted()
+                        .joinToString(","),
+                    activo = it.activo,
                     syncedAtMillis = now
                 )
             }
@@ -108,11 +125,13 @@ class ReferenceCatalogRepository(
                 participants,
                 areas,
                 assignments,
+                participantTypes,
                 CatalogSyncStateEntity(
                     lastSuccessfulSyncMillis = now,
                     participantCount = participants.count { it.activo },
                     areaCount = areas.count { it.activo },
-                    assignmentCount = assignments.count { it.activo }
+                    assignmentCount = assignments.count { it.activo },
+                    participantTypeCount = participantTypes.count { it.activo }
                 )
             )
             CatalogSyncResult(true, participants.size, areas.size, assignments.size)
@@ -233,24 +252,27 @@ class ReferenceCatalogRepository(
         items.forEach {
             dao.upsertAssignment(
                 EmpleadoAreaLocalEntity(
-                    it.id_participante,
-                    it.id_area,
-                    it.cargo,
-                    it.fecha_final,
-                    true,
-                    null,
-                    now
+                    idParticipante = it.id_participante,
+                    idArea = it.id_area,
+                    cargo = it.cargo,
+                    fechaInicia = null,
+                    fechaFinal = it.fecha_final,
+                    activo = true,
+                    updatedAtServer = null,
+                    syncedAtMillis = now
                 )
             )
             it.area_descripcion?.let { name ->
                 dao.upsertArea(
                     AreaAdministrativaLocalEntity(
-                        it.id_area,
-                        canonicalAreaCode(it.id_area, name),
-                        name,
-                        true,
-                        null,
-                        now
+                        idArea = it.id_area,
+                        codigoQr = canonicalAreaCode(it.id_area, name),
+                        nombreArea = name,
+                        nombreCorto = null,
+                        idPadre = null,
+                        activo = true,
+                        updatedAtServer = null,
+                        syncedAtMillis = now
                     )
                 )
             }
@@ -295,12 +317,14 @@ private fun ParticipanteOut.toLocal(now: Long) = ParticipanteLocalEntity(
 private fun AreaAdministrativaLocalEntity.toApi() = AreaOut(idArea, nombreArea)
 
 private fun AreaOut.toLocal(now: Long) = AreaAdministrativaLocalEntity(
-    id_area,
-    ReferenceCatalogRepository.canonicalAreaCode(id_area, descripcion),
-    descripcion,
-    true,
-    null,
-    now
+    idArea = id_area,
+    codigoQr = ReferenceCatalogRepository.canonicalAreaCode(id_area, descripcion),
+    nombreArea = descripcion,
+    nombreCorto = null,
+    idPadre = null,
+    activo = true,
+    updatedAtServer = null,
+    syncedAtMillis = now
 )
 
 private fun EmpleadoAreaLocalEntity.toApi() = EmpleadoAreaActivaOut(

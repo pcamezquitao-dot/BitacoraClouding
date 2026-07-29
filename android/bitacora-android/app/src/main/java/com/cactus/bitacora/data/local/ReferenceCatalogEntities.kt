@@ -36,7 +36,9 @@ data class AreaAdministrativaLocalEntity(
     val nombreArea: String,
     val activo: Boolean = true,
     val updatedAtServer: String? = null,
-    val syncedAtMillis: Long
+    val syncedAtMillis: Long,
+    val nombreCorto: String? = null,
+    val idPadre: Int? = null
 )
 
 @Entity(
@@ -52,11 +54,32 @@ data class EmpleadoAreaLocalEntity(
     val idParticipante: Int,
     val idArea: Int,
     val cargo: Int?,
-    val fechaFinal: String?,
+    val fechaFinal: String? = null,
     val activo: Boolean = true,
     val updatedAtServer: String? = null,
-    val syncedAtMillis: Long
+    val syncedAtMillis: Long,
+    val fechaInicia: String? = null
 )
+
+@Entity(
+    tableName = "tipos_participante_locales",
+    primaryKeys = ["codigo"],
+    indices = [Index(value = ["activo"])]
+)
+data class TipoParticipanteLocalEntity(
+    val codigo: Int,
+    val descripcion: String,
+    val capacidadesCsv: String,
+    val activo: Boolean = true,
+    val syncedAtMillis: Long
+) {
+    val capacidades: Set<String>
+        get() = capacidadesCsv.split(",")
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .map(String::uppercase)
+            .toSet()
+}
 
 @Entity(tableName = "catalog_sync_state")
 data class CatalogSyncStateEntity(
@@ -65,5 +88,6 @@ data class CatalogSyncStateEntity(
     val participantCount: Int = 0,
     val areaCount: Int = 0,
     val assignmentCount: Int = 0,
+    val participantTypeCount: Int = 0,
     val lastError: String? = null
 )

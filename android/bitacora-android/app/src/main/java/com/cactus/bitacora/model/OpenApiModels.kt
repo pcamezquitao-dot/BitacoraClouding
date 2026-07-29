@@ -125,6 +125,8 @@ data class CatalogParticipantOut(
 data class CatalogAreaOut(
     val id_area: Int,
     val descripcion: String,
+    val nombre_corto: String? = null,
+    val nodo_padre: Int? = null,
     val activo: Boolean = true,
     val updated_at: String? = null
 )
@@ -133,16 +135,121 @@ data class CatalogAssignmentOut(
     val id_participante: Int,
     val id_area: Int,
     val cargo: Int? = null,
+    val fecha_inicia: String? = null,
     val fecha_final: String? = null,
     val activo: Boolean = true,
     val updated_at: String? = null
+)
+
+data class CatalogParticipantTypeOut(
+    val codigo: Int,
+    val descripcion: String,
+    val activo: Boolean = true,
+    val capacidades: List<String> = emptyList()
 )
 
 data class OfflineCatalogOut(
     val generated_at: String,
     val participantes: List<CatalogParticipantOut>,
     val areas: List<CatalogAreaOut>,
-    val empleado_areas: List<CatalogAssignmentOut>
+    val empleado_areas: List<CatalogAssignmentOut>,
+    val tipos_participante: List<CatalogParticipantTypeOut> = emptyList()
+)
+
+data class ParticipantTypeAdminOut(
+    val codigo: Int,
+    val descripcion: String,
+    val activo: Boolean,
+    val capacidades: List<String>
+)
+
+data class ParticipantTypeAdminIn(
+    val descripcion: String,
+    val capacidades: List<String>
+)
+
+data class ParticipantTypeStatusIn(val activo: Boolean)
+
+data class AreaTreeNodeOut(
+    val id_area: Int,
+    val descripcion: String,
+    val nombre_corto: String? = null,
+    val id_padre: Int? = null,
+    val nivel: Int,
+    val ruta: String
+)
+
+data class AdministrativeAreaIn(
+    val descripcion: String,
+    val nombre_corto: String? = null,
+    val nodo_padre: Int? = null
+)
+
+data class AdministrativeAreaOut(
+    val id_area_administrativa: Int,
+    val descripcion: String,
+    val nombre_corto: String? = null,
+    val nodo_padre: Int? = null
+)
+
+data class EmployeeAreaAdminIn(
+    val id_participante: Int,
+    val id_area: Int,
+    val codigo_tipo: Int,
+    val descripcion: String? = null,
+    val fecha_inicia: String,
+    val fecha_final: String? = null
+)
+
+data class EmployeeAreaAdminOut(
+    val id_empleado_area: Int,
+    val id_participante: Int,
+    val id_area: Int,
+    val codigo_tipo: Int,
+    val descripcion: String? = null,
+    val fecha_inicia: String,
+    val fecha_final: String? = null
+)
+
+data class EmployeeAreaAssignmentOut(
+    val id_empleado_area: Int,
+    val id_participante: Int,
+    val codigo_participante: String,
+    val nombre_completo: String,
+    val codigo_tipo: Int? = null,
+    val cargo: String? = null,
+    val descripcion: String? = null,
+    val fecha_inicia: String,
+    val fecha_final: String? = null
+)
+
+data class EmployeeAreaTreeNodeOut(
+    val id_area: Int,
+    val descripcion: String,
+    val nombre_corto: String? = null,
+    val nodo_padre: Int? = null,
+    val nivel: Int,
+    val ruta: String,
+    val cantidad_participantes: Int,
+    val participantes: List<EmployeeAreaAssignmentOut> = emptyList(),
+    val hijos: List<EmployeeAreaTreeNodeOut> = emptyList()
+)
+
+data class EmployeeAreaUpdateIn(
+    val id_area: Int,
+    val codigo_tipo: Int,
+    val descripcion: String? = null,
+    val fecha_inicia: String,
+    val fecha_final: String? = null
+)
+
+data class ParticipantOptionOut(
+    val id_participante: Int,
+    val codigo: String,
+    val nombres: String,
+    val apellidos: String,
+    val nombre_completo: String,
+    val documento: String? = null
 )
 
 data class FaceTemplateEnrollIn(

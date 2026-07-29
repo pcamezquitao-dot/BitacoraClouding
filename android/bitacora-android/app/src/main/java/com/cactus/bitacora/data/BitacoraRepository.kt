@@ -1,6 +1,7 @@
 package com.cactus.bitacora.data
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.room.withTransaction
 import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
@@ -19,6 +20,14 @@ import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.model.EvidenciaTextoCreate
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
+import com.cactus.bitacora.model.EmployeeAreaAdminIn
+import com.cactus.bitacora.model.ParticipantTypeAdminIn
+import com.cactus.bitacora.model.ParticipantTypeStatusIn
+import com.cactus.bitacora.model.AdministrativeAreaIn
+import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
+import com.cactus.bitacora.model.EmployeeAreaUpdateIn
+import com.cactus.bitacora.model.ParticipantOptionOut
+import com.cactus.bitacora.util.AppConfig
 import retrofit2.HttpException
 import com.cactus.bitacora.location.LocationSnapshot
 import java.io.File
@@ -30,6 +39,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 
 internal fun remoteDeleteAlreadySatisfied(statusCode: Int): Boolean = statusCode == 404
 
@@ -52,6 +62,264 @@ class BitacoraRepository(
 
     suspend fun checkHealth() =
         api.health()
+
+    suspend fun adminParticipantTypes(actor: String) =
+        api.getAdminParticipantTypes(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL
+        )
+
+    suspend fun createAdminParticipantType(
+        actor: String,
+        description: String,
+        capabilities: List<String>
+    ) = api.createAdminParticipantType(
+        adminAuthorization(),
+        actor.trim(),
+        Build.MODEL,
+        ParticipantTypeAdminIn(description, capabilities)
+    )
+
+    suspend fun updateAdminParticipantType(
+        actor: String,
+        code: Int,
+        description: String,
+        capabilities: List<String>
+    ) = api.updateAdminParticipantType(
+        adminAuthorization(),
+        actor.trim(),
+        Build.MODEL,
+        code,
+        ParticipantTypeAdminIn(description, capabilities)
+    )
+
+    suspend fun setAdminParticipantTypeStatus(
+        actor: String,
+        code: Int,
+        active: Boolean
+    ) = api.setAdminParticipantTypeStatus(
+        adminAuthorization(),
+        actor.trim(),
+        Build.MODEL,
+        code,
+        ParticipantTypeStatusIn(active)
+    )
+
+    suspend fun adminAreaTree(actor: String): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
+        val url = "${AppConfig.BASE_URL}admin/areas/arbol"
+        val normalizedActor = actor.trim().ifBlank { "administrador-consulta" }
+        Log.i("AdminAreaTree", "URL consultada: $url")
+        return try {
+            val response = api.getAdminAreaTree(
+                adminAuthorization(),
+                normalizedActor,
+                Build.MODEL
+            )
+            Log.i("AdminAreaTree", "Código HTTP: ${response.code()}")
+            if (!response.isSuccessful) throw HttpException(response)
+            val areas = response.body()
+                ?: throw IOException("El endpoint de áreas respondió sin contenido")
+            val ids = areas.mapTo(mutableSetOf()) { it.id_area }
+            val roots = areas.count { it.id_padre == null || it.id_padre == 0 }
+            val orphanIds = areas
+                .filter {
+                    it.id_padre != null &&
+                        it.id_padre != 0 &&
+                        it.id_padre !in ids
+                }
+                .map { it.id_area }
+            Log.i(
+                "AdminAreaTree",
+                "Áreas recibidas: ${areas.size}; nodos raíz: $roots"
+            )
+            Log.i("AdminAreaTree", "IDs sin padre válido: $orphanIds")
+            areas
+        } catch (error: Exception) {
+            Log.e(
+                "AdminAreaTree",
+                "Error HTTP o de deserialización al consultar $url",
+                error
+            )
+            throw error
+        }
+    }
+
+    suspend fun createAdminArea(
+        actor: String,
+        description: String,
+        shortName: String?,
+        parentId: Int?
+    ) = adminMutation(
+        action = "ADD",
+        areaId = parentId,
+        endpoint = "${AppConfig.BASE_URL}admin/areas"
+    ) {
+        api.createAdminArea(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            AdministrativeAreaIn(description, shortName, parentId)
+        )
+    } ?: throw IOException("El servidor no devolvió el área creada")
+
+    suspend fun updateAdminArea(
+        actor: String,
+        areaId: Int,
+        description: String,
+        shortName: String?,
+        parentId: Int?
+    ) = adminMutation(
+        action = "EDIT",
+        areaId = areaId,
+        endpoint = "${AppConfig.BASE_URL}admin/areas/$areaId"
+    ) {
+        api.updateAdminArea(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            areaId,
+            AdministrativeAreaIn(description, shortName, parentId)
+        )
+    } ?: throw IOException("El servidor no devolvió el área actualizada")
+
+    suspend fun deleteAdminArea(actor: String, areaId: Int) =
+        adminMutation<Unit>(
+            action = "DEL",
+            areaId = areaId,
+            endpoint = "${AppConfig.BASE_URL}admin/areas/$areaId",
+            requireBody = false
+        ) {
+            api.deleteAdminArea(
+                adminAuthorization(),
+                actor.trim(),
+                Build.MODEL,
+                areaId
+            )
+        }
+
+    suspend fun createAdminEmployeeArea(
+        actor: String,
+        payload: EmployeeAreaAdminIn
+    ) = api.createAdminEmployeeArea(
+        adminAuthorization(),
+        actor.trim(),
+        Build.MODEL,
+        payload
+    )
+
+    suspend fun adminEmployeeAreaTree(actor: String): List<EmployeeAreaTreeNodeOut> =
+        adminMutation(
+            action = "EMPLOYEE_AREA_TREE",
+            areaId = null,
+            endpoint = "${AppConfig.BASE_URL}admin/empleado-area/tree"
+        ) {
+            api.getAdminEmployeeAreaTree(
+                adminAuthorization(),
+                actor.trim().ifBlank { "administrador-consulta" },
+                Build.MODEL
+            )
+        }.orEmpty()
+
+    suspend fun adminParticipantOptions(
+        actor: String,
+        search: String = ""
+    ): List<ParticipantOptionOut> =
+        adminMutation(
+            action = "PARTICIPANT_OPTIONS",
+            areaId = null,
+            endpoint = "${AppConfig.BASE_URL}admin/participantes/options"
+        ) {
+            api.getAdminParticipantOptions(
+                adminAuthorization(),
+                actor.trim().ifBlank { "administrador-consulta" },
+                Build.MODEL,
+                search
+            )
+        }.orEmpty()
+
+    suspend fun updateAdminEmployeeArea(
+        actor: String,
+        assignmentId: Int,
+        payload: EmployeeAreaUpdateIn
+    ) = adminMutation(
+        action = "EDIT_EMPLOYEE_AREA",
+        areaId = payload.id_area,
+        endpoint = "${AppConfig.BASE_URL}admin/empleado-area/$assignmentId"
+    ) {
+        api.updateAdminEmployeeArea(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            assignmentId,
+            payload
+        )
+    } ?: throw IOException("El servidor no devolvió la asignación actualizada")
+
+    suspend fun retireAdminEmployeeArea(actor: String, assignmentId: Int) =
+        adminMutation<Unit>(
+            action = "DEL_EMPLOYEE_AREA",
+            areaId = null,
+            endpoint = "${AppConfig.BASE_URL}admin/empleado-area/$assignmentId",
+            requireBody = false
+        ) {
+            api.retireAdminEmployeeArea(
+                adminAuthorization(),
+                actor.trim(),
+                Build.MODEL,
+                assignmentId
+            )
+        }
+
+    private fun adminAuthorization(): String =
+        AppConfig.ADMIN_AUTHORIZATION.takeIf(String::isNotBlank)
+            ?: throw IllegalStateException(
+                "La credencial administrativa no está configurada"
+            )
+
+    private suspend fun <T> adminMutation(
+        action: String,
+        areaId: Int?,
+        endpoint: String,
+        requireBody: Boolean = true,
+        block: suspend () -> retrofit2.Response<T>
+    ): T? =
+        try {
+            Log.i(
+                "AdminAreaAction",
+                "Acción=$action id=$areaId endpoint=$endpoint"
+            )
+            val response = block()
+            Log.i(
+                "AdminAreaAction",
+                "Acción=$action id=$areaId HTTP=${response.code()} " +
+                    "respuesta=${response.body() ?: "<sin contenido>"}"
+            )
+            if (!response.isSuccessful) throw HttpException(response)
+            response.body().also {
+                if (requireBody && it == null) {
+                    throw IOException("El servidor respondió sin contenido")
+                }
+            }
+        } catch (error: HttpException) {
+            val detail = runCatching {
+                JSONObject(error.response()?.errorBody()?.string().orEmpty())
+                    .optString("detail")
+            }.getOrNull().orEmpty()
+            Log.e(
+                "AdminAreaAction",
+                "Acción=$action id=$areaId HTTP=${error.code()} error=$detail",
+                error
+            )
+            throw IOException(detail.ifBlank { error.message() }, error)
+        } catch (error: Exception) {
+            Log.e(
+                "AdminAreaAction",
+                "Acción=$action id=$areaId error de red o deserialización",
+                error
+            )
+            throw error
+        }
 
     suspend fun getAreaByQr(qr: String) =
         referenceCatalogRepository.areaByQr(qr)

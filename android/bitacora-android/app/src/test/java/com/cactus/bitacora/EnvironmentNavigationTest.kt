@@ -31,6 +31,30 @@ class EnvironmentNavigationTest {
     }
 
     @Test
+    fun onlyAdministratorCanOpenCatalogAdministration() {
+        assertTrue(
+            isScreenAllowed(
+                AppEnvironment.ADMINISTRADOR,
+                AppScreen.AdminCatalog
+            )
+        )
+        assertTrue(
+            environmentMenuScreens(AppEnvironment.ADMINISTRADOR)
+                .contains(AppScreen.AdminCatalog)
+        )
+        assertFalse(
+            isScreenAllowed(
+                AppEnvironment.CIUDADANO,
+                AppScreen.AdminCatalog
+            )
+        )
+        assertFalse(
+            environmentMenuScreens(AppEnvironment.CIUDADANO)
+                .contains(AppScreen.AdminCatalog)
+        )
+    }
+
+    @Test
     fun bothEnvironmentsKeepCitizenFunctions() {
         val common = listOf(
             AppScreen.CreateDailyLog,

@@ -22,6 +22,9 @@ interface ReferenceCatalogDao {
     @Query("SELECT * FROM areas_administrativas_locales WHERE activo = 1 ORDER BY nombreArea")
     suspend fun activeAreas(): List<AreaAdministrativaLocalEntity>
 
+    @Query("SELECT * FROM tipos_participante_locales ORDER BY descripcion, codigo")
+    suspend fun participantTypes(): List<TipoParticipanteLocalEntity>
+
     @Query(
         "SELECT * FROM empleado_area_locales " +
             "WHERE idParticipante = :participantId AND activo = 1 ORDER BY idArea"
@@ -59,6 +62,9 @@ interface ReferenceCatalogDao {
     suspend fun upsertAssignments(items: List<EmpleadoAreaLocalEntity>)
 
     @Upsert
+    suspend fun upsertParticipantTypes(items: List<TipoParticipanteLocalEntity>)
+
+    @Upsert
     suspend fun upsertSyncState(state: CatalogSyncStateEntity)
 
     @Query("UPDATE participantes_locales SET activo = 0")
@@ -70,6 +76,9 @@ interface ReferenceCatalogDao {
     @Query("UPDATE empleado_area_locales SET activo = 0")
     suspend fun markAllAssignmentsInactive()
 
+    @Query("UPDATE tipos_participante_locales SET activo = 0")
+    suspend fun markAllParticipantTypesInactive()
+
     @Query("SELECT COUNT(*) FROM participantes_locales WHERE activo = 1")
     suspend fun participantCount(): Int
 
@@ -79,6 +88,9 @@ interface ReferenceCatalogDao {
     @Query("SELECT COUNT(*) FROM empleado_area_locales WHERE activo = 1")
     suspend fun assignmentCount(): Int
 
+    @Query("SELECT COUNT(*) FROM tipos_participante_locales WHERE activo = 1")
+    suspend fun participantTypeCount(): Int
+
     @Query("SELECT * FROM catalog_sync_state WHERE catalogKey = 'reference_catalogs' LIMIT 1")
     suspend fun syncState(): CatalogSyncStateEntity?
 
@@ -87,14 +99,17 @@ interface ReferenceCatalogDao {
         participants: List<ParticipanteLocalEntity>,
         areas: List<AreaAdministrativaLocalEntity>,
         assignments: List<EmpleadoAreaLocalEntity>,
+        participantTypes: List<TipoParticipanteLocalEntity>,
         state: CatalogSyncStateEntity
     ) {
         markAllParticipantsInactive()
         markAllAreasInactive()
         markAllAssignmentsInactive()
+        markAllParticipantTypesInactive()
         upsertParticipants(participants)
         upsertAreas(areas)
         upsertAssignments(assignments)
+        upsertParticipantTypes(participantTypes)
         upsertSyncState(state)
     }
 }

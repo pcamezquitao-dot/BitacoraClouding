@@ -171,6 +171,8 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     val participants = linkedMapOf<Int, ParticipanteLocalEntity>()
     val areas = linkedMapOf<Int, AreaAdministrativaLocalEntity>()
     val assignments = linkedMapOf<Pair<Int, Int>, EmpleadoAreaLocalEntity>()
+    val participantTypes =
+        linkedMapOf<Int, com.cactus.bitacora.data.local.TipoParticipanteLocalEntity>()
     var state: CatalogSyncStateEntity? = null
 
     override suspend fun participantByCode(code: String) =
@@ -180,6 +182,7 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun areaByCode(code: String) = areas.values.firstOrNull { it.codigoQr == code }
     override suspend fun activeAreas() =
         areas.values.filter { it.activo }.sortedBy { it.nombreArea }
+    override suspend fun participantTypes() = participantTypes.values.toList()
     override suspend fun activeAssignmentsForParticipant(participantId: Int) =
         assignments.values.filter { it.idParticipante == participantId && it.activo }
     override suspend fun activeAssignmentsForArea(areaId: Int) =
@@ -201,6 +204,11 @@ private class FakeCatalogDao : ReferenceCatalogDao {
         items.forEach { upsertArea(it) }
     override suspend fun upsertAssignments(items: List<EmpleadoAreaLocalEntity>) =
         items.forEach { upsertAssignment(it) }
+    override suspend fun upsertParticipantTypes(
+        items: List<com.cactus.bitacora.data.local.TipoParticipanteLocalEntity>
+    ) {
+        items.forEach { participantTypes[it.codigo] = it }
+    }
     override suspend fun upsertSyncState(state: CatalogSyncStateEntity) {
         this.state = state
     }
@@ -213,9 +221,14 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun markAllAssignmentsInactive() {
         assignments.replaceAll { _, value -> value.copy(activo = false) }
     }
+    override suspend fun markAllParticipantTypesInactive() {
+        participantTypes.replaceAll { _, value -> value.copy(activo = false) }
+    }
     override suspend fun participantCount() = participants.values.count { it.activo }
     override suspend fun areaCount() = areas.values.count { it.activo }
     override suspend fun assignmentCount() = assignments.values.count { it.activo }
+    override suspend fun participantTypeCount() =
+        participantTypes.values.count { it.activo }
     override suspend fun syncState() = state
 }
 

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     FACE_TEMPLATE_TABLE: str = "participante_face_template"
     FACE_TEMPLATE_API_TOKEN: str = ""
     FACE_TEMPLATE_MASTER_KEY: str = ""
+    ADMIN_API_TOKEN: str = ""
 
     FFMPEG_PATH: str = "/usr/bin/ffmpeg"
     WHISPER_CLI_PATH: str = "/srv/bitacora/tools/whisper.cpp/build/bin/whisper-cli"

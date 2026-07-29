@@ -27,6 +27,16 @@ android {
                     .get()
             }\""
         )
+        buildConfigField(
+            "String",
+            "ADMIN_API_TOKEN",
+            "\"${
+                providers.gradleProperty("ADMIN_API_TOKEN")
+                    .orElse(providers.environmentVariable("ADMIN_API_TOKEN"))
+                    .orElse("")
+                    .get()
+            }\""
+        )
     }
 
     productFlavors {

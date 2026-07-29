@@ -133,6 +133,63 @@ class CatalogMigrationJvmTest {
         }
     }
 
+    @Test
+    fun migrationElevenToTwelvePreservesCatalogAndAddsHierarchy() {
+        createVersion11ForCatalog().use {
+            it.writableDatabase.execSQL(
+                "INSERT INTO areas_administrativas_locales VALUES " +
+                    "(7, 'AREA_ADMINISTRATIVA|7|Administracion', " +
+                    "'Administracion', 1, NULL, 100)"
+            )
+            it.writableDatabase.execSQL(
+                "INSERT INTO empleado_area_locales VALUES " +
+                    "(2, 7, 3, NULL, 1, NULL, 100)"
+            )
+            it.writableDatabase.execSQL(
+                "INSERT INTO catalog_sync_state VALUES " +
+                    "('reference_catalogs', 100, 1, 1, 1, NULL)"
+            )
+        }
+        migrateToVersion12().use {
+            val db = it.readableDatabase
+            assertEquals(
+                "Administracion",
+                value(
+                    db,
+                    "SELECT nombreArea FROM areas_administrativas_locales " +
+                        "WHERE idArea=7"
+                )
+            )
+            assertEquals(
+                "3",
+                value(
+                    db,
+                    "SELECT cargo FROM empleado_area_locales " +
+                        "WHERE idParticipante=2 AND idArea=7"
+                )
+            )
+            assertEquals(
+                "0",
+                value(
+                    db,
+                    "SELECT participantTypeCount FROM catalog_sync_state"
+                )
+            )
+            db.execSQL(
+                "INSERT INTO tipos_participante_locales VALUES " +
+                    "(3, 'Supervisor', 'SUPERVISOR', 1, 100)"
+            )
+            assertEquals(
+                "SUPERVISOR",
+                value(
+                    db,
+                    "SELECT capacidadesCsv FROM tipos_participante_locales " +
+                        "WHERE codigo=3"
+                )
+            )
+        }
+    }
+
     private fun createVersion8(): SupportSQLiteOpenHelper =
         helper(8, object : SupportSQLiteOpenHelper.Callback(8) {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -231,6 +288,69 @@ class CatalogMigrationJvmTest {
                 newVersion: Int
             ) {
                 BitacoraDatabase.MIGRATION_10_11.migrate(db)
+            }
+        })
+
+    private fun createVersion11ForCatalog(): SupportSQLiteOpenHelper =
+        helper(11, object : SupportSQLiteOpenHelper.Callback(11) {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE areas_administrativas_locales (
+                        idArea INTEGER NOT NULL PRIMARY KEY,
+                        codigoQr TEXT NOT NULL,
+                        nombreArea TEXT NOT NULL,
+                        activo INTEGER NOT NULL,
+                        updatedAtServer TEXT,
+                        syncedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE empleado_area_locales (
+                        idParticipante INTEGER NOT NULL,
+                        idArea INTEGER NOT NULL,
+                        cargo INTEGER,
+                        fechaFinal TEXT,
+                        activo INTEGER NOT NULL,
+                        updatedAtServer TEXT,
+                        syncedAtMillis INTEGER NOT NULL,
+                        PRIMARY KEY(idParticipante, idArea)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE catalog_sync_state (
+                        catalogKey TEXT NOT NULL PRIMARY KEY,
+                        lastSuccessfulSyncMillis INTEGER,
+                        participantCount INTEGER NOT NULL,
+                        areaCount INTEGER NOT NULL,
+                        assignmentCount INTEGER NOT NULL,
+                        lastError TEXT
+                    )
+                    """.trimIndent()
+                )
+            }
+
+            override fun onUpgrade(
+                db: SupportSQLiteDatabase,
+                oldVersion: Int,
+                newVersion: Int
+            ) = Unit
+        })
+
+    private fun migrateToVersion12(): SupportSQLiteOpenHelper =
+        helper(12, object : SupportSQLiteOpenHelper.Callback(12) {
+            override fun onCreate(db: SupportSQLiteDatabase) = Unit
+
+            override fun onUpgrade(
+                db: SupportSQLiteDatabase,
+                oldVersion: Int,
+                newVersion: Int
+            ) {
+                BitacoraDatabase.MIGRATION_11_12.migrate(db)
             }
         })
 

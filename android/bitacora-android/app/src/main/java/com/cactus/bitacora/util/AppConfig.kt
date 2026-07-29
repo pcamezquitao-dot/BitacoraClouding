@@ -12,4 +12,10 @@ object AppConfig {
             .takeIf { it.isNotBlank() }
             ?.let { "Bearer $it" }
             .orEmpty()
+
+    val ADMIN_AUTHORIZATION: String
+        get() = BuildConfig.ADMIN_API_TOKEN.trim()
+            .takeIf(String::isNotEmpty)
+            ?.let { "Bearer $it" }
+            .orEmpty()
 }

@@ -27,9 +27,23 @@ import com.cactus.bitacora.model.FaceTemplateMetadataOut
 import com.cactus.bitacora.model.FaceTemplateDeactivateIn
 import com.cactus.bitacora.model.OfflineCatalogOut
 import com.cactus.bitacora.model.BitacoraDiariaSyncOut
+import com.cactus.bitacora.model.AreaTreeNodeOut
+import com.cactus.bitacora.model.AdministrativeAreaIn
+import com.cactus.bitacora.model.AdministrativeAreaOut
+import com.cactus.bitacora.model.EmployeeAreaAdminIn
+import com.cactus.bitacora.model.EmployeeAreaAdminOut
+import com.cactus.bitacora.model.EmployeeAreaAssignmentOut
+import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
+import com.cactus.bitacora.model.EmployeeAreaUpdateIn
+import com.cactus.bitacora.model.ParticipantOptionOut
+import com.cactus.bitacora.model.ParticipantTypeAdminIn
+import com.cactus.bitacora.model.ParticipantTypeAdminOut
+import com.cactus.bitacora.model.ParticipantTypeStatusIn
+import retrofit2.Response
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.DELETE
+import retrofit2.http.PUT
 
 object ApiConfig {
     val BASE_URL: String
@@ -45,6 +59,111 @@ interface BitacoraApi {
 
     @GET("catalogos/offline")
     suspend fun getOfflineCatalogs(): OfflineCatalogOut
+
+    @GET("admin/tipos-participante")
+    suspend fun getAdminParticipantTypes(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): List<ParticipantTypeAdminOut>
+
+    @POST("admin/tipos-participante")
+    suspend fun createAdminParticipantType(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: ParticipantTypeAdminIn
+    ): ParticipantTypeAdminOut
+
+    @PUT("admin/tipos-participante/{codigo}")
+    suspend fun updateAdminParticipantType(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("codigo") code: Int,
+        @Body payload: ParticipantTypeAdminIn
+    ): ParticipantTypeAdminOut
+
+    @PUT("admin/tipos-participante/{codigo}/estado")
+    suspend fun setAdminParticipantTypeStatus(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("codigo") code: Int,
+        @Body payload: ParticipantTypeStatusIn
+    ): ParticipantTypeAdminOut
+
+    @GET("admin/areas/arbol")
+    suspend fun getAdminAreaTree(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): Response<List<AreaTreeNodeOut>>
+
+    @POST("admin/areas")
+    suspend fun createAdminArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: AdministrativeAreaIn
+    ): Response<AdministrativeAreaOut>
+
+    @PUT("admin/areas/{idArea}")
+    suspend fun updateAdminArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("idArea") idArea: Int,
+        @Body payload: AdministrativeAreaIn
+    ): Response<AdministrativeAreaOut>
+
+    @DELETE("admin/areas/{idArea}")
+    suspend fun deleteAdminArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("idArea") idArea: Int
+    ): Response<Unit>
+
+    @POST("admin/empleado-area")
+    suspend fun createAdminEmployeeArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: EmployeeAreaAdminIn
+    ): EmployeeAreaAdminOut
+
+    @GET("admin/empleado-area/tree")
+    suspend fun getAdminEmployeeAreaTree(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): Response<List<EmployeeAreaTreeNodeOut>>
+
+    @GET("admin/participantes/options")
+    suspend fun getAdminParticipantOptions(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Query("search") search: String
+    ): Response<List<ParticipantOptionOut>>
+
+    @PUT("admin/empleado-area/{idAssignment}")
+    suspend fun updateAdminEmployeeArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("idAssignment") idAssignment: Int,
+        @Body payload: EmployeeAreaUpdateIn
+    ): Response<EmployeeAreaAssignmentOut>
+
+    @DELETE("admin/empleado-area/{idAssignment}")
+    suspend fun retireAdminEmployeeArea(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("idAssignment") idAssignment: Int
+    ): Response<Unit>
 
     @DELETE("bitacora-area-evidencias/{id_evidencia}")
     suspend fun deleteEvidence(
