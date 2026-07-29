@@ -247,11 +247,7 @@ fun FaceTechnicalScreen(
 
     LaunchedEffect(mode, enrollmentIdentity?.participantId) {
         activeTemplateCount = try {
-            if (mode == FaceFlowMode.IDENTIFICATION) {
-                repository.ensureActiveTemplatesAvailable()
-            } else {
-                repository.activeCount()
-            }
+            repository.activeCount()
         } catch (error: Exception) {
             visibleState = FaceVisibleState.ERROR
             detail = error.message ?: "No fue posible cargar los enrolamientos"

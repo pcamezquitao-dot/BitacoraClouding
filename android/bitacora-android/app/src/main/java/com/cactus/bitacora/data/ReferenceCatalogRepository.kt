@@ -25,6 +25,11 @@ data class CatalogStatus(
     val lastError: String?
 )
 
+data class CatalogAreaOption(
+    val area: AreaOut,
+    val qr: String
+)
+
 data class CatalogSyncResult(
     val success: Boolean,
     val participants: Int,
@@ -163,6 +168,15 @@ class ReferenceCatalogRepository(
             else throw CatalogValidationException(MISSING_LOCAL_MESSAGE)
         }
     }
+
+    suspend fun participantById(participantId: Int): ParticipanteOut =
+        dao.participantById(participantId)?.toApi()
+            ?: throw CatalogValidationException(
+                "El supervisor no está disponible en el catálogo local"
+            )
+
+    suspend fun activeAreas(): List<CatalogAreaOption> =
+        dao.activeAreas().map { CatalogAreaOption(it.toApi(), it.codigoQr) }
 
     suspend fun assignmentForRole(
         participantId: Int,

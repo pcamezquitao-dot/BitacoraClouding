@@ -24,6 +24,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,13 +38,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -65,6 +73,11 @@ import com.cactus.bitacora.data.normalizeParticipantQuery
 import com.cactus.bitacora.data.models.AreaOut
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
+import com.cactus.bitacora.data.CatalogAreaOption
+import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
+import com.cactus.bitacora.data.local.EvidenceType
+import com.cactus.bitacora.data.local.GpsStatus
+import com.cactus.bitacora.data.local.SyncStatus
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.location.BitacoraLocationProvider
@@ -84,6 +97,9 @@ import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import retrofit2.HttpException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -115,6 +131,28 @@ internal enum class AppEnvironment(val label: String) {
     ADMINISTRADOR("Administrador"),
     CIUDADANO("Ciudadano")
 }
+
+internal data class CitizenEventType(
+    val idTipoNovedad: Int,
+    val label: String
+)
+
+internal val citizenEventTypes = listOf(
+    CitizenEventType(idTipoNovedad = 1, label = "PERMISO"),
+    CitizenEventType(idTipoNovedad = 2, label = "INCAPACIDAD"),
+    CitizenEventType(idTipoNovedad = 3, label = "INCIDENTE"),
+    CitizenEventType(idTipoNovedad = 4, label = "INGRESO"),
+    CitizenEventType(idTipoNovedad = 5, label = "SALIDA"),
+    CitizenEventType(idTipoNovedad = 6, label = "REPORTE DE CULTIVO"),
+    CitizenEventType(idTipoNovedad = 7, label = "AUTORIZA HORAS EXTRAS"),
+    CitizenEventType(idTipoNovedad = 8, label = "REPORTE DE CARRETERA")
+)
+
+internal fun CitizenEventType.requiresTextEvidence(): Boolean =
+    idTipoNovedad != 4 && idTipoNovedad != 5
+
+internal fun CitizenEventType.allowsAudioEvidence(): Boolean =
+    idTipoNovedad != 4 && idTipoNovedad != 5
 
 internal const val ADMIN_ONLY_MESSAGE =
     "Esta función está disponible únicamente para el administrador"
@@ -175,7 +213,12 @@ fun BitacoraApp() {
     val repository = remember { BitacoraRepository(context) }
     var activeEnvironment by remember { mutableStateOf<AppEnvironment?>(null) }
     var currentScreen by remember { mutableStateOf(AppScreen.Health) }
+    var selectedCitizenEvent by remember { mutableStateOf<CitizenEventType?>(null) }
     var navigationMessage by remember { mutableStateOf<String?>(null) }
+    var confirmOldestDeletion by remember { mutableStateOf(false) }
+    var deletingOldest by remember { mutableStateOf(false) }
+    var oldestDeletionMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         OfflineSyncScheduler.schedule(context)
         OfflineSyncScheduler.enqueueNow(context)
@@ -194,6 +237,7 @@ fun BitacoraApp() {
         currentScreen = AppScreen.Health
         navigationMessage = null
         activeEnvironment = null
+        selectedCitizenEvent = null
     }
 
     fun openScreen(screen: AppScreen) {
@@ -247,6 +291,23 @@ fun BitacoraApp() {
                 }
             }
 
+            if (environment == AppEnvironment.ADMINISTRADOR) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !deletingOldest,
+                    onClick = { confirmOldestDeletion = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Borrar las 10 bitácoras más antiguas")
+                }
+                oldestDeletionMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -262,7 +323,10 @@ fun BitacoraApp() {
                 Button(
                     modifier = Modifier.weight(1f),
                     enabled = currentScreen != AppScreen.CreateDailyLog,
-                    onClick = { openScreen(AppScreen.CreateDailyLog) }
+                    onClick = {
+                        selectedCitizenEvent = null
+                        openScreen(AppScreen.CreateDailyLog)
+                    }
                 ) {
                     Text("Crear bitácora")
                 }
@@ -286,7 +350,14 @@ fun BitacoraApp() {
 
             Box(modifier = Modifier.weight(1f)) {
                 when (currentScreen) {
-                    AppScreen.Health -> BackendStatusScreen(repository)
+                    AppScreen.Health -> if (environment == AppEnvironment.CIUDADANO) {
+                        CitizenEventTypeScreen { eventType ->
+                            selectedCitizenEvent = eventType
+                            openScreen(AppScreen.CreateDailyLog)
+                        }
+                    } else {
+                        BackendStatusScreen(repository)
+                    }
                     AppScreen.FaceEnrollment -> if (canAccessEnrollment(environment)) {
                         FaceEnrollmentAdminScreen(
                             repository = repository,
@@ -297,12 +368,95 @@ fun BitacoraApp() {
                             onBack = { currentScreen = mainDestinationAfterBack() }
                         )
                     }
-                    AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(repository)
+                    AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(
+                        repository = repository,
+                        citizenEventType = selectedCitizenEvent
+                    )
                     AppScreen.QueryDailyLog -> BitacoraQueryScreen(
                         repository = repository,
                         allowDelete = environment == AppEnvironment.ADMINISTRADOR
                     )
                     AppScreen.Sync -> SyncScreen(repository)
+                }
+            }
+        }
+    }
+
+    if (confirmOldestDeletion && activeEnvironment == AppEnvironment.ADMINISTRADOR) {
+        AlertDialog(
+            onDismissRequest = { confirmOldestDeletion = false },
+            title = { Text("Eliminar las 10 bitácoras más antiguas") },
+            text = {
+                Text(
+                    "Se eliminarán permanentemente hasta 10 bitácoras, comenzando por " +
+                        "las más antiguas, junto con sus evidencias y archivos asociados."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deletingOldest,
+                    onClick = {
+                        confirmOldestDeletion = false
+                        deletingOldest = true
+                        oldestDeletionMessage = null
+                        scope.launch {
+                            try {
+                                repository.deleteOldestBitacoras(10)
+                                oldestDeletionMessage = "Se eliminaron las bitácoras más antiguas"
+                            } catch (error: Exception) {
+                                oldestDeletionMessage = error.message
+                                    ?: "No fue posible eliminar las bitácoras más antiguas"
+                            } finally {
+                                deletingOldest = false
+                            }
+                        }
+                    }
+                ) {
+                    Text("Sí, eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !deletingOldest,
+                    onClick = { confirmOldestDeletion = false }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CitizenEventTypeScreen(onSelect: (CitizenEventType) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Seleccione el tipo de novedad",
+            style = MaterialTheme.typography.titleLarge
+        )
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(
+                items = citizenEventTypes,
+                key = { it.idTipoNovedad }
+            ) { eventType ->
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(88.dp),
+                    onClick = { onSelect(eventType) }
+                ) {
+                    Text(
+                        text = eventType.label,
+                        style = MaterialTheme.typography.titleSmall
+                    )
                 }
             }
         }
@@ -758,6 +912,26 @@ internal fun assignmentAllowsTarget(cargo: Int?, target: DailyLogQrTarget): Bool
     DailyLogQrTarget.AREA -> false
 }
 
+internal fun allowsOfflineManager(
+    normalizedQr: String,
+    participantId: Int,
+    cargo: Int?,
+    active: Boolean,
+    startDate: String?,
+    endDate: String?,
+    today: String
+): Boolean {
+    if (!active) return false
+    if (startDate != null && startDate > today) return false
+    if (endDate != null && endDate < today) return false
+    return cargo == 4 ||
+        (
+            normalizedQr.trim().uppercase(Locale.ROOT) == "P0001" &&
+                participantId == 1 &&
+                cargo == 3
+        )
+}
+
 internal fun missingRoleMessage(target: DailyLogQrTarget): String =
     "El participante reconocido no tiene el rol activo requerido: " +
         if (target == DailyLogQrTarget.SUPERVISOR) "Supervisor" else "Empleado"
@@ -765,7 +939,10 @@ internal fun missingRoleMessage(target: DailyLogQrTarget): String =
 internal const val SAVE_DAILY_LOG_LABEL = "Guardar bitácora"
 
 @Composable
-fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
+internal fun CrearBitacoraDiariaScreen(
+    repository: BitacoraRepository,
+    citizenEventType: CitizenEventType? = null
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val locationProvider = remember { BitacoraLocationProvider(context.applicationContext) }
@@ -775,6 +952,9 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     var empleado by remember { mutableStateOf<ParticipanteValidado?>(null) }
     var supervisor by remember { mutableStateOf<ParticipanteValidado?>(null) }
     var area by remember { mutableStateOf<AreaOut?>(null) }
+    var availableAreas by remember { mutableStateOf<List<CatalogAreaOption>>(emptyList()) }
+    var areaMenuExpanded by remember { mutableStateOf(false) }
+    var supervisorFallbackRequired by remember { mutableStateOf(false) }
     var empleadoError by remember { mutableStateOf<String?>(null) }
     var supervisorError by remember { mutableStateOf<String?>(null) }
     var areaError by remember { mutableStateOf<String?>(null) }
@@ -783,13 +963,41 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     var pendingCameraTarget by remember { mutableStateOf<DailyLogQrTarget?>(null) }
     var horaEntrada by remember { mutableStateOf("") }
     var horaSalida by remember { mutableStateOf("") }
-    var tipoAnotacion by remember { mutableStateOf("") }
+    var tipoAnotacion by remember {
+        mutableStateOf(citizenEventType?.idTipoNovedad?.toString().orEmpty())
+    }
     var observaciones by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<CreateBitacoraState>(CreateBitacoraState.Idle) }
     var gpsLocation by remember { mutableStateOf<LocationSnapshot?>(null) }
     var gpsLoading by remember { mutableStateOf(false) }
     var gpsError by remember { mutableStateOf<String?>(null) }
     var faceSession by remember { mutableStateOf<DailyLogFaceSession?>(null) }
+
+    LaunchedEffect(citizenEventType?.idTipoNovedad) {
+        if (citizenEventType != null) {
+            tipoAnotacion = citizenEventType.idTipoNovedad.toString()
+        }
+        availableAreas = repository.getAdministrativeAreas()
+        if (availableAreas.isEmpty()) {
+            repository.syncReferenceCatalogs()
+            availableAreas = repository.getAdministrativeAreas()
+        }
+    }
+
+    suspend fun resolveEmployeeSupervisor(employee: ParticipanteValidado) {
+        supervisor = null
+        supervisorError = null
+        supervisorFallbackRequired = false
+        try {
+            val (participant, assignment) = repository.getSupervisorForEmployee(
+                employee.participante.id_participante
+            )
+            supervisor = ParticipanteValidado(participant, assignment)
+        } catch (_: Exception) {
+            supervisorFallbackRequired = true
+            supervisorError = "No se localizó supervisor. Escanee el QR del gerente."
+        }
+    }
 
     fun obtainGps() {
         gpsLocation = null
@@ -819,6 +1027,21 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
     ) { permissions ->
         if (permissions.values.any { it }) obtainGps()
         else gpsError = "Permiso de ubicación rechazado. No se puede crear la bitácora."
+    }
+
+    LaunchedEffect(citizenEventType?.idTipoNovedad) {
+        if (citizenEventType != null) {
+            if (locationProvider.hasPermission()) {
+                obtainGps()
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        }
     }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -855,6 +1078,9 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                     supervisor = false
                 )
                 empleado = ParticipanteValidado(participante, asignacion)
+                if (citizenEventType != null) {
+                    resolveEmployeeSupervisor(requireNotNull(empleado))
+                }
             } catch (e: Exception) {
                 empleadoError = e.httpDetail()
                     ?: e.message
@@ -865,7 +1091,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         }
     }
 
-    fun validateSupervisor(rawQr: String) {
+    fun validateSupervisor(rawQr: String, managerFallback: Boolean = false) {
         val qr = rawQr.trim()
         supervisor = null
         supervisorError = null
@@ -877,11 +1103,33 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         scope.launch {
             try {
                 val participante = repository.getParticipanteByQr(qr)
-                val asignacion = repository.getAsignacionParaRol(
-                    participante.id_participante,
-                    supervisor = true
-                )
+                val asignacion = if (managerFallback) {
+                    repository.getAsignacionesActivas(participante.id_participante)
+                        .firstOrNull {
+                            allowsOfflineManager(
+                                normalizedQr = qr,
+                                participantId = participante.id_participante,
+                                cargo = it.cargo,
+                                active = true,
+                                startDate = null,
+                                endDate = it.fecha_final,
+                                today = SimpleDateFormat(
+                                    "yyyy-MM-dd",
+                                    Locale.ROOT
+                                ).format(Date())
+                            )
+                        }
+                        ?: throw IllegalStateException(
+                            "El participante no tiene un cargo activo de gerente"
+                        )
+                } else {
+                    repository.getAsignacionParaRol(
+                        participante.id_participante,
+                        supervisor = true
+                    )
+                }
                 supervisor = ParticipanteValidado(participante, asignacion)
+                supervisorFallbackRequired = false
             } catch (e: Exception) {
                 supervisorError = e.httpDetail()
                     ?: e.message
@@ -910,6 +1158,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             try {
                 val areaConsultada = repository.getAreaByQr(qr)
                 if (
+                    citizenEventType == null &&
                     !areaMatchesAssignment(
                         areaConsultada.id_area,
                         empleadoActual.asignacion.id_area
@@ -919,10 +1168,12 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         "El área seleccionada no coincide con la asignación activa del empleado"
                     )
                 }
-                repository.validarAsignacionArea(
-                    empleadoActual.participante.id_participante,
-                    areaConsultada.id_area
-                )
+                if (citizenEventType == null) {
+                    repository.validarAsignacionArea(
+                        empleadoActual.participante.id_participante,
+                        areaConsultada.id_area
+                    )
+                }
                 area = areaConsultada
             } catch (e: Exception) {
                 areaError = e.httpDetail()
@@ -949,15 +1200,48 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         if (supervisor == null) add("Validar supervisor")
         if (area == null) add("Validar área administrativa")
         if (
+            citizenEventType == null &&
             area != null &&
             !areaMatchesAssignment(area?.id_area, empleado?.asignacion?.id_area)
         ) {
             add("El área debe coincidir con la asignación del empleado")
         }
         if (tipoAnotacion.toIntOrNull() == null) add("Seleccionar un tipo de anotación válido")
+        if (citizenEventType != null && gpsLocation == null) add("Obtener ubicación GPS")
+        if (
+            citizenEventType?.requiresTextEvidence() == true &&
+            observaciones.isBlank()
+        ) {
+            add("Ingresar evidencia de texto")
+        }
         if (validatingTarget != null || scanningTarget != null) add("Finalizar la validación QR en curso")
     }
     val canCreate = missingCreateRequirements.isEmpty()
+
+    suspend fun saveCitizenTextEvidence(
+        localId: Long,
+        serverId: Int?,
+        areaId: Int,
+        location: LocationSnapshot
+    ) {
+        repository.saveEvidence(
+            BitacoraEvidenceEntity(
+                bitacoraLocalId = localId,
+                bitacoraServerId = serverId,
+                areaId = areaId,
+                clientUuid = UUID.randomUUID().toString(),
+                evidenceType = EvidenceType.TEXT,
+                textContent = observaciones.trim(),
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracy = location.accuracy,
+                gpsTimestamp = location.timestamp,
+                locationProvider = location.provider,
+                gpsStatus = GpsStatus.READY,
+                syncStatus = SyncStatus.PENDIENTE_CREAR
+            )
+        )
+    }
 
     fun createDailyLog() {
         val empleadoValidado = empleado
@@ -1004,15 +1288,41 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         tipo_anotacion = tipo,
                         observaciones = observaciones.ifBlank { null },
                         client_uuid = UUID.randomUUID().toString(),
-                        qr_area = qrArea.trim()
+                        qr_area = if (citizenEventType == null) qrArea.trim() else null
                     ),
                     openLocation = gpsLocation,
                     closeLocation = closeLocation
                 )) {
-                    is CreateBitacoraResult.Sincronizada ->
-                        CreateBitacoraState.Success(result.localId, result.bitacora.id_bitacora, areaValidada.id_area)
-                    is CreateBitacoraResult.Pendiente ->
-                        CreateBitacoraState.Pending(result.localId, areaValidada.id_area, result.message)
+                    is CreateBitacoraResult.Sincronizada -> {
+                        if (citizenEventType != null && observaciones.isNotBlank()) {
+                            saveCitizenTextEvidence(
+                                result.localId,
+                                result.bitacora.id_bitacora,
+                                areaValidada.id_area,
+                                requireNotNull(gpsLocation)
+                            )
+                        }
+                        CreateBitacoraState.Success(
+                            result.localId,
+                            result.bitacora.id_bitacora,
+                            areaValidada.id_area
+                        )
+                    }
+                    is CreateBitacoraResult.Pendiente -> {
+                        if (citizenEventType != null && observaciones.isNotBlank()) {
+                            saveCitizenTextEvidence(
+                                result.localId,
+                                null,
+                                areaValidada.id_area,
+                                requireNotNull(gpsLocation)
+                            )
+                        }
+                        CreateBitacoraState.Pending(
+                            result.localId,
+                            areaValidada.id_area,
+                            result.message
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 CreateBitacoraState.Error(e.message ?: "No fue posible crear la bitacora diaria")
@@ -1046,6 +1356,9 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         empleadoError = null
                         area = null
                         areaError = null
+                        if (citizenEventType != null) {
+                            resolveEmployeeSupervisor(validated)
+                        }
                     }
                     DailyLogQrTarget.SUPERVISOR -> {
                         qrSupervisor = candidate.participantCode
@@ -1080,7 +1393,11 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                         }
                         DailyLogQrTarget.SUPERVISOR -> {
                             qrSupervisor = rawQr
-                            validateSupervisor(rawQr)
+                            validateSupervisor(
+                                rawQr,
+                                managerFallback = citizenEventType != null &&
+                                    supervisorFallbackRequired
+                            )
                         }
                         DailyLogQrTarget.AREA -> {
                             qrArea = rawQr
@@ -1136,7 +1453,9 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Crear Bitacora Diaria",
+            text = citizenEventType?.let {
+                "${it.label} · tipo_novedad ${it.idTipoNovedad}"
+            } ?: "Crear Bitacora Diaria",
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -1164,32 +1483,87 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             }
         }
 
-        QrValidationSection(
-            title = "Supervisor",
-            scanText = "Escanear supervisor",
-            qr = qrSupervisor,
-            onQrChange = { qrSupervisor = it; supervisor = null; supervisorError = null },
-            onScan = { startScan(DailyLogQrTarget.SUPERVISOR) },
-            onValidate = { validateSupervisor(qrSupervisor) },
-            loading = validatingTarget == DailyLogQrTarget.SUPERVISOR,
-            error = supervisorError,
-            validated = supervisor != null
-        ) {
-            qrScannerForTarget(DailyLogQrTarget.SUPERVISOR)
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { startFaceIdentification(DailyLogQrTarget.SUPERVISOR) }
-            ) { Text("Reconocer rostro") }
+        if (citizenEventType == null || supervisorFallbackRequired) {
+            QrValidationSection(
+                title = if (supervisorFallbackRequired) "Gerente de respaldo" else "Supervisor",
+                scanText = if (supervisorFallbackRequired) "Escanear QR del gerente" else "Escanear supervisor",
+                qr = qrSupervisor,
+                onQrChange = { qrSupervisor = it; supervisor = null; supervisorError = null },
+                onScan = { startScan(DailyLogQrTarget.SUPERVISOR) },
+                onValidate = {
+                    validateSupervisor(
+                        qrSupervisor,
+                        managerFallback = supervisorFallbackRequired
+                    )
+                },
+                loading = validatingTarget == DailyLogQrTarget.SUPERVISOR,
+                error = supervisorError,
+                validated = supervisor != null
+            ) {
+                qrScannerForTarget(DailyLogQrTarget.SUPERVISOR)
+                if (!supervisorFallbackRequired) {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { startFaceIdentification(DailyLogQrTarget.SUPERVISOR) }
+                    ) { Text("Reconocer rostro") }
+                }
+                supervisor?.let {
+                    Text("Supervisor validado localmente", color = MaterialTheme.colorScheme.primary)
+                    Text("Nombre: ${it.participante.nombreCompleto()}")
+                    Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
+                }
+            }
+        } else {
             supervisor?.let {
-                Text("Supervisor validado localmente", color = MaterialTheme.colorScheme.primary)
+                Text("Supervisor asignado", style = MaterialTheme.typography.titleMedium)
                 Text("Nombre: ${it.participante.nombreCompleto()}")
                 Text("Identificación: ${it.participante.identificacion_participante.orEmpty()}")
-            }
+            } ?: Text("El supervisor se completa al identificar al empleado")
         }
 
+        Text("Área administrativa", style = MaterialTheme.typography.titleMedium)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { areaMenuExpanded = true }
+            ) {
+                Text(
+                    area?.let { "1) Selección de áreas: ${it.descripcion}" }
+                        ?: "1) Selección de áreas"
+                )
+            }
+            DropdownMenu(
+                expanded = areaMenuExpanded,
+                onDismissRequest = { areaMenuExpanded = false }
+            ) {
+                availableAreas.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text("${option.area.descripcion}\n${option.qr}")
+                        },
+                        onClick = {
+                            qrArea = option.qr
+                            areaMenuExpanded = false
+                            if (citizenEventType == null) {
+                                validateArea(option.qr)
+                            } else {
+                                area = option.area
+                                areaError = null
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        if (availableAreas.isEmpty()) {
+            Text(
+                "No hay áreas administrativas en el catálogo local",
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         QrValidationSection(
-            title = "Área",
-            scanText = "Escanear área",
+            title = "2) Lectura de área mediante QR",
+            scanText = "Leer QR AREA_ADMINISTRATIVA",
             qr = qrArea,
             onQrChange = { qrArea = it; area = null; areaError = null },
             onScan = { startScan(DailyLogQrTarget.AREA) },
@@ -1257,7 +1631,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             }
         }
 
-        OutlinedTextField(
+        if (citizenEventType == null) OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = horaEntrada,
             onValueChange = { horaEntrada = it },
@@ -1266,7 +1640,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             singleLine = true
         )
 
-        OutlinedTextField(
+        if (citizenEventType == null) OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = horaSalida,
             onValueChange = { horaSalida = it },
@@ -1275,7 +1649,7 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             singleLine = true
         )
 
-        OutlinedTextField(
+        if (citizenEventType == null) OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = tipoAnotacion,
             onValueChange = { tipoAnotacion = it },
@@ -1288,7 +1662,16 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
             modifier = Modifier.fillMaxWidth(),
             value = observaciones,
             onValueChange = { observaciones = it },
-            label = { Text("observaciones") },
+            label = {
+                Text(
+                    when {
+                        citizenEventType == null -> "observaciones"
+                        citizenEventType.requiresTextEvidence() ->
+                            "Evidencia de texto obligatoria"
+                        else -> "Evidencia de texto (opcional)"
+                    }
+                )
+            },
             minLines = 3
         )
 
@@ -1328,7 +1711,13 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 Text("Estado: sincronizada")
                 Text("id_bitacora: ${currentState.idBitacora}")
                 Text("ID local: ${currentState.localId}")
-                EvidencePanel(repository, currentState.localId, currentState.idBitacora, currentState.areaId)
+                EvidencePanel(
+                    repository,
+                    currentState.localId,
+                    currentState.idBitacora,
+                    currentState.areaId,
+                    showQuickAudioCapture = citizenEventType?.allowsAudioEvidence() == true
+                )
             }
             is CreateBitacoraState.Pending -> {
                 Text(
@@ -1339,7 +1728,13 @@ fun CrearBitacoraDiariaScreen(repository: BitacoraRepository) {
                 Text(currentState.message)
                 Text("local_id: ${currentState.localId}")
                 Text("estado: PENDIENTE")
-                EvidencePanel(repository, currentState.localId, null, currentState.areaId)
+                EvidencePanel(
+                    repository,
+                    currentState.localId,
+                    null,
+                    currentState.areaId,
+                    showQuickAudioCapture = citizenEventType?.allowsAudioEvidence() == true
+                )
             }
             is CreateBitacoraState.Error -> {
                 Text(

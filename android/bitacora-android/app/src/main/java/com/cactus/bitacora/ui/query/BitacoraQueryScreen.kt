@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
+import android.view.LayoutInflater
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -52,6 +54,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.cactus.bitacora.R
 import com.cactus.bitacora.api.NetworkClient
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
@@ -342,6 +345,7 @@ private fun QueryList(
         Text("Consultar bitácoras", style = MaterialTheme.typography.titleLarge)
         if (allowDelete) {
             Button(
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !deletionInProgress,
                 onClick = onDeleteOldest,
                 colors = ButtonDefaults.buttonColors(
@@ -646,16 +650,25 @@ private fun PhotoViewer(file: File, onError: (String) -> Unit) {
 }
 
 @Composable
-private fun VideoViewer(uri: Uri, onError: (String) -> Unit) {
+internal fun VideoViewer(uri: Uri, onError: (String) -> Unit) {
     val context = LocalContext.current
     var loading by remember(uri) { mutableStateOf(true) }
     val player = remember(uri) {
         ExoPlayer.Builder(context).build().apply {
+            var initialSeekApplied = false
             setMediaItem(MediaItem.fromUri(uri))
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     loading = playbackState == Player.STATE_BUFFERING ||
                         playbackState == Player.STATE_IDLE
+                    if (
+                        playbackState == Player.STATE_READY &&
+                        !initialSeekApplied &&
+                        currentPosition == 0L
+                    ) {
+                        initialSeekApplied = true
+                        seekTo(1L)
+                    }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
@@ -667,20 +680,31 @@ private fun VideoViewer(uri: Uri, onError: (String) -> Unit) {
             playWhenReady = true
         }
     }
-    if (loading) {
-        CircularProgressIndicator()
-        Text("Cargando video")
-    }
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { context ->
-            PlayerView(context).also { view ->
-                view.player = player
-                view.useController = true
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                (LayoutInflater.from(context).inflate(
+                    R.layout.video_player_view,
+                    null,
+                    false
+                ) as PlayerView).also { view ->
+                    view.player = player
+                    view.useController = true
+                }
+            },
+            update = { it.player = player }
+        )
+        if (loading) {
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                Text("Cargando video")
             }
-        },
-        update = { it.player = player }
-    )
+        }
+    }
     DisposableEffect(uri) {
         onDispose {
             player.release()

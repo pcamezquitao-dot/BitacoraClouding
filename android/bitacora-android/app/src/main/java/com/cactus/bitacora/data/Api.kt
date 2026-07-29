@@ -8,6 +8,7 @@ import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.data.models.HealthOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
+import com.cactus.bitacora.model.SupervisorEmpleadoOut
 import com.cactus.bitacora.util.AppConfig
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -94,6 +95,11 @@ interface BitacoraApi {
     suspend fun getAsignacionesActivas(
         @Path("id_participante") idParticipante: Int
     ): List<EmpleadoAreaActivaOut>
+
+    @GET("empleados/{id_empleado}/supervisor")
+    suspend fun getSupervisorForEmployee(
+        @Path("id_empleado") idEmpleado: Int
+    ): SupervisorEmpleadoOut
 
     @GET("health")
     suspend fun health(): HealthOut

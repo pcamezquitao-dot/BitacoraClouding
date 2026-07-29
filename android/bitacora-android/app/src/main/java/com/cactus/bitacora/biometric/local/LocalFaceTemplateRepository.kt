@@ -141,25 +141,7 @@ class LocalFaceTemplateRepository(
                 ?.takeIf { it.similarity >= MATCH_THRESHOLD }
         }
 
-    suspend fun activeCount(): Int = withContext(Dispatchers.IO) {
-        val active = dao.getActive()
-        if (active.isEmpty()) return@withContext 0
-        val usable = active.count { entity ->
-            entity.modelVersion == "FaceNet-160/128" &&
-                runCatching { crypto.decrypt(entity.encryptedEmbedding) }
-                    .onFailure {
-                        Log.e(
-                            SYNC_TAG,
-                            "face load failed participantId=${entity.participantId} " +
-                                "state=${entity.centralSyncState} reason=decrypt_error"
-                        )
-                    }
-                    .isSuccess
-        }
-        Log.i(SYNC_TAG, "face templates found=${active.size} usable=$usable")
-        check(usable > 0) { "No fue posible cargar los enrolamientos locales" }
-        usable
-    }
+    suspend fun activeCount(): Int = withContext(Dispatchers.IO) { dao.countActive() }
 
     suspend fun ensureActiveTemplatesAvailable(): Int {
         val localCount = activeCount()
@@ -213,13 +195,12 @@ class LocalFaceTemplateRepository(
 
     suspend fun syncWithCentral(): FaceCentralSyncResult = withContext(Dispatchers.IO) {
         if (authorization.isBlank()) {
-            val message = "Token de sincronización facial no configurado"
             return@withContext FaceCentralSyncResult(
                 uploaded = 0,
                 downloaded = 0,
-                errors = 1,
+                errors = 0,
                 retryableErrors = 0,
-                errorMessages = listOf(message)
+                errorMessages = emptyList()
             )
         }
         var uploaded = 0

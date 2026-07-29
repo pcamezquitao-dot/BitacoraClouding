@@ -6,12 +6,14 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +52,7 @@ import com.cactus.bitacora.data.local.EvidenceType
 import com.cactus.bitacora.data.local.GpsStatus
 import com.cactus.bitacora.data.local.SyncStatus
 import com.cactus.bitacora.location.BitacoraLocationProvider
+import com.cactus.bitacora.ui.query.VideoViewer
 import java.io.File
 import java.io.IOException
 import java.text.DateFormat
@@ -114,7 +118,8 @@ fun EvidencePanel(
     repository: BitacoraRepository,
     bitacoraLocalId: Long,
     remoteId: Int?,
-    areaId: Int
+    areaId: Int,
+    showQuickAudioCapture: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -128,6 +133,44 @@ fun EvidencePanel(
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var pendingType by remember { mutableStateOf<EvidenceType?>(null) }
     var preview by remember { mutableStateOf<PendingEvidencePreview?>(null) }
+    var previewVideo by remember { mutableStateOf<PendingEvidencePreview?>(null) }
+    var previewAudioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    fun fileUri(file: File): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+
+    fun stopPreviewAudio() {
+        previewAudioPlayer?.release()
+        previewAudioPlayer = null
+    }
+
+    fun playAudio(file: File) {
+        stopPreviewAudio()
+        try {
+            previewAudioPlayer = requireNotNull(MediaPlayer.create(context, fileUri(file))) {
+                "MediaPlayer no pudo preparar el audio"
+            }.apply {
+                setOnCompletionListener { player ->
+                    player.release()
+                    if (previewAudioPlayer === player) previewAudioPlayer = null
+                }
+                start()
+            }
+            message = null
+        } catch (error: Exception) {
+            stopPreviewAudio()
+            message = "No fue posible reproducir la grabación"
+            Log.e(
+                EVIDENCE_LOG_TAG,
+                "Error controlado al reproducir audio temporal: " +
+                    error.javaClass.simpleName
+            )
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { stopPreviewAudio() }
+    }
 
     fun refresh() {
         scope.launch { evidences = repository.getEvidences(bitacoraLocalId) }
@@ -171,9 +214,6 @@ fun EvidencePanel(
             }
         }
     }
-
-    fun fileUri(file: File): Uri =
-        FileProvider.getUriForFile(context, "${context.packageName}.files", file)
 
     fun openFile(review: PendingEvidencePreview) {
         message = openEvidenceSafely(
@@ -370,6 +410,7 @@ fun EvidencePanel(
                         val file = newTemporaryFile("mp4")
                         val uri = fileUri(file)
                         pendingFile = file
+                        ProcessCameraProvider.getInstance(context).get().unbindAll()
                         Log.i(EVIDENCE_LOG_TAG, "URI temporal creada tipo=$type uri=$uri")
                         videoLauncher.launch(uri)
                     }
@@ -414,6 +455,12 @@ fun EvidencePanel(
                 onClick = { menu = true },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Agregar evidencia") }
+            if (showQuickAudioCapture) {
+                OutlinedButton(
+                    onClick = { launchCapture(EvidenceType.AUDIO) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Grabar audio") }
+            }
             message?.let {
                 Text(
                     it,
@@ -450,12 +497,16 @@ fun EvidencePanel(
                             evidence.localFilePath?.let { path ->
                                 OutlinedButton(onClick = {
                                     val file = File(path)
-                                    message = openEvidenceSafely(
-                                        context = context,
-                                        file = file,
-                                        mime = evidence.mimeType ?: "*/*",
-                                        uriFactory = ::fileUri
-                                    )
+                                    if (evidence.evidenceType == EvidenceType.AUDIO) {
+                                        playAudio(file)
+                                    } else {
+                                        message = openEvidenceSafely(
+                                            context = context,
+                                            file = file,
+                                            mime = evidence.mimeType ?: "*/*",
+                                            uriFactory = ::fileUri
+                                        )
+                                    }
                                 }) {
                                     Text(if (evidence.evidenceType == EvidenceType.AUDIO) {
                                         "Escuchar"
@@ -501,7 +552,15 @@ fun EvidencePanel(
                     }
                     if (review.type != EvidenceType.TEXT) {
                         OutlinedButton(
-                            onClick = { openFile(review) },
+                            onClick = {
+                                if (review.type == EvidenceType.AUDIO) {
+                                    playAudio(review.file)
+                                } else if (review.type == EvidenceType.VIDEO) {
+                                    previewVideo = review
+                                } else {
+                                    openFile(review)
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -516,25 +575,46 @@ fun EvidencePanel(
                 }
             },
             confirmButton = {
-                Button(onClick = { scope.launch { savePreview(review) } }) {
+                Button(onClick = {
+                    stopPreviewAudio()
+                    scope.launch { savePreview(review) }
+                }) {
                     Text("Guardar evidencia")
                 }
             },
             dismissButton = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     OutlinedButton(onClick = {
+                        stopPreviewAudio()
                         review.file.delete()
                         preview = null
                         pendingFile = null
                         message = "Evidencia descartada"
                     }) { Text("Cancelar") }
                     OutlinedButton(onClick = {
+                        stopPreviewAudio()
                         review.file.delete()
                         preview = null
                         pendingFile = null
                         launchCapture(review.type)
                     }) { Text("Repetir") }
                 }
+            }
+        )
+    }
+
+    previewVideo?.let { review ->
+        AlertDialog(
+            onDismissRequest = { previewVideo = null },
+            title = { Text("Vista previa del video") },
+            text = {
+                VideoViewer(
+                    uri = fileUri(review.file),
+                    onError = { message = it }
+                )
+            },
+            confirmButton = {
+                Button(onClick = { previewVideo = null }) { Text("Volver") }
             }
         )
     }

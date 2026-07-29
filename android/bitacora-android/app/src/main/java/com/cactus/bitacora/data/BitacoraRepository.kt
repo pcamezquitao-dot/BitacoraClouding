@@ -17,6 +17,8 @@ import com.cactus.bitacora.data.models.AreaByQrIn
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.model.EvidenciaTextoCreate
+import com.cactus.bitacora.model.EmpleadoAreaActivaOut
+import com.cactus.bitacora.model.ParticipanteOut
 import retrofit2.HttpException
 import com.cactus.bitacora.location.LocationSnapshot
 import java.io.File
@@ -106,6 +108,19 @@ class BitacoraRepository(
 
     suspend fun getAsignacionesActivas(idParticipante: Int) =
         referenceCatalogRepository.assignmentsForParticipant(idParticipante)
+
+    suspend fun getSupervisorForEmployee(idEmpleado: Int): Pair<ParticipanteOut, EmpleadoAreaActivaOut> {
+        val response = api.getSupervisorForEmployee(idEmpleado)
+        val participant = referenceCatalogRepository.participantById(response.id_supervisor)
+        val assignment = referenceCatalogRepository.assignmentsForParticipant(response.id_supervisor)
+            .firstOrNull { it.cargo == 3 }
+            ?: throw CatalogValidationException(
+                "El supervisor asignado no tiene un cargo activo de supervisor"
+            )
+        return participant to assignment
+    }
+
+    suspend fun getAdministrativeAreas() = referenceCatalogRepository.activeAreas()
 
     suspend fun getAsignacionParaRol(idParticipante: Int, supervisor: Boolean) =
         referenceCatalogRepository.assignmentForRole(
@@ -290,6 +305,9 @@ class BitacoraRepository(
         reintentables += faceSync.retryableErrors
         mensajes += faceSync.errorMessages.map { "Enrolamiento: $it" }
 
+        runCatching { enforceLocalEvidenceRetention() }
+            .onFailure { Log.w(RETENTION_TAG, "No se pudo aplicar la retención local", it) }
+
         return SyncRunResult(
             revisados = 1 + pendientes.size + pendingEvidences.size +
                 faceSync.uploaded + faceSync.downloaded + faceSync.errors,
@@ -298,6 +316,43 @@ class BitacoraRepository(
             erroresReintentables = reintentables,
             mensajes = mensajes.distinct()
         )
+    }
+
+    private suspend fun enforceLocalEvidenceRetention(now: Long = System.currentTimeMillis()) {
+        val evidenceWithLocalFile = evidenceDao.getWithLocalFile()
+        val existingFiles = evidenceWithLocalFile.mapNotNull { evidence ->
+            val file = evidence.localFilePath?.let(::File)
+            if (file?.isFile == true) evidence to file else null
+        }
+        val totalLocalBytes = existingFiles.sumOf { (_, file) -> file.length() }
+        val victims = selectLocalEvidenceRetentionVictims(
+            candidates = existingFiles.map { (evidence, file) ->
+                LocalEvidenceRetentionCandidate(
+                    localId = evidence.localId,
+                    createdAt = evidence.createdAt,
+                    bytes = file.length(),
+                    synchronized = evidence.syncStatus == SyncStatus.SINCRONIZADO,
+                    hasRemoteCopy = evidence.remoteId != null
+                )
+            },
+            totalLocalBytes = totalLocalBytes,
+            now = now
+        ).toSet()
+
+        existingFiles
+            .filter { (evidence, _) -> evidence.localId in victims }
+            .forEach { (evidence, file) ->
+                val releasedBytes = file.length()
+                if (file.delete() || !file.exists()) {
+                    evidenceDao.clearSyncedLocalFilePath(evidence.localId)
+                    Log.i(
+                        RETENTION_TAG,
+                        "Archivo local liberado localId=${evidence.localId} bytes=$releasedBytes"
+                    )
+                } else {
+                    Log.w(RETENTION_TAG, "No se pudo liberar ${file.absolutePath}")
+                }
+            }
     }
 
 
@@ -565,6 +620,7 @@ private fun SyncStatus.pendingEquivalent(): SyncStatus = when (this) {
 
 private const val PARTICIPANT_SEARCH_TAG = "ParticipantSearch"
 private const val SYNC_TAG = "OfflineSync"
+private const val RETENTION_TAG = "LocalEvidenceRetention"
 
 private fun File.sha256(): String {
     val digest = MessageDigest.getInstance("SHA-256")

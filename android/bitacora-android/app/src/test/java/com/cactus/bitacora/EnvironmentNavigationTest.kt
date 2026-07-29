@@ -48,4 +48,35 @@ class EnvironmentNavigationTest {
         assertEquals("Ciudadano", AppEnvironment.CIUDADANO.label)
         assertFalse(canAccessEnrollment(null))
     }
+
+    @Test
+    fun citizenEventTypesKeepRequiredIdsAndLabels() {
+        assertEquals(
+            listOf(
+                1 to "PERMISO",
+                2 to "INCAPACIDAD",
+                3 to "INCIDENTE",
+                4 to "INGRESO",
+                5 to "SALIDA",
+                6 to "REPORTE DE CULTIVO",
+                7 to "AUTORIZA HORAS EXTRAS",
+                8 to "REPORTE DE CARRETERA"
+            ),
+            citizenEventTypes.map { it.idTipoNovedad to it.label }
+        )
+    }
+
+    @Test
+    fun ingresoAndSalidaAllowEmptyTextWhileOtherEventsAllowAudio() {
+        val ingreso = citizenEventTypes.single { it.idTipoNovedad == 4 }
+        val salida = citizenEventTypes.single { it.idTipoNovedad == 5 }
+        assertFalse(ingreso.requiresTextEvidence())
+        assertFalse(salida.requiresTextEvidence())
+        assertFalse(ingreso.allowsAudioEvidence())
+        assertFalse(salida.allowsAudioEvidence())
+        citizenEventTypes.filterNot { it.idTipoNovedad in setOf(4, 5) }.forEach {
+            assertTrue(it.requiresTextEvidence())
+            assertTrue(it.allowsAudioEvidence())
+        }
+    }
 }

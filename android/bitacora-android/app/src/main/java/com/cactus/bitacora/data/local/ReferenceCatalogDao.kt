@@ -19,6 +19,9 @@ interface ReferenceCatalogDao {
     @Query("SELECT * FROM areas_administrativas_locales WHERE codigoQr = :code LIMIT 1")
     suspend fun areaByCode(code: String): AreaAdministrativaLocalEntity?
 
+    @Query("SELECT * FROM areas_administrativas_locales WHERE activo = 1 ORDER BY nombreArea")
+    suspend fun activeAreas(): List<AreaAdministrativaLocalEntity>
+
     @Query(
         "SELECT * FROM empleado_area_locales " +
             "WHERE idParticipante = :participantId AND activo = 1 ORDER BY idArea"

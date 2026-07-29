@@ -47,6 +47,20 @@ interface BitacoraEvidenceDao {
     @Query("SELECT * FROM bitacora_evidences WHERE syncStatus IN (:statuses) ORDER BY createdAt ASC")
     suspend fun getBySyncStatuses(statuses: List<SyncStatus>): List<BitacoraEvidenceEntity>
 
+    @Query("SELECT * FROM bitacora_evidences WHERE localFilePath IS NOT NULL ORDER BY createdAt ASC")
+    suspend fun getWithLocalFile(): List<BitacoraEvidenceEntity>
+
+    @Query(
+        """
+        UPDATE bitacora_evidences
+        SET localFilePath = NULL
+        WHERE localId = :localId
+          AND syncStatus = 'SINCRONIZADO'
+          AND remoteId IS NOT NULL
+        """
+    )
+    suspend fun clearSyncedLocalFilePath(localId: Long)
+
     @Query(
         "SELECT COUNT(*) FROM bitacora_evidences " +
             "WHERE syncStatus IN ('PENDIENTE_CREAR','PENDIENTE_ACTUALIZAR','PENDIENTE_ELIMINAR')"

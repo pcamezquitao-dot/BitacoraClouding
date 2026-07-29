@@ -50,6 +50,11 @@ data class BitacoraDiariaOut(
     val observaciones: String?
 )
 
+data class SupervisorEmpleadoOut(
+    val id_empleado: Int,
+    val id_supervisor: Int
+)
+
 data class BitacoraDiariaSyncOut(
     val id_bitacora: Int,
     val id_empleado: Int,

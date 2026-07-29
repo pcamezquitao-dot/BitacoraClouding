@@ -178,6 +178,8 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun participantById(id: Int) = participants[id]
     override suspend fun areaById(id: Int) = areas[id]
     override suspend fun areaByCode(code: String) = areas.values.firstOrNull { it.codigoQr == code }
+    override suspend fun activeAreas() =
+        areas.values.filter { it.activo }.sortedBy { it.nombreArea }
     override suspend fun activeAssignmentsForParticipant(participantId: Int) =
         assignments.values.filter { it.idParticipante == participantId && it.activo }
     override suspend fun activeAssignmentsForArea(areaId: Int) =
