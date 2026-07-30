@@ -452,6 +452,14 @@ private fun BitacoraQueryDetail(
         Text("Supervisor: ${bitacora.idSupervisor ?: "sin asignar"}")
         Text("Área: ${bitacora.qrArea ?: "sin información"}")
         Text("Tipo de anotación: ${bitacora.tipoAnotacion ?: "sin información"}")
+        if (bitacora.origenBitacora == "SATELITAL") {
+            Text("Origen: SATELITAL")
+            Text("Objeto monitoreado: ${bitacora.idObjetoMonitoreo ?: "sin información"}")
+            Text(
+                "Tipo de seguimiento: " +
+                    (bitacora.tipoSeguimientoSatelital ?: "sin información")
+            )
+        }
         Text("Observaciones: ${bitacora.observaciones ?: "sin observaciones"}")
         Text("Estado: ${bitacora.syncStatus.queryLabel}")
         deletionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

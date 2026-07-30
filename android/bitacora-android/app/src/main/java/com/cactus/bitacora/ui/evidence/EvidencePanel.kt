@@ -13,7 +13,6 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -135,6 +134,7 @@ fun EvidencePanel(
     var preview by remember { mutableStateOf<PendingEvidencePreview?>(null) }
     var previewVideo by remember { mutableStateOf<PendingEvidencePreview?>(null) }
     var previewAudioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var internalVideoFile by remember { mutableStateOf<File?>(null) }
 
     fun fileUri(file: File): Uri =
         FileProvider.getUriForFile(context, "${context.packageName}.files", file)
@@ -297,25 +297,6 @@ fun EvidencePanel(
             message = "Captura de fotografía cancelada"
         }
     }
-    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok ->
-        val file = pendingFile
-        Log.i(
-            EVIDENCE_LOG_TAG,
-            "Resultado video recibido ok=$ok archivoDisponible=${file?.exists() == true}"
-        )
-        if (ok && file != null) {
-            preview = PendingEvidencePreview(
-                file,
-                EvidenceType.VIDEO,
-                "video/mp4",
-                mediaDurationSeconds(file)
-            )
-        } else {
-            file?.delete()
-            pendingFile = null
-            message = "Captura de video cancelada"
-        }
-    }
     val audioLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -408,11 +389,12 @@ fun EvidencePanel(
                     }
                     EvidenceType.VIDEO -> {
                         val file = newTemporaryFile("mp4")
-                        val uri = fileUri(file)
                         pendingFile = file
-                        ProcessCameraProvider.getInstance(context).get().unbindAll()
-                        Log.i(EVIDENCE_LOG_TAG, "URI temporal creada tipo=$type uri=$uri")
-                        videoLauncher.launch(uri)
+                        internalVideoFile = file
+                        Log.i(
+                            EVIDENCE_LOG_TAG,
+                            "Captura interna preparada tipo=$type archivo=${file.name}"
+                        )
                     }
                     EvidenceType.AUDIO ->
                         audioLauncher.launch(Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION))
@@ -446,6 +428,41 @@ fun EvidencePanel(
     }
 
     LaunchedEffect(bitacoraLocalId) { refresh() }
+
+    internalVideoFile?.let { file ->
+        InternalVideoCapture(
+            outputFile = file,
+            onCompleted = { completed ->
+                internalVideoFile = null
+                preview = PendingEvidencePreview(
+                    completed,
+                    EvidenceType.VIDEO,
+                    "video/mp4",
+                    mediaDurationSeconds(completed),
+                )
+                Log.i(
+                    EVIDENCE_LOG_TAG,
+                    "Resultado video interno válido bytes=${completed.length()}"
+                )
+            },
+            onCancelled = {
+                file.delete()
+                internalVideoFile = null
+                pendingFile = null
+                pendingType = null
+                message = "Captura de video cancelada"
+            },
+            onError = { detail ->
+                file.delete()
+                internalVideoFile = null
+                pendingFile = null
+                pendingType = null
+                message = detail
+                Log.e(EVIDENCE_LOG_TAG, "Error de captura interna: $detail")
+            },
+        )
+        return
+    }
 
     Surface(Modifier.fillMaxWidth(), tonalElevation = 2.dp) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

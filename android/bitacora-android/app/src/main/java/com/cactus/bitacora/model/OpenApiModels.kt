@@ -37,7 +37,10 @@ data class BitacoraDiariaCreate(
     val tipo_anotacion: Int? = null,
     val observaciones: String? = null,
     val client_uuid: String? = null,
-    val qr_area: String? = null
+    val qr_area: String? = null,
+    val id_objeto_monitoreo: Int? = null,
+    val origen_bitacora: String = "MANUAL",
+    val tipo_seguimiento_satelital: String? = null
 )
 
 data class BitacoraDiariaOut(
@@ -47,7 +50,10 @@ data class BitacoraDiariaOut(
     val ts_in_min: Int,
     val ts_out_min: Int?,
     val tipo_anotacion: Int?,
-    val observaciones: String?
+    val observaciones: String?,
+    val id_objeto_monitoreo: Int? = null,
+    val origen_bitacora: String = "MANUAL",
+    val tipo_seguimiento_satelital: String? = null
 )
 
 data class SupervisorEmpleadoOut(
@@ -63,8 +69,24 @@ data class BitacoraDiariaSyncOut(
     val ts_out_min: Int?,
     val tipo_anotacion: Int?,
     val observaciones: String?,
-    val client_uuid: String?
+    val client_uuid: String?,
+    val id_objeto_monitoreo: Int? = null,
+    val origen_bitacora: String = "MANUAL",
+    val tipo_seguimiento_satelital: String? = null
 )
+
+data class ObjetoMonitoreoSatelitalOut(
+    val id_objeto_monitoreo: Int,
+    val nombre: String,
+    val tipo_objeto: String,
+    val pais_codigo: String,
+    val departamento_provincia: String? = null,
+    val municipio_localidad: String? = null,
+    val descripcion: String? = null,
+    val latitud_centro: Double? = null,
+    val longitud_centro: Double? = null
+)
+
 
 data class BitacoraAreaObsCreate(
     val id_empleado: Int,

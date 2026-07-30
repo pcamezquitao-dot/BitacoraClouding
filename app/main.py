@@ -25,6 +25,7 @@ from app.routers.bitacora_area_evidencia import router as bitacora_area_evidenci
 from app.routers.face_templates import router as face_templates_router
 from app.routers.catalogos import router as catalogos_router
 from app.routers.admin_catalog import router as admin_catalog_router
+from app.routers.satelital import router as satelital_router
 from app.services.evidencia_file_service import evidencia_root
 from app.services.audio_transcription_service import recover_pending_transcriptions
 
@@ -37,6 +38,16 @@ app = FastAPI(title="BACKEND_FASTAPI_BITACORA3")
 upload_dir = os.getenv("UPLOAD_DIR", "uploads")
 os.makedirs(upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
+satelital_dir = os.getenv(
+    "SATELITAL_DIR",
+    str(Path.cwd() / "satelital" / "embalses"),
+)
+os.makedirs(satelital_dir, exist_ok=True)
+app.mount(
+    "/satelital-files",
+    StaticFiles(directory=satelital_dir),
+    name="satelital-files",
+)
 evidencia_root()
 
 app.include_router(health_router)
@@ -49,6 +60,7 @@ app.include_router(bitacora_area_evidencia_router)
 app.include_router(face_templates_router)
 app.include_router(catalogos_router)
 app.include_router(admin_catalog_router)
+app.include_router(satelital_router)
 
 
 @app.on_event("startup")

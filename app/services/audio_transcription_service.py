@@ -2,9 +2,9 @@ import logging
 import subprocess
 import tempfile
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import SessionLocal
@@ -16,6 +16,32 @@ PENDING = "PENDIENTE"
 PROCESSING = "PROCESANDO"
 COMPLETED = "COMPLETADA"
 ERROR = "ERROR"
+
+
+def ensure_pending_transcription(
+    db: Session,
+    id_evidencia: int,
+    id_bitacora: int,
+) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO evidencia_transcripcion
+                (id_evidencia, id_bitacora, estado, proveedor, modelo, idioma)
+            VALUES
+                (:id_evidencia, :id_bitacora, 'PENDIENTE',
+                 :proveedor, :modelo, :idioma)
+            ON DUPLICATE KEY UPDATE id_evidencia=VALUES(id_evidencia)
+            """
+        ),
+        {
+            "id_evidencia": id_evidencia,
+            "id_bitacora": id_bitacora,
+            "proveedor": "local",
+            "modelo": settings.TRANSCRIPTION_ENGINE,
+            "idioma": settings.TRANSCRIPTION_LANGUAGE,
+        },
+    )
 
 
 def transcribe_file(source: Path) -> str:
@@ -32,21 +58,9 @@ def transcribe_file(source: Path) -> str:
         output = workdir / "transcripcion"
         subprocess.run(
             [
-                str(ffmpeg),
-                "-nostdin",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-y",
-                "-i",
-                str(source),
-                "-ar",
-                "16000",
-                "-ac",
-                "1",
-                "-c:a",
-                "pcm_s16le",
-                str(wav),
+                str(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error",
+                "-y", "-i", str(source), "-ar", "16000", "-ac", "1",
+                "-c:a", "pcm_s16le", str(wav),
             ],
             check=True,
             capture_output=True,
@@ -55,25 +69,15 @@ def transcribe_file(source: Path) -> str:
         )
         subprocess.run(
             [
-                str(whisper),
-                "-m",
-                str(model),
-                "-f",
-                str(wav),
-                "-l",
-                settings.TRANSCRIPTION_LANGUAGE,
-                "-otxt",
-                "-of",
-                str(output),
-                "-np",
+                str(whisper), "-m", str(model), "-f", str(wav), "-l",
+                settings.TRANSCRIPTION_LANGUAGE, "-otxt", "-of", str(output), "-np",
             ],
             check=True,
             capture_output=True,
             text=True,
             timeout=1800,
         )
-        transcript_path = output.with_suffix(".txt")
-        transcript = transcript_path.read_text(encoding="utf-8").strip()
+        transcript = output.with_suffix(".txt").read_text(encoding="utf-8").strip()
         if not transcript:
             raise RuntimeError("El motor no produjo texto")
         return transcript
@@ -84,15 +88,16 @@ def _mark_error(id_evidencia: int, error: Exception) -> None:
     with SessionLocal() as db:
         db.execute(
             text(
-                f"""
-                UPDATE {settings.BAE_TABLE}
-                SET transcripcion_estado=:estado,
-                    transcripcion_fecha=NOW(),
-                    transcripcion_error=:error
-                WHERE id_evidencia=:id
+                """
+                UPDATE evidencia_transcripcion
+                SET estado='ERROR',
+                    ultimo_error=:error,
+                    numero_reintentos=numero_reintentos+1,
+                    completado_en=NULL
+                WHERE id_evidencia=:id_evidencia
                 """
             ),
-            {"estado": ERROR, "error": diagnostic[:2000], "id": id_evidencia},
+            {"error": diagnostic[:65535], "id_evidencia": id_evidencia},
         )
         db.commit()
     logger.exception("audio transcription failed evidence_id=%s", id_evidencia)
@@ -104,65 +109,29 @@ def transcribe_audio_evidence(id_evidencia: int) -> None:
             audio = db.execute(
                 text(
                     f"""
-                    SELECT id_evidencia, id_bitacora, id_area, ts_in_min, archivo_url,
-                           archivo_hash, orden, transcripcion_estado
-                    FROM {settings.BAE_TABLE}
-                    WHERE id_evidencia=:id AND id_tipo_evidencia=2
+                    SELECT e.id_evidencia, e.id_bitacora, e.archivo_url
+                    FROM {settings.BAE_TABLE} AS e
+                    JOIN evidencia_transcripcion AS t
+                      ON t.id_evidencia=e.id_evidencia
+                    WHERE e.id_evidencia=:id_evidencia
+                      AND e.id_tipo_evidencia=2
                     LIMIT 1
                     """
                 ),
-                {"id": id_evidencia},
+                {"id_evidencia": id_evidencia},
             ).mappings().first()
             if not audio:
                 return
-            existing = db.execute(
-                text(
-                    f"""
-                    SELECT id_evidencia
-                    FROM {settings.BAE_TABLE}
-                    WHERE id_evidencia_origen=:id
-                    LIMIT 1
-                    """
-                ),
-                {"id": id_evidencia},
-            ).first()
-            if existing:
-                db.execute(
-                    text(
-                        f"""
-                        UPDATE {settings.BAE_TABLE}
-                        SET transcripcion_estado=:estado,
-                            transcripcion_fecha=NOW(),
-                            transcripcion_error=NULL
-                        WHERE id_evidencia=:id
-                        """
-                    ),
-                    {"estado": COMPLETED, "id": id_evidencia},
-                )
-                db.commit()
-                return
             claimed = db.execute(
                 text(
-                    f"""
-                    UPDATE {settings.BAE_TABLE}
-                    SET transcripcion_estado=:procesando,
-                        transcripcion_motor=:motor,
-                        transcripcion_idioma=:idioma,
-                        transcripcion_fecha=NOW(),
-                        transcripcion_error=NULL,
-                        transcripcion_intentos=transcripcion_intentos+1
-                    WHERE id_evidencia=:id
-                      AND transcripcion_estado IN (:pendiente, :error)
+                    """
+                    UPDATE evidencia_transcripcion
+                    SET estado='PROCESANDO', ultimo_error=NULL
+                    WHERE id_evidencia=:id_evidencia
+                      AND estado IN ('PENDIENTE', 'ERROR')
                     """
                 ),
-                {
-                    "procesando": PROCESSING,
-                    "motor": settings.TRANSCRIPTION_ENGINE,
-                    "idioma": settings.TRANSCRIPTION_LANGUAGE,
-                    "id": id_evidencia,
-                    "pendiente": PENDING,
-                    "error": ERROR,
-                },
+                {"id_evidencia": id_evidencia},
             )
             db.commit()
             if claimed.rowcount != 1:
@@ -179,47 +148,20 @@ def transcribe_audio_evidence(id_evidencia: int) -> None:
         if source is None:
             raise RuntimeError("Archivo de audio no encontrado")
         transcript = transcribe_file(source)
-        transcript_uuid = str(
-            uuid5(
-                NAMESPACE_URL,
-                f"bitacora:transcripcion:{id_evidencia}:{audio['archivo_hash'] or ''}",
-            )
-        )
 
         with SessionLocal() as db:
             db.execute(
                 text(
-                    f"""
-                    INSERT INTO {settings.BAE_TABLE}
-                        (id_evidencia_origen, id_bitacora, id_area, ts_in_min,
-                         id_tipo_evidencia, contenido_texto, orden, uuid_cliente)
-                    VALUES
-                        (:origen, :bitacora, :area, :ts, 4, :texto, :orden, :uuid)
-                    ON DUPLICATE KEY UPDATE
-                        contenido_texto=VALUES(contenido_texto)
+                    """
+                    UPDATE evidencia_transcripcion
+                    SET estado='COMPLETADA',
+                        texto_transcrito=:texto,
+                        ultimo_error=NULL,
+                        completado_en=CURRENT_TIMESTAMP(6)
+                    WHERE id_evidencia=:id_evidencia
                     """
                 ),
-                {
-                    "origen": id_evidencia,
-                    "bitacora": audio["id_bitacora"],
-                    "area": audio["id_area"],
-                    "ts": audio["ts_in_min"],
-                    "texto": transcript,
-                    "orden": (audio["orden"] or 0) + 1,
-                    "uuid": transcript_uuid,
-                },
-            )
-            db.execute(
-                text(
-                    f"""
-                    UPDATE {settings.BAE_TABLE}
-                    SET transcripcion_estado=:estado,
-                        transcripcion_fecha=NOW(),
-                        transcripcion_error=NULL
-                    WHERE id_evidencia=:id
-                    """
-                ),
-                {"estado": COMPLETED, "id": id_evidencia},
+                {"texto": transcript, "id_evidencia": id_evidencia},
             )
             db.commit()
         logger.info("audio transcription completed evidence_id=%s", id_evidencia)
@@ -231,16 +173,15 @@ def recover_pending_transcriptions(limit: int = 20) -> None:
     with SessionLocal() as db:
         pending = db.execute(
             text(
-                f"""
+                """
                 SELECT id_evidencia
-                FROM {settings.BAE_TABLE}
-                WHERE id_tipo_evidencia=2
-                  AND transcripcion_estado=:estado
-                ORDER BY created_at ASC
+                FROM evidencia_transcripcion
+                WHERE estado='PENDIENTE'
+                ORDER BY creado_en ASC
                 LIMIT :limit
                 """
             ),
-            {"estado": PENDING, "limit": limit},
+            {"limit": limit},
         ).scalars().all()
     for id_evidencia in pending:
         transcribe_audio_evidence(int(id_evidencia))

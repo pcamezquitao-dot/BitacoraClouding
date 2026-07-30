@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TipoParticipanteLocalEntity::class,
         CatalogSyncStateEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -48,7 +48,8 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
-                    MIGRATION_11_12
+                    MIGRATION_11_12,
+                    MIGRATION_12_13
                 ).build().also { instance = it }
             }
 
@@ -341,6 +342,21 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS " +
                         "index_tipos_participante_locales_activo " +
                         "ON tipos_participante_locales(activo)"
+                )
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE bitacoras_locales ADD COLUMN idObjetoMonitoreo INTEGER"
+                )
+                db.execSQL(
+                    "ALTER TABLE bitacoras_locales ADD COLUMN origenBitacora TEXT " +
+                        "NOT NULL DEFAULT 'MANUAL'"
+                )
+                db.execSQL(
+                    "ALTER TABLE bitacoras_locales ADD COLUMN tipoSeguimientoSatelital TEXT"
                 )
             }
         }

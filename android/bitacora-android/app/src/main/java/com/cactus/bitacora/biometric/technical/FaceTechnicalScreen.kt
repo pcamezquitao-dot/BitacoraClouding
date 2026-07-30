@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,6 +93,13 @@ internal fun shouldPersistEnrollment(
     action == FaceEnrollmentReviewAction.SAVE &&
         validSamples >= LocalFaceTemplateRepository.REQUIRED_ENROLLMENT_CAPTURES
 
+internal fun nextEnrollmentCameraLens(currentLens: Int): Int =
+    if (currentLens == CameraSelector.LENS_FACING_FRONT) {
+        CameraSelector.LENS_FACING_BACK
+    } else {
+        CameraSelector.LENS_FACING_FRONT
+    }
+
 fun faceEnrollmentSelectionError(
     participantCode: String,
     participantSelected: Boolean
@@ -145,6 +153,7 @@ fun FaceTechnicalScreen(
     var replaceExisting by remember { mutableStateOf(false) }
     var showReplaceConfirmation by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var cameraLens by remember { mutableStateOf(CameraSelector.LENS_FACING_FRONT) }
     val enrollmentEmbeddings = remember { mutableStateListOf<FloatArray>() }
     val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
     val embedder = remember { FaceNetEmbeddingGenerator(context.applicationContext) }
@@ -409,11 +418,27 @@ fun FaceTechnicalScreen(
                 Text("Permitir cámara")
             }
         } else if (cameraAllowed) {
+            if (mode == FaceFlowMode.ENROLLMENT) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !operationInProgress,
+                    onClick = { cameraLens = nextEnrollmentCameraLens(cameraLens) }
+                ) {
+                    Text(
+                        if (cameraLens == CameraSelector.LENS_FACING_FRONT) {
+                            "Cambiar a cámara trasera"
+                        } else {
+                            "Cambiar a cámara delantera"
+                        }
+                    )
+                }
+            }
             Box(
                 modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f),
                 contentAlignment = Alignment.Center
             ) {
-                AndroidView(
+                key(cameraLens) {
+                    AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { viewContext ->
                         PreviewView(viewContext).also { previewView ->
@@ -433,6 +458,7 @@ fun FaceTechnicalScreen(
                                     cameraHandle.bind(
                                         provider = provider,
                                         lifecycleOwner = lifecycleOwner,
+                                        cameraLens = cameraLens,
                                         preview = preview,
                                         analysis = analysis
                                     )
@@ -444,7 +470,8 @@ fun FaceTechnicalScreen(
                             }, ContextCompat.getMainExecutor(viewContext))
                         }
                     }
-                )
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .size(width = 220.dp, height = 285.dp)
@@ -614,7 +641,7 @@ fun FaceTechnicalScreen(
                     cameraHandle.close()
                     onEnrollmentComplete()
                 }
-            ) { Text("Volver al formulario") }
+            ) { Text("Enrolar otro participante") }
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
@@ -660,6 +687,7 @@ private class FaceCameraHandle {
     fun bind(
         provider: ProcessCameraProvider,
         lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+        cameraLens: Int,
         preview: Preview,
         analysis: ImageAnalysis
     ) {
@@ -676,7 +704,7 @@ private class FaceCameraHandle {
         }
         provider.bindToLifecycle(
             lifecycleOwner,
-            CameraSelector.DEFAULT_FRONT_CAMERA,
+            CameraSelector.Builder().requireLensFacing(cameraLens).build(),
             preview,
             analysis
         )

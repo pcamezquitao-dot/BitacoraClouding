@@ -390,6 +390,22 @@ class BitacoraRepository(
 
     suspend fun getAdministrativeAreas() = referenceCatalogRepository.activeAreas()
 
+    suspend fun getObjetosMonitoreoSatelital() =
+        runCatching { api.getObjetosMonitoreoSatelital() }.getOrElse {
+            listOf(
+                com.cactus.bitacora.model.ObjetoMonitoreoSatelitalOut(
+                    id_objeto_monitoreo = 1,
+                    nombre = "Embalse La Copa",
+                    tipo_objeto = "EMBALSE",
+                    pais_codigo = "CO",
+                    departamento_provincia = "Boyacá",
+                    municipio_localidad = "Toca",
+                    descripcion = "Objeto piloto para seguimiento satelital mediante Copernicus Sentinel-2."
+                )
+            )
+        }
+
+
     suspend fun getAsignacionParaRol(idParticipante: Int, supervisor: Boolean) =
         referenceCatalogRepository.assignmentForRole(
             idParticipante,

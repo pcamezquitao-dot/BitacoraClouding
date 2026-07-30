@@ -17,6 +17,9 @@ data class BitacoraLocalEntity(
     val tipoAnotacion: Int? = null,
     val observaciones: String? = null,
     val qrArea: String? = null,
+    val idObjetoMonitoreo: Int? = null,
+    val origenBitacora: String = "MANUAL",
+    val tipoSeguimientoSatelital: String? = null,
     val openLatitude: Double? = null,
     val openLongitude: Double? = null,
     val openAccuracy: Float? = null,
@@ -44,7 +47,10 @@ data class BitacoraLocalEntity(
         tipo_anotacion = tipoAnotacion,
         observaciones = observaciones,
         client_uuid = clientUuid,
-        qr_area = qrArea
+        qr_area = qrArea,
+        id_objeto_monitoreo = idObjetoMonitoreo,
+        origen_bitacora = origenBitacora,
+        tipo_seguimiento_satelital = tipoSeguimientoSatelital
     )
 }
 
@@ -63,6 +69,9 @@ fun BitacoraDiariaCreate.toLocalEntity(
     tipoAnotacion = tipo_anotacion,
     observaciones = observaciones,
     qrArea = qr_area,
+    idObjetoMonitoreo = id_objeto_monitoreo,
+    origenBitacora = origen_bitacora,
+    tipoSeguimientoSatelital = tipo_seguimiento_satelital,
     openLatitude = openLocation?.latitude,
     openLongitude = openLocation?.longitude,
     openAccuracy = openLocation?.accuracy,

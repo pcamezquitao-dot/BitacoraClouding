@@ -80,6 +80,7 @@ import com.cactus.bitacora.data.local.GpsStatus
 import com.cactus.bitacora.data.local.SyncStatus
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
+import com.cactus.bitacora.model.ObjetoMonitoreoSatelitalOut
 import com.cactus.bitacora.location.BitacoraLocationProvider
 import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
@@ -147,7 +148,21 @@ internal val citizenEventTypes = listOf(
     CitizenEventType(idTipoNovedad = 5, label = "SALIDA"),
     CitizenEventType(idTipoNovedad = 6, label = "REPORTE DE CULTIVO"),
     CitizenEventType(idTipoNovedad = 7, label = "AUTORIZA HORAS EXTRAS"),
-    CitizenEventType(idTipoNovedad = 8, label = "REPORTE DE CARRETERA")
+    CitizenEventType(idTipoNovedad = 8, label = "REPORTE DE CARRETERA"),
+    CitizenEventType(idTipoNovedad = 9, label = "SATELITAL")
+)
+
+internal val satelliteTrackingTypes = listOf(
+    "SUPERFICIE_DE_AGUA",
+    "CAMBIO_TERRITORIAL",
+    "INUNDACION",
+    "DEFORESTACION",
+    "CULTIVO",
+    "MINERIA",
+    "GLACIAR",
+    "RIO",
+    "ASENTAMIENTO",
+    "OTRO"
 )
 
 internal fun CitizenEventType.requiresTextEvidence(): Boolean =
@@ -298,6 +313,7 @@ fun BitacoraApp() {
             navigationMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
+
 
             if (canAccessEnrollment(environment)) {
                 Button(
@@ -781,6 +797,10 @@ private fun FaceEnrollmentAdminScreen(
                 },
                 onEnrollmentComplete = {
                     message = "Rostro registrado correctamente"
+                    selectedParticipant = null
+                    query = ""
+                    activeAssignments = emptyList()
+                    assignmentsInfo = "Sin información de roles activos"
                     faceSession = null
                 },
                 onTestRecognition = {
@@ -1009,6 +1029,16 @@ internal fun CrearBitacoraDiariaScreen(
     var gpsLoading by remember { mutableStateOf(false) }
     var gpsError by remember { mutableStateOf<String?>(null) }
     var faceSession by remember { mutableStateOf<DailyLogFaceSession?>(null) }
+    val isSatellite = citizenEventType?.idTipoNovedad == 9
+    var satelliteObjects by remember {
+        mutableStateOf<List<ObjetoMonitoreoSatelitalOut>>(emptyList())
+    }
+    var selectedSatelliteObject by remember {
+        mutableStateOf<ObjetoMonitoreoSatelitalOut?>(null)
+    }
+    var satelliteObjectMenuExpanded by remember { mutableStateOf(false) }
+    var selectedTrackingType by remember { mutableStateOf<String?>(null) }
+    var trackingTypeMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(citizenEventType?.idTipoNovedad) {
         if (citizenEventType != null) {
@@ -1018,6 +1048,10 @@ internal fun CrearBitacoraDiariaScreen(
         if (availableAreas.isEmpty()) {
             repository.syncReferenceCatalogs()
             availableAreas = repository.getAdministrativeAreas()
+        }
+        if (isSatellite) {
+            satelliteObjects = repository.getObjetosMonitoreoSatelital()
+            selectedSatelliteObject = satelliteObjects.firstOrNull()
         }
     }
 
@@ -1251,6 +1285,12 @@ internal fun CrearBitacoraDiariaScreen(
         ) {
             add("Ingresar evidencia de texto")
         }
+        if (isSatellite && selectedSatelliteObject == null) {
+            add("Seleccionar objeto monitoreado")
+        }
+        if (isSatellite && selectedTrackingType == null) {
+            add("Seleccionar tipo de seguimiento")
+        }
         if (validatingTarget != null || scanningTarget != null) add("Finalizar la validación QR en curso")
     }
     val canCreate = missingCreateRequirements.isEmpty()
@@ -1325,7 +1365,12 @@ internal fun CrearBitacoraDiariaScreen(
                         tipo_anotacion = tipo,
                         observaciones = observaciones.ifBlank { null },
                         client_uuid = UUID.randomUUID().toString(),
-                        qr_area = if (citizenEventType == null) qrArea.trim() else null
+                        qr_area = if (citizenEventType == null) qrArea.trim() else null,
+                        id_objeto_monitoreo =
+                            if (isSatellite) selectedSatelliteObject?.id_objeto_monitoreo else null,
+                        origen_bitacora = if (isSatellite) "SATELITAL" else "MANUAL",
+                        tipo_seguimiento_satelital =
+                            if (isSatellite) selectedTrackingType else null
                     ),
                     openLocation = gpsLocation,
                     closeLocation = closeLocation
@@ -1694,6 +1739,64 @@ internal fun CrearBitacoraDiariaScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             singleLine = true
         )
+
+        if (isSatellite) {
+            Text("Seguimiento satelital", style = MaterialTheme.typography.titleMedium)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { satelliteObjectMenuExpanded = true }
+                ) {
+                    Text(
+                        selectedSatelliteObject?.let {
+                            "${it.nombre} · ${it.tipo_objeto}"
+                        } ?: "Seleccionar objeto monitoreado"
+                    )
+                }
+                DropdownMenu(
+                    expanded = satelliteObjectMenuExpanded,
+                    onDismissRequest = { satelliteObjectMenuExpanded = false }
+                ) {
+                    satelliteObjects.forEach { option ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${option.nombre}\n" +
+                                        "${option.departamento_provincia.orEmpty()} · " +
+                                        option.municipio_localidad.orEmpty()
+                                )
+                            },
+                            onClick = {
+                                selectedSatelliteObject = option
+                                satelliteObjectMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { trackingTypeMenuExpanded = true }
+                ) {
+                    Text(selectedTrackingType ?: "Seleccionar tipo de seguimiento")
+                }
+                DropdownMenu(
+                    expanded = trackingTypeMenuExpanded,
+                    onDismissRequest = { trackingTypeMenuExpanded = false }
+                ) {
+                    satelliteTrackingTypes.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type) },
+                            onClick = {
+                                selectedTrackingType = type
+                                trackingTypeMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),

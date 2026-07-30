@@ -31,7 +31,9 @@ def _get_bitacora_by_client_uuid(db: Session, client_uuid: str | None):
         text(
             f"""
             SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min,
-                   ts_out_min, tipo_anotacion, observaciones
+                   ts_out_min, tipo_anotacion, observaciones,
+                   id_objeto_monitoreo, origen_bitacora,
+                   tipo_seguimiento_satelital
             FROM {table}
             WHERE client_uuid = :client_uuid
             LIMIT 1
@@ -62,6 +64,9 @@ def _crear_bitacora_diaria(
     observaciones: str | None,
     client_uuid: str | None = None,
     qr_area: str | None = None,
+    id_objeto_monitoreo: int | None = None,
+    origen_bitacora: str = "MANUAL",
+    tipo_seguimiento_satelital: str | None = None,
 ) -> BitacoraDiariaOut:
     existing = _get_bitacora_by_client_uuid(db, client_uuid)
     if existing:
@@ -82,6 +87,31 @@ def _crear_bitacora_diaria(
             raise HTTPException(
                 status_code=422,
                 detail="El área seleccionada no coincide con la asignación activa del empleado",
+            )
+
+    normalized_origin = (origen_bitacora or "MANUAL").strip().upper()
+    if normalized_origin not in {"MANUAL", "SATELITAL"}:
+        raise HTTPException(status_code=422, detail="origen_bitacora inválido")
+    if normalized_origin == "SATELITAL":
+        if id_objeto_monitoreo is None or not tipo_seguimiento_satelital:
+            raise HTTPException(
+                status_code=422,
+                detail="SATELITAL requiere objeto monitoreado y tipo de seguimiento",
+            )
+        object_exists = db.execute(
+            text(
+                """
+                SELECT 1 FROM objeto_monitoreo_satelital
+                WHERE id_objeto_monitoreo=:id AND activo=TRUE
+                LIMIT 1
+                """
+            ),
+            {"id": id_objeto_monitoreo},
+        ).scalar_one_or_none()
+        if object_exists is None:
+            raise HTTPException(
+                status_code=422,
+                detail="El objeto de monitoreo satelital no existe o está inactivo",
             )
 
     if id_supervisor is None:
@@ -107,10 +137,12 @@ def _crear_bitacora_diaria(
     sql_insert_bd = text(f"""
         INSERT INTO {bd}
             (id_empleado, id_supervisor, ts_in_min, ts_out_min, tipo_anotacion,
-             observaciones, fecha_in, hora_in, fecha_out, hora_out, client_uuid)
+             observaciones, fecha_in, hora_in, fecha_out, hora_out, client_uuid,
+             id_objeto_monitoreo, origen_bitacora, tipo_seguimiento_satelital)
         VALUES
             (:id_empleado, :id_supervisor, :ts_in_min, :ts_out_min, :tipo_anotacion,
-             :observaciones, :fecha_in, :hora_in, :fecha_out, :hora_out, :client_uuid)
+             :observaciones, :fecha_in, :hora_in, :fecha_out, :hora_out, :client_uuid,
+             :id_objeto_monitoreo, :origen_bitacora, :tipo_seguimiento_satelital)
     """)
     try:
         res = db.execute(sql_insert_bd, {
@@ -125,6 +157,9 @@ def _crear_bitacora_diaria(
             "fecha_out": fecha_out,
             "hora_out": hora_out,
             "client_uuid": client_uuid,
+            "id_objeto_monitoreo": id_objeto_monitoreo,
+            "origen_bitacora": normalized_origin,
+            "tipo_seguimiento_satelital": tipo_seguimiento_satelital,
         })
     except IntegrityError:
         # El endpoint exterior resuelve la carrera idempotente consultando
@@ -141,6 +176,9 @@ def _crear_bitacora_diaria(
         ts_out_min=ts_out_min,
         tipo_anotacion=tipo_anotacion,
         observaciones=observaciones,
+        id_objeto_monitoreo=id_objeto_monitoreo,
+        origen_bitacora=normalized_origin,
+        tipo_seguimiento_satelital=tipo_seguimiento_satelital,
     )
 
 
@@ -312,6 +350,9 @@ def crear_bitacora_diaria(payload: BitacoraDiariaCreate, db: Session = Depends(g
             observaciones=payload.observaciones,
             client_uuid=payload.client_uuid,
             qr_area=payload.qr_area,
+            id_objeto_monitoreo=payload.id_objeto_monitoreo,
+            origen_bitacora=payload.origen_bitacora,
+            tipo_seguimiento_satelital=payload.tipo_seguimiento_satelital,
         )
         db.commit()
         return out
@@ -342,7 +383,9 @@ def listar_bitacoras_diarias(
         text(
             f"""
             SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min,
-                   ts_out_min, tipo_anotacion, observaciones, client_uuid
+                   ts_out_min, tipo_anotacion, observaciones, client_uuid,
+                   id_objeto_monitoreo, origen_bitacora,
+                   tipo_seguimiento_satelital
             FROM {bd}
             ORDER BY id_bitacora ASC
             LIMIT :limit OFFSET :offset
@@ -486,7 +529,9 @@ def crear_bitacora_completa_upload(
 def obtener_bitacora_diaria(id_bitacora: int, db: Session = Depends(get_db)):
     bd = settings.BITACORA_DIARIA_TABLE
     row = db.execute(text(f"""
-        SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min, ts_out_min, tipo_anotacion, observaciones
+        SELECT id_bitacora, id_empleado, id_supervisor, ts_in_min, ts_out_min,
+               tipo_anotacion, observaciones, id_objeto_monitoreo,
+               origen_bitacora, tipo_seguimiento_satelital
         FROM {bd}
         WHERE id_bitacora=:id
         LIMIT 1

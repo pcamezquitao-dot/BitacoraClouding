@@ -36,6 +36,7 @@ import com.cactus.bitacora.model.EmployeeAreaAssignmentOut
 import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaUpdateIn
 import com.cactus.bitacora.model.ParticipantOptionOut
+import com.cactus.bitacora.model.ObjetoMonitoreoSatelitalOut
 import com.cactus.bitacora.model.ParticipantTypeAdminIn
 import com.cactus.bitacora.model.ParticipantTypeAdminOut
 import com.cactus.bitacora.model.ParticipantTypeStatusIn
@@ -222,6 +223,10 @@ interface BitacoraApi {
 
     @GET("health")
     suspend fun health(): HealthOut
+
+    @GET("satelital/objetos")
+    suspend fun getObjetosMonitoreoSatelital(): List<ObjetoMonitoreoSatelitalOut>
+
 
     @POST("areas/by_qr")
     suspend fun getAreaByQr(@Body request: AreaByQrIn): AreaOut

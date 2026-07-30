@@ -25,6 +25,12 @@ from app.schemas.bitacora_area_evidencia import (
     BitacoraAreaEvidenciaResponse,
     BitacoraAreaEvidenciaUpdate,
 )
+from app.schemas.evidencia_transcripcion import (
+    EstadoTranscripcion,
+    TranscripcionCreate,
+    TranscripcionResponse,
+    TranscripcionUpdate,
+)
 from app.services.evidencia_file_service import (
     candidate_evidence_paths,
     resolve_evidencia_path,
@@ -33,20 +39,24 @@ from app.services.evidencia_file_service import (
 from app.services.audio_transcription_service import (
     ERROR as TRANSCRIPTION_ERROR,
     PENDING as TRANSCRIPTION_PENDING,
+    ensure_pending_transcription,
     transcribe_audio_evidence,
 )
 
 router = APIRouter(prefix="/bitacora-area-evidencias", tags=["Bitácora área evidencias"])
 
 COLUMNAS = """
-    id_evidencia, id_evidencia_origen, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
+    id_evidencia, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
     archivo_url, contenido_texto, archivo_nombre, archivo_hash, mime_type, duracion_seg,
     tamanio_bytes, orden, latitud, longitud, precision_gps,
-    transcripcion_estado, transcripcion_motor, transcripcion_idioma,
-    transcripcion_fecha, transcripcion_error, transcripcion_intentos,
     uuid_cliente, created_at
 """
 logger = logging.getLogger("bitacora.sync")
+TRANSCRIPCION_COLUMNAS = """
+    id_transcripcion, id_evidencia, id_bitacora, estado, proveedor, modelo,
+    idioma, confianza, texto_transcrito, numero_reintentos, ultimo_error,
+    creado_en, actualizado_en, completado_en
+"""
 
 
 def _get(db: Session, id_evidencia: int):
@@ -60,6 +70,20 @@ def _get_by_uuid(db: Session, uuid_cliente: UUID | str):
     return db.execute(
         text(f"SELECT {COLUMNAS} FROM {settings.BAE_TABLE} WHERE uuid_cliente=:uuid LIMIT 1"),
         {"uuid": str(uuid_cliente)},
+    ).mappings().first()
+
+
+def _get_transcripcion(db: Session, id_evidencia: int):
+    return db.execute(
+        text(
+            f"""
+            SELECT {TRANSCRIPCION_COLUMNAS}
+            FROM evidencia_transcripcion
+            WHERE id_evidencia=:id_evidencia
+            LIMIT 1
+            """
+        ),
+        {"id_evidencia": id_evidencia},
     ).mappings().first()
 
 
@@ -92,28 +116,20 @@ def _insert(db: Session, payload: BitacoraAreaEvidenciaCreate):
     elif not payload.archivo_url:
         raise HTTPException(status_code=422, detail="archivo_url es obligatorio para evidencia multimedia")
     values = payload.model_dump(mode="json")
-    values["transcripcion_estado"] = (
-        TRANSCRIPTION_PENDING if payload.id_tipo_evidencia == 2 else None
-    )
-    values["transcripcion_motor"] = (
-        settings.TRANSCRIPTION_ENGINE if payload.id_tipo_evidencia == 2 else None
-    )
-    values["transcripcion_idioma"] = (
-        settings.TRANSCRIPTION_LANGUAGE if payload.id_tipo_evidencia == 2 else None
-    )
     result = db.execute(text(f"""
         INSERT INTO {settings.BAE_TABLE}
             (id_bitacora, id_area, ts_in_min, id_tipo_evidencia, archivo_url, contenido_texto,
              archivo_nombre, archivo_hash, mime_type, duracion_seg, tamanio_bytes,
-             orden, latitud, longitud, precision_gps, uuid_cliente,
-             transcripcion_estado, transcripcion_motor, transcripcion_idioma)
+             orden, latitud, longitud, precision_gps, uuid_cliente)
         VALUES
             (:id_bitacora, :id_area, :ts_in_min, :id_tipo_evidencia, :archivo_url, :contenido_texto,
              :archivo_nombre, :archivo_hash, :mime_type, :duracion_seg, :tamanio_bytes,
-             :orden, :latitud, :longitud, :precision_gps, :uuid_cliente,
-             :transcripcion_estado, :transcripcion_motor, :transcripcion_idioma)
+             :orden, :latitud, :longitud, :precision_gps, :uuid_cliente)
     """), values)
-    return _get(db, int(result.lastrowid))
+    id_evidencia = int(result.lastrowid)
+    if payload.id_tipo_evidencia == 2:
+        ensure_pending_transcription(db, id_evidencia, payload.id_bitacora)
+    return _get(db, id_evidencia)
 
 
 @router.get("", response_model=list[BitacoraAreaEvidenciaResponse])
@@ -142,6 +158,112 @@ def consultar_evidencia(id_evidencia: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Evidencia no encontrada")
     return row
+
+
+@router.post(
+    "/{id_evidencia}/transcripcion",
+    response_model=TranscripcionResponse,
+    status_code=201,
+)
+def crear_transcripcion_pendiente(
+    id_evidencia: int,
+    payload: TranscripcionCreate,
+    db: Session = Depends(get_db),
+):
+    evidencia = _get(db, id_evidencia)
+    if not evidencia:
+        raise HTTPException(status_code=404, detail="Evidencia no encontrada")
+    if evidencia["id_tipo_evidencia"] != 2:
+        raise HTTPException(status_code=422, detail="La evidencia no es de audio")
+    existente = _get_transcripcion(db, id_evidencia)
+    if existente:
+        return existente
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO evidencia_transcripcion
+                    (id_evidencia, id_bitacora, estado, proveedor, modelo, idioma)
+                VALUES
+                    (:id_evidencia, :id_bitacora, 'PENDIENTE',
+                     :proveedor, :modelo, :idioma)
+                """
+            ),
+            {
+                "id_evidencia": id_evidencia,
+                "id_bitacora": evidencia["id_bitacora"],
+                **payload.model_dump(),
+            },
+        )
+        db.commit()
+        return _get_transcripcion(db, id_evidencia)
+    except IntegrityError:
+        db.rollback()
+        existente = _get_transcripcion(db, id_evidencia)
+        if existente:
+            return existente
+        raise HTTPException(status_code=409, detail="Conflicto al crear la transcripción")
+
+
+@router.get(
+    "/{id_evidencia}/transcripcion",
+    response_model=TranscripcionResponse,
+)
+def consultar_transcripcion(id_evidencia: int, db: Session = Depends(get_db)):
+    transcripcion = _get_transcripcion(db, id_evidencia)
+    if not transcripcion:
+        raise HTTPException(status_code=404, detail="Transcripción no encontrada")
+    return transcripcion
+
+
+@router.patch(
+    "/{id_evidencia}/transcripcion",
+    response_model=TranscripcionResponse,
+)
+def actualizar_transcripcion(
+    id_evidencia: int,
+    payload: TranscripcionUpdate,
+    db: Session = Depends(get_db),
+):
+    if not _get_transcripcion(db, id_evidencia):
+        raise HTTPException(status_code=404, detail="Transcripción no encontrada")
+    values = payload.model_dump(mode="json")
+    values["id_evidencia"] = id_evidencia
+    values["texto_transcrito"] = (
+        payload.texto_transcrito.strip() if payload.texto_transcrito else None
+    )
+    values["ultimo_error"] = payload.error.strip() if payload.error else None
+    values["incrementar_reintento"] = int(payload.estado == EstadoTranscripcion.ERROR)
+    try:
+        db.execute(
+            text(
+                """
+                UPDATE evidencia_transcripcion
+                SET estado=:estado,
+                    proveedor=COALESCE(:proveedor, proveedor),
+                    modelo=COALESCE(:modelo, modelo),
+                    idioma=COALESCE(:idioma, idioma),
+                    confianza=:confianza,
+                    texto_transcrito=:texto_transcrito,
+                    ultimo_error=:ultimo_error,
+                    numero_reintentos=numero_reintentos+:incrementar_reintento,
+                    completado_en=CASE
+                        WHEN :estado='COMPLETADA' THEN CURRENT_TIMESTAMP(6)
+                        ELSE NULL
+                    END
+                WHERE id_evidencia=:id_evidencia
+                """
+            ),
+            values,
+        )
+        db.commit()
+        return _get_transcripcion(db, id_evidencia)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo actualizar la transcripción: {exc}",
+        )
 
 
 @router.post("", response_model=BitacoraAreaEvidenciaResponse, status_code=201)
@@ -277,12 +399,12 @@ def reintentar_transcripcion(
         raise HTTPException(status_code=422, detail="La evidencia no es un audio")
     db.execute(
         text(
-            f"""
-            UPDATE {settings.BAE_TABLE}
-            SET transcripcion_estado=:estado,
-                transcripcion_error=NULL
+            """
+            UPDATE evidencia_transcripcion
+            SET estado=:estado,
+                ultimo_error=NULL
             WHERE id_evidencia=:id
-              AND transcripcion_estado=:error
+              AND estado=:error
             """
         ),
         {
@@ -292,8 +414,10 @@ def reintentar_transcripcion(
         },
     )
     db.commit()
+    if not _get_transcripcion(db, id_evidencia):
+        raise HTTPException(status_code=404, detail="Transcripción no encontrada")
     background_tasks.add_task(transcribe_audio_evidence, id_evidencia)
-    return {"id_evidencia": id_evidencia, "transcripcion_estado": TRANSCRIPTION_PENDING}
+    return {"id_evidencia": id_evidencia, "estado": TRANSCRIPTION_PENDING}
 
 
 @router.patch("/{id_evidencia}", response_model=BitacoraAreaEvidenciaResponse)
