@@ -40,11 +40,15 @@ import com.cactus.bitacora.model.ObjetoMonitoreoSatelitalOut
 import com.cactus.bitacora.model.ParticipantTypeAdminIn
 import com.cactus.bitacora.model.ParticipantTypeAdminOut
 import com.cactus.bitacora.model.ParticipantTypeStatusIn
+import com.cactus.bitacora.model.ReservoirSatelliteImageOut
+import com.cactus.bitacora.model.ReservoirSatelliteOut
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.DELETE
 import retrofit2.http.PUT
+import retrofit2.http.Url
 
 object ApiConfig {
     val BASE_URL: String
@@ -227,6 +231,16 @@ interface BitacoraApi {
     @GET("satelital/objetos")
     suspend fun getObjetosMonitoreoSatelital(): List<ObjetoMonitoreoSatelitalOut>
 
+    @GET("satelital/embalses")
+    suspend fun getReservoirs(): List<ReservoirSatelliteOut>
+
+    @GET("satelital/embalses/{id_embalse}/imagenes")
+    suspend fun getReservoirImages(
+        @Path("id_embalse") reservoirId: Int
+    ): List<ReservoirSatelliteImageOut>
+
+    @GET
+    suspend fun downloadSatelliteImage(@Url url: String): ResponseBody
 
     @POST("areas/by_qr")
     suspend fun getAreaByQr(@Body request: AreaByQrIn): AreaOut

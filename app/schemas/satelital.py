@@ -21,6 +21,10 @@ class EmbalseSatelitalOut(BaseModel):
     pais: str
     departamento: str | None = None
     municipio: str | None = None
+    descripcion: str | None = None
+    fuente_geografica: str | None = None
+    ultima_fecha_procesada: date | None = None
+    estado_seguimiento: str = "SIN_IMAGENES"
 
 
 class ImagenSatelitalEmbalseOut(BaseModel):
@@ -28,6 +32,8 @@ class ImagenSatelitalEmbalseOut(BaseModel):
     id_embalse: int
     fecha_captura: date
     porcentaje_nubes: float | None = None
+    porcentaje_pixeles_validos: float | None = None
     fuente: str
     imagen_url: str
     mime_type: str
+    estado: str = "DISPONIBLE"

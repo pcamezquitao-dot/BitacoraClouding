@@ -405,6 +405,19 @@ class BitacoraRepository(
             )
         }
 
+    suspend fun getReservoirs() = api.getReservoirs()
+
+    suspend fun getReservoirImages(reservoirId: Int) =
+        api.getReservoirImages(reservoirId)
+
+    suspend fun downloadSatelliteImage(relativeUrl: String): ByteArray {
+        val absoluteUrl = if (relativeUrl.startsWith("http")) {
+            relativeUrl
+        } else {
+            "${AppConfig.BASE_URL.trimEnd('/')}/${relativeUrl.trimStart('/')}"
+        }
+        return api.downloadSatelliteImage(absoluteUrl).bytes()
+    }
 
     suspend fun getAsignacionParaRol(idParticipante: Int, supervisor: Boolean) =
         referenceCatalogRepository.assignmentForRole(

@@ -61,7 +61,10 @@ class EnvironmentNavigationTest {
             AppScreen.QueryDailyLog,
             AppScreen.Sync
         )
-        AppEnvironment.entries.forEach { environment ->
+        listOf(
+            AppEnvironment.ADMINISTRADOR,
+            AppEnvironment.CIUDADANO
+        ).forEach { environment ->
             assertTrue(environmentMenuScreens(environment).containsAll(common))
         }
     }
@@ -70,6 +73,10 @@ class EnvironmentNavigationTest {
     fun environmentIsSessionStateWithStableLabels() {
         assertEquals("Administrador", AppEnvironment.ADMINISTRADOR.label)
         assertEquals("Ciudadano", AppEnvironment.CIUDADANO.label)
+        assertEquals(
+            "Seguimiento satelital de embalses",
+            AppEnvironment.SEGUIMIENTO_SATELITAL.label
+        )
         assertFalse(canAccessEnrollment(null))
     }
 

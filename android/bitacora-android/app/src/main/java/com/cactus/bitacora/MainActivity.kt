@@ -86,6 +86,7 @@ import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import com.cactus.bitacora.ui.admin.AdminCatalogScreen
+import com.cactus.bitacora.ui.satellite.ReservoirSatelliteScreen
 import com.cactus.bitacora.biometric.FaceIdentificationTarget
 import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
 import com.cactus.bitacora.biometric.technical.FaceFlowMode
@@ -127,12 +128,14 @@ internal enum class AppScreen {
     AdminCatalog,
     CreateDailyLog,
     QueryDailyLog,
-    Sync
+    Sync,
+    ReservoirSatellite
 }
 
 internal enum class AppEnvironment(val label: String) {
     ADMINISTRADOR("Administrador"),
-    CIUDADANO("Ciudadano")
+    CIUDADANO("Ciudadano"),
+    SEGUIMIENTO_SATELITAL("Seguimiento satelital de embalses")
 }
 
 internal data class CitizenEventType(
@@ -181,17 +184,24 @@ internal fun isScreenAllowed(environment: AppEnvironment?, screen: AppScreen): B
     when (screen) {
         AppScreen.FaceEnrollment, AppScreen.AdminCatalog ->
             environment == AppEnvironment.ADMINISTRADOR
-        else -> environment != null
+        AppScreen.ReservoirSatellite ->
+            environment == AppEnvironment.SEGUIMIENTO_SATELITAL
+        else -> environment == AppEnvironment.ADMINISTRADOR ||
+            environment == AppEnvironment.CIUDADANO
     }
 
 internal fun environmentMenuScreens(environment: AppEnvironment): List<AppScreen> =
-    buildList {
-        add(AppScreen.Health)
-        if (canAccessEnrollment(environment)) add(AppScreen.FaceEnrollment)
-        if (environment == AppEnvironment.ADMINISTRADOR) add(AppScreen.AdminCatalog)
-        add(AppScreen.CreateDailyLog)
-        add(AppScreen.QueryDailyLog)
-        add(AppScreen.Sync)
+    if (environment == AppEnvironment.SEGUIMIENTO_SATELITAL) {
+        listOf(AppScreen.ReservoirSatellite)
+    } else {
+        buildList {
+            add(AppScreen.Health)
+            if (canAccessEnrollment(environment)) add(AppScreen.FaceEnrollment)
+            if (environment == AppEnvironment.ADMINISTRADOR) add(AppScreen.AdminCatalog)
+            add(AppScreen.CreateDailyLog)
+            add(AppScreen.QueryDailyLog)
+            add(AppScreen.Sync)
+        }
     }
 
 private sealed interface ConnectionState {
@@ -246,12 +256,21 @@ fun BitacoraApp() {
         OfflineSyncScheduler.enqueueNow(context)
     }
     BackHandler(enabled = activeEnvironment != null && currentScreen != AppScreen.Health) {
-        currentScreen = mainDestinationAfterBack()
+        if (activeEnvironment == AppEnvironment.SEGUIMIENTO_SATELITAL) {
+            activeEnvironment = null
+            currentScreen = AppScreen.Health
+        } else {
+            currentScreen = mainDestinationAfterBack()
+        }
     }
 
     fun selectEnvironment(environment: AppEnvironment) {
         activeEnvironment = environment
-        currentScreen = AppScreen.Health
+        currentScreen = if (environment == AppEnvironment.SEGUIMIENTO_SATELITAL) {
+            AppScreen.ReservoirSatellite
+        } else {
+            AppScreen.Health
+        }
         navigationMessage = null
     }
 
@@ -288,6 +307,17 @@ fun BitacoraApp() {
                 AdminCatalogScreen(
                     repository = repository,
                     onBack = { currentScreen = mainDestinationAfterBack() }
+                )
+                return@Column
+            }
+
+            if (
+                environment == AppEnvironment.SEGUIMIENTO_SATELITAL &&
+                currentScreen == AppScreen.ReservoirSatellite
+            ) {
+                ReservoirSatelliteScreen(
+                    repository = repository,
+                    onBack = ::changeEnvironment
                 )
                 return@Column
             }
@@ -430,6 +460,10 @@ fun BitacoraApp() {
                         allowDelete = environment == AppEnvironment.ADMINISTRADOR
                     )
                     AppScreen.Sync -> SyncScreen(repository)
+                    AppScreen.ReservoirSatellite -> ReservoirSatelliteScreen(
+                        repository = repository,
+                        onBack = { currentScreen = mainDestinationAfterBack() }
+                    )
                 }
             }
         }
@@ -531,6 +565,10 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.CIUDADANO) }
         ) { Text("Ciudadano") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.SEGUIMIENTO_SATELITAL) }
+        ) { Text("Seguimiento satelital de embalses") }
     }
 }
 

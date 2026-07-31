@@ -79,3 +79,58 @@
   `E9D54EAFB56041728E271ADC7490950B4507C77191DCE974D344943CFAEAFA95`.
 - Validación física: pendiente.
 - Commit: pendiente.
+
+## maria05.apk
+
+- Fecha: 2026-07-30
+- versionCode: 6
+- versionName: maria05
+- Objetivo: Iteración 1 del seguimiento satelital de embalses.
+- Alcance: botón principal, pantalla independiente, catálogo dinámico de seis
+  embalses, selección de fechas, metadatos, imagen demostrativa de La Copa y
+  botón Regresar.
+- Base estable: commit `8807c61`, etiqueta `maria04-stable`.
+- Pruebas automatizadas: 84 FastAPI aprobadas (2 omitidas) y 156 pruebas
+  Android aprobadas, 0 fallos.
+- Instalación ADB: `Success` mediante `adb install -r`; copia adicional en
+  `/sdcard/Download/BitacoraVersiones/maria05.apk`.
+- SHA-256:
+  `307F514508B4480FCCE54A1C0105145D45598DADC7956DB11D31A601A8F221DA`.
+- Validación física: pendiente.
+- Commit: pendiente.
+
+## maria06.apk
+
+- Fecha: 2026-07-30
+- versionCode: 7
+- versionName: maria06
+- Objetivo: presentar el seguimiento satelital como pantalla exclusiva y
+  permitir ampliar manualmente la imagen.
+- Alcance: oculta temporalmente las opciones generales durante el seguimiento;
+  las restaura al regresar. Añade pellizco, desplazamiento, zoom 1×–5× y
+  controles `−`, `+` y `Restablecer`.
+- Pruebas automatizadas: 156 pruebas Android aprobadas, 0 fallos.
+- Instalación ADB: `Success` mediante `adb install -r`; copia adicional en
+  `/sdcard/Download/BitacoraVersiones/maria06.apk`.
+- SHA-256:
+  `C64D33ED91A7AA0D780BFB769DDA51C9C73801A1D7C6E19BEC7509C4F3E87D62`.
+- Validación física: pendiente.
+- Commit: pendiente.
+
+## maria07.apk
+
+- Fecha: 2026-07-30
+- versionCode: 8
+- versionName: maria07
+- Objetivo: convertir Seguimiento satelital de embalses en un tercer ambiente,
+  junto a Administrador y Ciudadano.
+- Alcance: el ambiente satelital abre directamente su pantalla exclusiva y al
+  regresar vuelve a la selección de ambientes. Administrador y Ciudadano
+  conservan sus menús sin el botón satelital interno.
+- Pruebas automatizadas: 156 pruebas Android aprobadas, 0 fallos.
+- Instalación ADB: `Success` mediante `adb install -r`; copia adicional en
+  `/sdcard/Download/BitacoraVersiones/maria07.apk`.
+- SHA-256:
+  `CA7F7239CF2D997565AD6960E4A013D5E813AD2B9DEE10C5E7D8B79CBCA69945`.
+- Validación física: pendiente.
+- Commit: pendiente.

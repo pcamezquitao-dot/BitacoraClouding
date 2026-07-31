@@ -42,6 +42,31 @@ class SatelitalContractTest(unittest.TestCase):
         self.assertNotIn(" BLOB", sql)
         self.assertNotIn(" LONGBLOB", sql)
 
+    def test_iteracion_uno_registra_seis_embalses_sin_inventar_poligonos(self):
+        sql = Path("migrations/20260730_embalses_iteracion1.sql").read_text(
+            encoding="utf-8"
+        ).upper()
+        for reservoir in (
+            "EMBALSE LA COPA",
+            "EMBALSE DE TOMINÉ",
+            "EMBALSE DEL SISGA",
+            "EMBALSE DE SAN RAFAEL",
+            "EMBALSE DE CHUZA",
+            "EMBALSE DEL NEUSA",
+        ):
+            self.assertIn(reservoir, sql)
+        self.assertIn("OPENSTREETMAP", sql)
+        self.assertIn("EPSG:4326", sql)
+        self.assertIn("POLÍGONO ÍNTEGRO PENDIENTE", sql)
+        self.assertNotIn("DROP TABLE", sql)
+
+    def test_iteracion_uno_tiene_reversion_explicita(self):
+        rollback = Path(
+            "migrations/20260730_embalses_iteracion1_rollback.sql"
+        ).read_text(encoding="utf-8").upper()
+        self.assertIn("DELETE FROM OBJETO_MONITOREO_SATELITAL", rollback)
+        self.assertIn("DROP COLUMN IF EXISTS", rollback)
+
 
 if __name__ == "__main__":
     unittest.main()

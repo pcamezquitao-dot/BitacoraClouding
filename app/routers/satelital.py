@@ -23,6 +23,10 @@ def _embalse(row) -> EmbalseSatelitalOut:
         pais="Colombia" if data["pais_codigo"] == "CO" else data["pais_codigo"],
         departamento=data["departamento_provincia"],
         municipio=data["municipio_localidad"],
+        descripcion=data["descripcion"],
+        fuente_geografica=data["fuente_geometria"],
+        ultima_fecha_procesada=data["ultima_fecha_procesada"],
+        estado_seguimiento=data["estado_seguimiento"],
     )
 
 
@@ -33,9 +37,11 @@ def _imagen(row) -> ImagenSatelitalEmbalseOut:
         id_embalse=data["id_objeto_monitoreo"],
         fecha_captura=data["fecha_captura"],
         porcentaje_nubes=data["porcentaje_nubes"],
+        porcentaje_pixeles_validos=data["porcentaje_pixeles_validos"],
         fuente=data["fuente"],
         imagen_url=f"/satelital-files/{data['archivo_ruta']}",
         mime_type=data["mime_type"],
+        estado=data["estado"],
     )
 
 
@@ -67,10 +73,17 @@ def listar_embalses_activos(db: Session = Depends(get_db)):
     rows = db.execute(
         text(
             """
-            SELECT id_objeto_monitoreo, nombre, pais_codigo,
-                   departamento_provincia, municipio_localidad
-            FROM objeto_monitoreo_satelital
-            WHERE activo=TRUE AND tipo_objeto='EMBALSE'
+            SELECT o.id_objeto_monitoreo, o.nombre, o.pais_codigo,
+                   o.departamento_provincia, o.municipio_localidad,
+                   o.descripcion, o.fuente_geometria, o.estado_seguimiento,
+                   MAX(i.fecha_captura) AS ultima_fecha_procesada
+            FROM objeto_monitoreo_satelital o
+            LEFT JOIN imagen_satelital_embalse i
+              ON i.id_objeto_monitoreo=o.id_objeto_monitoreo AND i.activo=TRUE
+            WHERE o.activo=TRUE AND o.tipo_objeto='EMBALSE'
+            GROUP BY o.id_objeto_monitoreo, o.nombre, o.pais_codigo,
+                     o.departamento_provincia, o.municipio_localidad,
+                     o.descripcion, o.fuente_geometria, o.estado_seguimiento
             ORDER BY nombre, id_objeto_monitoreo
             """
         )
@@ -83,11 +96,18 @@ def consultar_embalse(id_embalse: int, db: Session = Depends(get_db)):
     row = db.execute(
         text(
             """
-            SELECT id_objeto_monitoreo, nombre, pais_codigo,
-                   departamento_provincia, municipio_localidad
-            FROM objeto_monitoreo_satelital
-            WHERE id_objeto_monitoreo=:id AND activo=TRUE
-              AND tipo_objeto='EMBALSE'
+            SELECT o.id_objeto_monitoreo, o.nombre, o.pais_codigo,
+                   o.departamento_provincia, o.municipio_localidad,
+                   o.descripcion, o.fuente_geometria, o.estado_seguimiento,
+                   MAX(i.fecha_captura) AS ultima_fecha_procesada
+            FROM objeto_monitoreo_satelital o
+            LEFT JOIN imagen_satelital_embalse i
+              ON i.id_objeto_monitoreo=o.id_objeto_monitoreo AND i.activo=TRUE
+            WHERE o.id_objeto_monitoreo=:id AND o.activo=TRUE
+              AND o.tipo_objeto='EMBALSE'
+            GROUP BY o.id_objeto_monitoreo, o.nombre, o.pais_codigo,
+                     o.departamento_provincia, o.municipio_localidad,
+                     o.descripcion, o.fuente_geometria, o.estado_seguimiento
             LIMIT 1
             """
         ),
@@ -107,7 +127,8 @@ def listar_imagenes_embalse(id_embalse: int, db: Session = Depends(get_db)):
         text(
             """
             SELECT id_imagen_satelital, id_objeto_monitoreo, fecha_captura,
-                   porcentaje_nubes, fuente, archivo_ruta, mime_type
+                   porcentaje_nubes, porcentaje_pixeles_validos, fuente,
+                   archivo_ruta, mime_type, estado
             FROM imagen_satelital_embalse
             WHERE id_objeto_monitoreo=:id AND activo=TRUE
             ORDER BY fecha_captura DESC, id_imagen_satelital DESC
@@ -127,7 +148,8 @@ def consultar_imagen_satelital(id_imagen: int, db: Session = Depends(get_db)):
         text(
             """
             SELECT id_imagen_satelital, id_objeto_monitoreo, fecha_captura,
-                   porcentaje_nubes, fuente, archivo_ruta, mime_type
+                   porcentaje_nubes, porcentaje_pixeles_validos, fuente,
+                   archivo_ruta, mime_type, estado
             FROM imagen_satelital_embalse
             WHERE id_imagen_satelital=:id AND activo=TRUE
             LIMIT 1
