@@ -11,6 +11,7 @@
     <application
         android:allowBackup="true"
         android:label="${appLabel}"
+        android:theme="@style/Theme.Bitacora"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
 

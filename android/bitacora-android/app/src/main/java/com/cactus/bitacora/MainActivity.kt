@@ -36,13 +36,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
@@ -58,7 +61,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -86,6 +92,9 @@ import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import com.cactus.bitacora.ui.admin.AdminCatalogScreen
+import com.cactus.bitacora.ui.home.BitacoraVisualTheme
+import com.cactus.bitacora.ui.home.MainBottomBar
+import com.cactus.bitacora.ui.home.MainHeader
 import com.cactus.bitacora.ui.satellite.ReservoirSatelliteScreen
 import com.cactus.bitacora.biometric.FaceIdentificationTarget
 import com.cactus.bitacora.biometric.technical.FaceEnrollmentIdentity
@@ -113,7 +122,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            BitacoraVisualTheme {
                 Surface {
                     BitacoraApp()
                 }
@@ -129,7 +138,8 @@ internal enum class AppScreen {
     CreateDailyLog,
     QueryDailyLog,
     Sync,
-    ReservoirSatellite
+    ReservoirSatellite,
+    More
 }
 
 internal enum class AppEnvironment(val label: String) {
@@ -201,6 +211,7 @@ internal fun environmentMenuScreens(environment: AppEnvironment): List<AppScreen
             add(AppScreen.CreateDailyLog)
             add(AppScreen.QueryDailyLog)
             add(AppScreen.Sync)
+            add(AppScreen.More)
         }
     }
 
@@ -250,10 +261,26 @@ fun BitacoraApp() {
     var confirmOldestDeletion by remember { mutableStateOf(false) }
     var deletingOldest by remember { mutableStateOf(false) }
     var oldestDeletionMessage by remember { mutableStateOf<String?>(null) }
+    var backendOnline by remember { mutableStateOf<Boolean?>(null) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         OfflineSyncScheduler.schedule(context)
         OfflineSyncScheduler.enqueueNow(context)
+    }
+    LaunchedEffect(activeEnvironment, currentScreen) {
+        backendOnline = if (
+            activeEnvironment == AppEnvironment.ADMINISTRADOR ||
+            activeEnvironment == AppEnvironment.CIUDADANO
+        ) {
+            try {
+                repository.checkHealth()
+                true
+            } catch (_: Exception) {
+                false
+            }
+        } else {
+            null
+        }
     }
     BackHandler(enabled = activeEnvironment != null && currentScreen != AppScreen.Health) {
         if (activeEnvironment == AppEnvironment.SEGUIMIENTO_SATELITAL) {
@@ -291,7 +318,25 @@ fun BitacoraApp() {
         }
     }
 
-    Scaffold { padding ->
+    val environment = activeEnvironment
+    Scaffold(
+        bottomBar = {
+            if (
+                environment == AppEnvironment.ADMINISTRADOR ||
+                environment == AppEnvironment.CIUDADANO
+            ) {
+                MainBottomBar(
+                    currentScreen = currentScreen,
+                    onNavigate = { destination ->
+                        if (destination == AppScreen.CreateDailyLog) {
+                            selectedCitizenEvent = null
+                        }
+                        openScreen(destination)
+                    }
+                )
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -299,7 +344,6 @@ fun BitacoraApp() {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            val environment = activeEnvironment
             if (
                 environment == AppEnvironment.ADMINISTRADOR &&
                 currentScreen == AppScreen.AdminCatalog
@@ -322,102 +366,20 @@ fun BitacoraApp() {
                 return@Column
             }
 
-            Text(
-                text = "BitacoraClouding",
-                style = MaterialTheme.typography.headlineSmall
-            )
-
             if (environment == null) {
                 EnvironmentSelectionScreen(onSelect = ::selectEnvironment)
                 return@Column
             }
 
-            Text(
-                "Ambiente: ${environment.label}",
-                style = MaterialTheme.typography.titleMedium
+            MainHeader(
+                environment = environment,
+                online = backendOnline,
+                onChangeEnvironment = ::changeEnvironment
             )
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = ::changeEnvironment
-            ) { Text("Cambiar ambiente") }
             navigationMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
 
-
-            if (canAccessEnrollment(environment)) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = currentScreen != AppScreen.FaceEnrollment,
-                    onClick = { openScreen(AppScreen.FaceEnrollment) }
-                ) {
-                    Text("Enrolamiento facial")
-                }
-            }
-
-            if (environment == AppEnvironment.ADMINISTRADOR) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = currentScreen != AppScreen.AdminCatalog,
-                    onClick = { openScreen(AppScreen.AdminCatalog) }
-                ) {
-                    Text("Administrar maestros")
-                }
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !deletingOldest,
-                    onClick = { confirmOldestDeletion = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
-                    )
-                ) {
-                    Text("Borrar las 10 bitácoras más antiguas")
-                }
-                oldestDeletionMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.Health,
-                    onClick = { openScreen(AppScreen.Health) }
-                ) {
-                    Text("Health")
-                }
-
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.CreateDailyLog,
-                    onClick = {
-                        selectedCitizenEvent = null
-                        openScreen(AppScreen.CreateDailyLog)
-                    }
-                ) {
-                    Text("Crear bitácora")
-                }
-
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.QueryDailyLog,
-                    onClick = { openScreen(AppScreen.QueryDailyLog) }
-                ) {
-                    Text("Consultar")
-                }
-
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = currentScreen != AppScreen.Sync,
-                    onClick = { openScreen(AppScreen.Sync) }
-                ) {
-                    Text("Sincronizar")
-                }
-            }
 
             Box(modifier = Modifier.weight(1f)) {
                 when (currentScreen) {
@@ -463,6 +425,16 @@ fun BitacoraApp() {
                     AppScreen.ReservoirSatellite -> ReservoirSatelliteScreen(
                         repository = repository,
                         onBack = { currentScreen = mainDestinationAfterBack() }
+                    )
+                    AppScreen.More -> MoreScreen(
+                        environment = environment,
+                        deletingOldest = deletingOldest,
+                        deletionMessage = oldestDeletionMessage,
+                        onEnrollment = { openScreen(AppScreen.FaceEnrollment) },
+                        onAdminCatalog = { openScreen(AppScreen.AdminCatalog) },
+                        onRefreshCatalogs = { openScreen(AppScreen.Sync) },
+                        onDeleteOldest = { confirmOldestDeletion = true },
+                        onChangeEnvironment = ::changeEnvironment
                     )
                 }
             }
@@ -521,7 +493,7 @@ private fun CitizenEventTypeScreen(onSelect: (CitizenEventType) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Seleccione el tipo de novedad",
+            text = "¿Qué desea registrar?",
             style = MaterialTheme.typography.titleLarge
         )
         LazyVerticalGrid(
@@ -531,22 +503,103 @@ private fun CitizenEventTypeScreen(onSelect: (CitizenEventType) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(
-                items = citizenEventTypes,
+                items = citizenEventTypes.filterNot { it.idTipoNovedad == 9 },
                 key = { it.idTipoNovedad }
             ) { eventType ->
-                Button(
+                val visual = eventVisual(eventType)
+                ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(88.dp),
+                        .height(124.dp)
+                        .semantics {
+                            contentDescription = "Registrar ${visual.second}"
+                        },
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
                     onClick = { onSelect(eventType) }
                 ) {
-                    Text(
-                        text = eventType.label,
-                        style = MaterialTheme.typography.titleSmall
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(visual.first, style = MaterialTheme.typography.headlineSmall)
+                        Text(visual.second, style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
         }
+    }
+}
+
+private fun eventVisual(eventType: CitizenEventType): Pair<String, String> = when (
+    eventType.idTipoNovedad
+) {
+    1 -> "✓" to "Permiso"
+    2 -> "✚" to "Incapacidad"
+    3 -> "!" to "Incidente"
+    4 -> "→" to "Ingreso / entrada"
+    5 -> "←" to "Salida"
+    6 -> "♧" to "Reporte de cultivo"
+    7 -> "◷" to "Autorización de horas extras"
+    8 -> "▤" to "Reporte de cartera"
+    else -> "•" to eventType.label
+}
+
+@Composable
+private fun MoreScreen(
+    environment: AppEnvironment,
+    deletingOldest: Boolean,
+    deletionMessage: String?,
+    onEnrollment: () -> Unit,
+    onAdminCatalog: () -> Unit,
+    onRefreshCatalogs: () -> Unit,
+    onDeleteOldest: () -> Unit,
+    onChangeEnvironment: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            if (environment == AppEnvironment.ADMINISTRADOR) {
+                "Administración"
+            } else {
+                "Más opciones"
+            },
+            style = MaterialTheme.typography.titleLarge
+        )
+        if (environment == AppEnvironment.ADMINISTRADOR) {
+            Button(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                onClick = onEnrollment
+            ) { Text("Enrolamiento facial") }
+            Button(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                onClick = onAdminCatalog
+            ) { Text("Administrar maestros") }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                onClick = onRefreshCatalogs
+            ) { Text("Actualizar catálogos y sincronización") }
+            Button(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                enabled = !deletingOldest,
+                onClick = onDeleteOldest,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) { Text("Borrar las 10 bitácoras más antiguas") }
+            deletionMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            onClick = onChangeEnvironment
+        ) { Text("Cambiar ambiente") }
     }
 }
 
@@ -556,7 +609,8 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text("Seleccione el ambiente", style = MaterialTheme.typography.headlineSmall)
+        Text("Bitácora", style = MaterialTheme.typography.headlineSmall)
+        Text("Seleccione cómo desea ingresar", style = MaterialTheme.typography.titleLarge)
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.ADMINISTRADOR) }

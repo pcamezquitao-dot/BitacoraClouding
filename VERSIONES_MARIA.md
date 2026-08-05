@@ -134,3 +134,35 @@
   `CA7F7239CF2D997565AD6960E4A013D5E813AD2B9DEE10C5E7D8B79CBCA69945`.
 - Validación física: pendiente.
 - Commit: pendiente.
+
+## maria08.apk
+
+- Fecha: 2026-07-31
+- versionCode: 9
+- versionName: maria08
+- Objetivo: rediseño visual controlado sobre la base estable `maria07`.
+- Alcance: tema Material 3 verde, encabezado con ambiente y estado de conexión,
+  tarjetas grandes en dos columnas, barra inferior y pantalla Administración.
+- Punto de restauración: commit `cf0ea9c`, etiqueta `maria07-stable`.
+- Protección: sin cambios en Room, SQLite, API, repositorios, sincronización,
+  evidencias, GPS, QR o biometría.
+- Pruebas automatizadas: pendiente de recuento final.
+- Instalación ADB: pendiente.
+- Validación física: pendiente.
+- Commit definitivo: pendiente.
+
+## maria09.apk
+
+- Fecha: 2026-07-31
+- versionCode: 10
+- versionName: maria09
+- Objetivo: corregir el ajuste visual detectado en `maria08` con tamaño de
+  fuente aumentado.
+- Alcance: conservar las cinco etiquetas de la barra inferior en una línea.
+- Pruebas automatizadas: 156 pruebas Android aprobadas, 0 fallos.
+- Instalación ADB: `Success` mediante `adb install -r`; copia adicional en
+  `/sdcard/Download/BitacoraVersiones/maria09.apk`.
+- SHA-256:
+  `3497B9696A019690985FD9367986304F9D56D686CF90FCD68912F46C1CDABCC3`.
+- Validación física: pendiente.
+- Commit definitivo: pendiente.

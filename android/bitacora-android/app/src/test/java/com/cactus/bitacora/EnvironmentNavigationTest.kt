@@ -59,7 +59,8 @@ class EnvironmentNavigationTest {
         val common = listOf(
             AppScreen.CreateDailyLog,
             AppScreen.QueryDailyLog,
-            AppScreen.Sync
+            AppScreen.Sync,
+            AppScreen.More
         )
         listOf(
             AppEnvironment.ADMINISTRADOR,
