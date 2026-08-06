@@ -114,7 +114,6 @@ class BitacoraRepository(
         Log.i("AdminAreaTree", "URL consultada: $url")
         return try {
             val response = api.getAdminAreaTree(
-                adminAuthorization(),
                 normalizedActor,
                 Build.MODEL
             )
@@ -187,7 +186,6 @@ class BitacoraRepository(
         endpoint = "${AppConfig.BASE_URL}admin/areas"
     ) {
         api.createAdminArea(
-            adminAuthorization(),
             actor.trim(),
             Build.MODEL,
             AdministrativeAreaIn(description, shortName, parentId)
@@ -206,7 +204,6 @@ class BitacoraRepository(
         endpoint = "${AppConfig.BASE_URL}admin/areas/$areaId"
     ) {
         api.updateAdminArea(
-            adminAuthorization(),
             actor.trim(),
             Build.MODEL,
             areaId,
@@ -222,7 +219,6 @@ class BitacoraRepository(
             requireBody = false
         ) {
             api.deleteAdminArea(
-                adminAuthorization(),
                 actor.trim(),
                 Build.MODEL,
                 areaId

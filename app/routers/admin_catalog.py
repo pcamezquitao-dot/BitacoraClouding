@@ -4,9 +4,6 @@ from sqlalchemy.orm import Session
 from app.core.admin_auth import AdminIdentity, require_admin_access
 from app.core.db import get_db
 from app.schemas.admin_catalog import (
-    AdministrativeAreaOut,
-    AdministrativeAreaWrite,
-    AreaTreeNodeOut,
     EmployeeAreaCreate,
     EmployeeAreaAssignmentOut,
     EmployeeAreaOut,
@@ -19,19 +16,14 @@ from app.schemas.admin_catalog import (
     ParticipantTypeUpdate,
 )
 from app.services.admin_catalog_service import (
-    AdministrativeAreaNotFound,
-    create_administrative_area,
     create_employee_area,
     create_participant_type,
-    delete_administrative_area,
-    list_area_tree,
     list_participant_types,
     list_employee_area_tree,
     list_participant_options,
     retire_employee_area,
     set_participant_type_status,
     update_participant_type,
-    update_administrative_area,
     update_employee_area,
 )
 
@@ -162,56 +154,6 @@ def cambiar_estado_tipo_participante(
             payload.activo,
             identity,
         )
-    except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-
-
-@router.get("/areas/arbol", response_model=list[AreaTreeNodeOut])
-def obtener_arbol_areas(db: Session = Depends(get_db)):
-    return list_area_tree(db)
-
-
-@router.post(
-    "/areas",
-    response_model=AdministrativeAreaOut,
-    status_code=status.HTTP_201_CREATED,
-)
-def crear_area_administrativa(
-    payload: AdministrativeAreaWrite,
-    db: Session = Depends(get_db),
-    identity: AdminIdentity = Depends(require_admin_access),
-):
-    try:
-        return create_administrative_area(db, payload, identity)
-    except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-
-
-@router.put("/areas/{id_area}", response_model=AdministrativeAreaOut)
-def editar_area_administrativa(
-    id_area: int,
-    payload: AdministrativeAreaWrite,
-    db: Session = Depends(get_db),
-    identity: AdminIdentity = Depends(require_admin_access),
-):
-    try:
-        return update_administrative_area(db, id_area, payload, identity)
-    except AdministrativeAreaNotFound as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-
-
-@router.delete("/areas/{id_area}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_area_administrativa(
-    id_area: int,
-    db: Session = Depends(get_db),
-    identity: AdminIdentity = Depends(require_admin_access),
-):
-    try:
-        delete_administrative_area(db, id_area, identity)
-    except AdministrativeAreaNotFound as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

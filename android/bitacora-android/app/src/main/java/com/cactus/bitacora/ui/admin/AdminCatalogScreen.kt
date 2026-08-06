@@ -784,10 +784,11 @@ fun AdminCatalogScreen(
         Button(
             enabled = !loading,
             onClick = {
-                if (section == AdminMasterSection.GENERAL_CALENDAR) {
-                    loadCalendarTree()
-                } else {
-                    refresh()
+                when (section) {
+                    AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
+                    AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
+                    AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
+                    else -> refresh()
                 }
             },
             modifier = Modifier.fillMaxWidth()

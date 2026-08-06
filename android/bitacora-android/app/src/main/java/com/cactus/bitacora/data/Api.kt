@@ -102,7 +102,6 @@ interface BitacoraApi {
 
     @GET("admin/areas/arbol")
     suspend fun getAdminAreaTree(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String
     ): Response<List<AreaTreeNodeOut>>
@@ -123,7 +122,6 @@ interface BitacoraApi {
 
     @POST("admin/areas")
     suspend fun createAdminArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Body payload: AdministrativeAreaIn
@@ -131,7 +129,6 @@ interface BitacoraApi {
 
     @PUT("admin/areas/{idArea}")
     suspend fun updateAdminArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Path("idArea") idArea: Int,
@@ -140,7 +137,6 @@ interface BitacoraApi {
 
     @DELETE("admin/areas/{idArea}")
     suspend fun deleteAdminArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Path("idArea") idArea: Int
