@@ -201,6 +201,27 @@ data class AreaTreeNodeOut(
     val ruta: String
 )
 
+data class CalendarTreeNodeOut(
+    val id_periodo: Long,
+    val id_padre: Long? = null,
+    val nivel: String,
+    val codigo: String,
+    val nombre: String,
+    val fecha_inicio: String,
+    val fecha_fin: String,
+    val numero_dia_semana: Int? = null,
+    val nombre_dia_semana: String? = null,
+    val es_fin_semana: Boolean? = null,
+    val es_festivo: Boolean,
+    val nombre_festivo: String? = null,
+    val hijos: List<CalendarTreeNodeOut> = emptyList()
+)
+
+data class CalendarHolidayUpdateIn(
+    val es_festivo: Boolean,
+    val nombre_festivo: String? = null
+)
+
 data class AdministrativeAreaIn(
     val descripcion: String,
     val nombre_corto: String? = null,

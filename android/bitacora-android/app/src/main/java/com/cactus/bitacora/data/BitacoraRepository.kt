@@ -24,6 +24,8 @@ import com.cactus.bitacora.model.EmployeeAreaAdminIn
 import com.cactus.bitacora.model.ParticipantTypeAdminIn
 import com.cactus.bitacora.model.ParticipantTypeStatusIn
 import com.cactus.bitacora.model.AdministrativeAreaIn
+import com.cactus.bitacora.model.CalendarHolidayUpdateIn
+import com.cactus.bitacora.model.CalendarTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaUpdateIn
 import com.cactus.bitacora.model.ParticipantOptionOut
@@ -144,6 +146,35 @@ class BitacoraRepository(
             throw error
         }
     }
+
+    suspend fun adminCalendarTree(actor: String): List<CalendarTreeNodeOut> =
+        adminMutation(
+            action = "CALENDAR_TREE",
+            areaId = null,
+            endpoint = "${AppConfig.BASE_URL}admin/calendario/arbol"
+        ) {
+            api.getAdminCalendarTree(
+                actor.trim().ifBlank { "administrador-consulta" },
+                Build.MODEL
+            )
+        }.orEmpty()
+
+    suspend fun updateAdminCalendarHoliday(
+        actor: String,
+        periodId: Long,
+        payload: CalendarHolidayUpdateIn
+    ): CalendarTreeNodeOut = adminMutation(
+        action = "EDIT_CALENDAR_HOLIDAY",
+        areaId = null,
+        endpoint = "${AppConfig.BASE_URL}admin/calendario/dias/$periodId/festivo"
+    ) {
+        api.updateAdminCalendarHoliday(
+            actor.trim(),
+            Build.MODEL,
+            periodId,
+            payload
+        )
+    } ?: throw IOException("El servidor no devolvió el día actualizado")
 
     suspend fun createAdminArea(
         actor: String,

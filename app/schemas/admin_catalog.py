@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ParticipantTypeCreate(BaseModel):
@@ -86,6 +86,52 @@ class EmployeeAreaUpdate(BaseModel):
     descripcion: str | None = Field(default=None, max_length=100)
     fecha_inicia: date
     fecha_final: date | None = None
+
+
+class CalendarHolidayUpdate(BaseModel):
+    es_festivo: bool
+    nombre_festivo: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_holiday_name(self):
+        normalized = (self.nombre_festivo or "").strip()
+        if self.es_festivo and not normalized:
+            raise ValueError("El nombre del festivo es obligatorio")
+        self.nombre_festivo = normalized if self.es_festivo else None
+        return self
+
+
+class CalendarTreeNodeOut(BaseModel):
+    id_periodo: int
+    id_padre: int | None = None
+    nivel: str
+    codigo: str
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    numero_dia_semana: int | None = None
+    nombre_dia_semana: str | None = None
+    es_fin_semana: bool | None = None
+    es_festivo: bool
+    nombre_festivo: str | None = None
+    activo: bool
+    hijos: list["CalendarTreeNodeOut"] = Field(default_factory=list)
+
+
+class CalendarDayOut(BaseModel):
+    id_periodo: int
+    id_padre: int | None = None
+    nivel: str
+    codigo: str
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    numero_dia_semana: int | None = None
+    nombre_dia_semana: str | None = None
+    es_fin_semana: bool | None = None
+    es_festivo: bool
+    nombre_festivo: str | None = None
+    activo: bool
 
 
 class ParticipantOptionOut(BaseModel):

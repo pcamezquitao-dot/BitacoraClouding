@@ -28,6 +28,8 @@ import com.cactus.bitacora.model.FaceTemplateDeactivateIn
 import com.cactus.bitacora.model.OfflineCatalogOut
 import com.cactus.bitacora.model.BitacoraDiariaSyncOut
 import com.cactus.bitacora.model.AreaTreeNodeOut
+import com.cactus.bitacora.model.CalendarHolidayUpdateIn
+import com.cactus.bitacora.model.CalendarTreeNodeOut
 import com.cactus.bitacora.model.AdministrativeAreaIn
 import com.cactus.bitacora.model.AdministrativeAreaOut
 import com.cactus.bitacora.model.EmployeeAreaAdminIn
@@ -104,6 +106,20 @@ interface BitacoraApi {
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String
     ): Response<List<AreaTreeNodeOut>>
+
+    @GET("admin/calendario/arbol")
+    suspend fun getAdminCalendarTree(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): Response<List<CalendarTreeNodeOut>>
+
+    @PATCH("admin/calendario/dias/{idPeriodo}/festivo")
+    suspend fun updateAdminCalendarHoliday(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("idPeriodo") idPeriodo: Long,
+        @Body payload: CalendarHolidayUpdateIn
+    ): Response<CalendarTreeNodeOut>
 
     @POST("admin/areas")
     suspend fun createAdminArea(

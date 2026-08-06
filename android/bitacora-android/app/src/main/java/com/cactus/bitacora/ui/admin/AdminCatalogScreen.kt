@@ -21,6 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.model.AreaTreeNodeOut
+import com.cactus.bitacora.model.CalendarHolidayUpdateIn
+import com.cactus.bitacora.model.CalendarTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaAdminIn
 import com.cactus.bitacora.model.EmployeeAreaAssignmentOut
 import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
@@ -48,7 +51,74 @@ private val availableCapabilities = listOf("EMPLEADO", "SUPERVISOR", "GERENTE")
 private enum class AdminMasterSection {
     PARTICIPANT_TYPES,
     EMPLOYEE_AREA,
-    ADMINISTRATIVE_AREAS
+    ADMINISTRATIVE_AREAS,
+    GENERAL_CALENDAR
+}
+
+internal fun canEditCalendarNode(node: CalendarTreeNodeOut): Boolean =
+    node.nivel == "DIA"
+
+internal fun validCalendarHolidayName(isHoliday: Boolean, name: String): Boolean =
+    !isHoliday || name.isNotBlank()
+
+internal fun visibleCalendarNodeIds(
+    roots: List<CalendarTreeNodeOut>,
+    expandedIds: Set<Long>
+): List<Long> = buildList {
+    fun visit(node: CalendarTreeNodeOut) {
+        add(node.id_periodo)
+        if (node.id_periodo in expandedIds) node.hijos.forEach(::visit)
+    }
+    roots.forEach(::visit)
+}
+
+@Composable
+private fun CalendarTreeRows(
+    nodes: List<CalendarTreeNodeOut>,
+    expandedIds: Set<Long>,
+    depth: Int = 0,
+    onToggle: (Long) -> Unit,
+    onEdit: (CalendarTreeNodeOut) -> Unit
+) {
+    nodes.forEach { node ->
+        val hasChildren = node.hijos.isNotEmpty()
+        val isDay = canEditCalendarNode(node)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = (depth * 12).dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = { if (hasChildren) onToggle(node.id_periodo) }
+            ) {
+                val marker = when {
+                    hasChildren && node.id_periodo in expandedIds -> "▼"
+                    hasChildren -> "▶"
+                    node.es_festivo -> "★"
+                    else -> "•"
+                }
+                val dayDetail = if (isDay) {
+                    buildString {
+                        append(" · ${node.fecha_inicio}")
+                        node.nombre_dia_semana?.let { append(" · $it") }
+                        if (node.es_festivo) {
+                            append(" · Festivo")
+                            node.nombre_festivo?.let { append(": $it") }
+                        }
+                    }
+                } else ""
+                Text("$marker ${node.nombre}$dayDetail")
+            }
+            if (isDay) {
+                Button(onClick = { onEdit(node) }) { Text("Editar") }
+            }
+        }
+        if (hasChildren && node.id_periodo in expandedIds) {
+            CalendarTreeRows(node.hijos, expandedIds, depth + 1, onToggle, onEdit)
+        }
+    }
 }
 
 internal fun visibleAreaTreeNodes(
@@ -301,6 +371,15 @@ fun AdminCatalogScreen(
     var assignmentError by remember { mutableStateOf<String?>(null) }
     var assignmentMessage by remember { mutableStateOf<String?>(null) }
     var assignmentAreaMenuExpanded by remember { mutableStateOf(false) }
+    var calendarTree by remember { mutableStateOf<List<CalendarTreeNodeOut>>(emptyList()) }
+    var expandedCalendarIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var calendarLoading by remember { mutableStateOf(false) }
+    var calendarError by remember { mutableStateOf<String?>(null) }
+    var calendarMessage by remember { mutableStateOf<String?>(null) }
+    var editingCalendarDay by remember { mutableStateOf<CalendarTreeNodeOut?>(null) }
+    var calendarIsHoliday by remember { mutableStateOf(false) }
+    var calendarHolidayName by remember { mutableStateOf("") }
+    var calendarSaving by remember { mutableStateOf(false) }
 
     fun requireActor(): String =
         actor.trim().takeIf(String::isNotEmpty)
@@ -360,6 +439,70 @@ fun AdminCatalogScreen(
                     ?: "No fue posible cargar empleado-área"
             } finally {
                 employeeTreeLoading = false
+            }
+        }
+    }
+
+    fun loadCalendarTree() {
+        calendarLoading = true
+        calendarError = null
+        scope.launch {
+            try {
+                val loaded = repository.adminCalendarTree(actor)
+                val validIds = mutableSetOf<Long>()
+                fun collect(nodes: List<CalendarTreeNodeOut>) {
+                    nodes.forEach { node ->
+                        validIds += node.id_periodo
+                        collect(node.hijos)
+                    }
+                }
+                collect(loaded)
+                calendarTree = loaded
+                expandedCalendarIds = expandedCalendarIds.intersect(validIds)
+            } catch (error: Exception) {
+                calendarError = error.message ?: "No fue posible cargar el calendario"
+            } finally {
+                calendarLoading = false
+            }
+        }
+    }
+
+    fun beginCalendarEdit(day: CalendarTreeNodeOut) {
+        if (!canEditCalendarNode(day)) return
+        editingCalendarDay = day
+        calendarIsHoliday = day.es_festivo
+        calendarHolidayName = day.nombre_festivo.orEmpty()
+        calendarError = null
+        calendarMessage = null
+    }
+
+    fun saveCalendarHoliday() {
+        val day = editingCalendarDay ?: return
+        if (!validCalendarHolidayName(calendarIsHoliday, calendarHolidayName)) {
+            calendarError = "El nombre del festivo es obligatorio"
+            return
+        }
+        calendarSaving = true
+        calendarError = null
+        scope.launch {
+            try {
+                repository.updateAdminCalendarHoliday(
+                    requireActor(),
+                    day.id_periodo,
+                    CalendarHolidayUpdateIn(
+                        es_festivo = calendarIsHoliday,
+                        nombre_festivo = calendarHolidayName.trim().takeIf {
+                            calendarIsHoliday
+                        }
+                    )
+                )
+                editingCalendarDay = null
+                calendarMessage = "Festivo actualizado correctamente"
+                loadCalendarTree()
+            } catch (error: Exception) {
+                calendarError = error.message ?: "No fue posible actualizar el festivo"
+            } finally {
+                calendarSaving = false
             }
         }
     }
@@ -590,6 +733,9 @@ fun AdminCatalogScreen(
         if (section == AdminMasterSection.EMPLOYEE_AREA) {
             loadEmployeeAreaTree()
         }
+        if (section == AdminMasterSection.GENERAL_CALENDAR) {
+            loadCalendarTree()
+        }
     }
 
     Column(
@@ -617,6 +763,10 @@ fun AdminCatalogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.ADMINISTRATIVE_AREAS }
             ) { Text("Áreas administrativas") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.GENERAL_CALENDAR }
+            ) { Text("Calendario general") }
             return@Column
         }
         OutlinedButton(
@@ -633,9 +783,15 @@ fun AdminCatalogScreen(
         )
         Button(
             enabled = !loading,
-            onClick = ::refresh,
+            onClick = {
+                if (section == AdminMasterSection.GENERAL_CALENDAR) {
+                    loadCalendarTree()
+                } else {
+                    refresh()
+                }
+            },
             modifier = Modifier.fillMaxWidth()
-        ) { Text(if (loading) "Cargando…" else "Cargar catálogos") }
+        ) { Text(if (loading || calendarLoading) "Cargando…" else "Actualizar") }
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {
@@ -844,6 +1000,78 @@ fun AdminCatalogScreen(
                 }
             )
         }
+
+        if (section == AdminMasterSection.GENERAL_CALENDAR) {
+            Text("Calendario general", style = MaterialTheme.typography.titleMedium)
+            if (calendarLoading) Text("Cargando calendario…")
+            calendarError?.takeIf { editingCalendarDay == null }?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            calendarMessage?.let { Text(it, color = Color(0xFF2E7D32)) }
+            if (!calendarLoading && calendarError == null && calendarTree.isEmpty()) {
+                Text("El calendario no contiene periodos activos.")
+            }
+            CalendarTreeRows(
+                nodes = calendarTree,
+                expandedIds = expandedCalendarIds,
+                onToggle = { id ->
+                    expandedCalendarIds = if (id in expandedCalendarIds) {
+                        expandedCalendarIds - id
+                    } else {
+                        expandedCalendarIds + id
+                    }
+                },
+                onEdit = ::beginCalendarEdit
+            )
+        }
+    }
+
+    editingCalendarDay?.let { day ->
+        AlertDialog(
+            onDismissRequest = { if (!calendarSaving) editingCalendarDay = null },
+            title = { Text("Editar festivo") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Fecha: ${day.fecha_inicio}")
+                    Text("Día: ${day.nombre_dia_semana.orEmpty()}")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Switch(
+                            checked = calendarIsHoliday,
+                            enabled = !calendarSaving,
+                            onCheckedChange = {
+                                calendarIsHoliday = it
+                                if (!it) calendarHolidayName = ""
+                            }
+                        )
+                        Text("Es festivo")
+                    }
+                    OutlinedTextField(
+                        value = calendarHolidayName,
+                        onValueChange = { calendarHolidayName = it },
+                        enabled = calendarIsHoliday && !calendarSaving,
+                        label = { Text("Nombre del festivo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    calendarError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    enabled = !calendarSaving,
+                    onClick = { editingCalendarDay = null }
+                ) { Text("Cancelar") }
+            },
+            confirmButton = {
+                Button(
+                    enabled = !calendarSaving &&
+                        validCalendarHolidayName(calendarIsHoliday, calendarHolidayName),
+                    onClick = ::saveCalendarHoliday
+                ) { Text(if (calendarSaving) "Guardando…" else "Guardar") }
+            }
+        )
     }
 
     assignmentArea?.let { area ->
