@@ -26,6 +26,7 @@ from app.routers.face_templates import router as face_templates_router
 from app.routers.catalogos import router as catalogos_router
 from app.routers.admin_catalog import router as admin_catalog_router
 from app.routers.administrative_areas import router as administrative_areas_router
+from app.routers.employee_area import router as employee_area_admin_router
 from app.routers.calendar_general import router as calendar_general_router
 from app.routers.satelital import router as satelital_router
 from app.services.evidencia_file_service import evidencia_root
@@ -63,6 +64,7 @@ app.include_router(face_templates_router)
 app.include_router(catalogos_router)
 app.include_router(admin_catalog_router)
 app.include_router(administrative_areas_router)
+app.include_router(employee_area_admin_router)
 app.include_router(calendar_general_router)
 app.include_router(satelital_router)
 

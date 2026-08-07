@@ -144,7 +144,6 @@ interface BitacoraApi {
 
     @POST("admin/empleado-area")
     suspend fun createAdminEmployeeArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Body payload: EmployeeAreaAdminIn
@@ -152,14 +151,18 @@ interface BitacoraApi {
 
     @GET("admin/empleado-area/tree")
     suspend fun getAdminEmployeeAreaTree(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String
     ): Response<List<EmployeeAreaTreeNodeOut>>
 
+    @GET("admin/empleado-area/tipos-participante")
+    suspend fun getAdminEmployeeAreaTypes(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): Response<List<ParticipantTypeAdminOut>>
+
     @GET("admin/participantes/options")
     suspend fun getAdminParticipantOptions(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Query("search") search: String
@@ -167,7 +170,6 @@ interface BitacoraApi {
 
     @PUT("admin/empleado-area/{idAssignment}")
     suspend fun updateAdminEmployeeArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Path("idAssignment") idAssignment: Int,
@@ -176,7 +178,6 @@ interface BitacoraApi {
 
     @DELETE("admin/empleado-area/{idAssignment}")
     suspend fun retireAdminEmployeeArea(
-        @Header("Authorization") authorization: String,
         @Header("X-Admin-Actor") actor: String,
         @Header("X-Admin-Device") device: String,
         @Path("idAssignment") idAssignment: Int

@@ -426,7 +426,7 @@ fun AdminCatalogScreen(
                 expandedEmployeeAreaIds = if (firstLoad) ids else {
                     expandedEmployeeAreaIds.intersect(ids)
                 }
-                types = repository.adminParticipantTypes(
+                types = repository.adminEmployeeAreaTypes(
                     actor.trim().ifBlank { "administrador-consulta" }
                 )
                 Log.i(

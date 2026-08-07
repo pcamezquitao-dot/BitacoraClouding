@@ -229,7 +229,6 @@ class BitacoraRepository(
         actor: String,
         payload: EmployeeAreaAdminIn
     ) = api.createAdminEmployeeArea(
-        adminAuthorization(),
         actor.trim(),
         Build.MODEL,
         payload
@@ -242,7 +241,20 @@ class BitacoraRepository(
             endpoint = "${AppConfig.BASE_URL}admin/empleado-area/tree"
         ) {
             api.getAdminEmployeeAreaTree(
-                adminAuthorization(),
+                actor.trim().ifBlank { "administrador-consulta" },
+                Build.MODEL
+            )
+        }.orEmpty()
+
+    suspend fun adminEmployeeAreaTypes(
+        actor: String
+    ): List<com.cactus.bitacora.model.ParticipantTypeAdminOut> =
+        adminMutation(
+            action = "EMPLOYEE_AREA_TYPES",
+            areaId = null,
+            endpoint = "${AppConfig.BASE_URL}admin/empleado-area/tipos-participante"
+        ) {
+            api.getAdminEmployeeAreaTypes(
                 actor.trim().ifBlank { "administrador-consulta" },
                 Build.MODEL
             )
@@ -258,7 +270,6 @@ class BitacoraRepository(
             endpoint = "${AppConfig.BASE_URL}admin/participantes/options"
         ) {
             api.getAdminParticipantOptions(
-                adminAuthorization(),
                 actor.trim().ifBlank { "administrador-consulta" },
                 Build.MODEL,
                 search
@@ -275,7 +286,6 @@ class BitacoraRepository(
         endpoint = "${AppConfig.BASE_URL}admin/empleado-area/$assignmentId"
     ) {
         api.updateAdminEmployeeArea(
-            adminAuthorization(),
             actor.trim(),
             Build.MODEL,
             assignmentId,
@@ -291,7 +301,6 @@ class BitacoraRepository(
             requireBody = false
         ) {
             api.retireAdminEmployeeArea(
-                adminAuthorization(),
                 actor.trim(),
                 Build.MODEL,
                 assignmentId
