@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 private val availableCapabilities = listOf("EMPLEADO", "SUPERVISOR", "GERENTE")
 
 private enum class AdminMasterSection {
+    PARTICIPANTS,
     PARTICIPANT_TYPES,
     EMPLOYEE_AREA,
     ADMINISTRATIVE_AREAS,
@@ -753,6 +754,10 @@ fun AdminCatalogScreen(
             Text("Seleccione la tabla maestra que desea administrar.")
             Button(
                 modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.PARTICIPANTS }
+            ) { Text("Participantes") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.PARTICIPANT_TYPES }
             ) { Text("Tipos de participante") }
             Button(
@@ -785,6 +790,7 @@ fun AdminCatalogScreen(
             enabled = !loading,
             onClick = {
                 when (section) {
+                    AdminMasterSection.PARTICIPANTS -> Unit
                     AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
                     AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
                     AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
@@ -794,6 +800,10 @@ fun AdminCatalogScreen(
             modifier = Modifier.fillMaxWidth()
         ) { Text(if (loading || calendarLoading) "Cargando…" else "Actualizar") }
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+
+        if (section == AdminMasterSection.PARTICIPANTS) {
+            ParticipantsAdminPanel(repository = repository, actor = actor)
+        }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {
             Text("Tipos de participante", style = MaterialTheme.typography.titleMedium)

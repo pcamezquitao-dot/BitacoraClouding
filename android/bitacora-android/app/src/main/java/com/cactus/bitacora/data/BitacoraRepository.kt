@@ -29,6 +29,7 @@ import com.cactus.bitacora.model.CalendarTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaUpdateIn
 import com.cactus.bitacora.model.ParticipantOptionOut
+import com.cactus.bitacora.model.ParticipantAdminIn
 import com.cactus.bitacora.util.AppConfig
 import retrofit2.HttpException
 import com.cactus.bitacora.location.LocationSnapshot
@@ -64,6 +65,20 @@ class BitacoraRepository(
 
     suspend fun checkHealth() =
         api.health()
+
+    suspend fun adminParticipants(search: String, offset: Int = 0, limit: Int = 50) =
+        api.getAdminParticipants(search.trim(), offset, limit)
+
+    suspend fun adminDocumentTypes() = api.getAdminDocumentTypes()
+
+    suspend fun createAdminParticipant(actor: String, payload: ParticipantAdminIn) =
+        api.createAdminParticipant(actor.trim(), Build.MODEL, payload)
+
+    suspend fun updateAdminParticipant(actor: String, id: Int, payload: ParticipantAdminIn) =
+        api.updateAdminParticipant(actor.trim(), Build.MODEL, id, payload)
+
+    suspend fun retireAdminParticipant(actor: String, id: Int) =
+        api.retireAdminParticipant(actor.trim(), Build.MODEL, id)
 
     suspend fun adminParticipantTypes(actor: String) =
         api.getAdminParticipantTypes(

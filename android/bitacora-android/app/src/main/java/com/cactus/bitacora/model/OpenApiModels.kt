@@ -295,6 +295,45 @@ data class ParticipantOptionOut(
     val documento: String? = null
 )
 
+data class ParticipantAdminIn(
+    val tipo_documento: Int,
+    val documento: String,
+    val identificacion_participante: String,
+    val nombre: String,
+    val apellido: String,
+    val fecha_nacimiento: String,
+    val sexo: String,
+    val fecha_entrada: String? = null,
+    val fecha_salida: String? = null,
+    val observaciones: String? = null,
+    val email: String? = null
+)
+
+data class ParticipantAdminOut(
+    val id_participante: Int,
+    val tipo_documento: Int,
+    val documento: String,
+    val identificacion_participante: String,
+    val nombre: String,
+    val apellido: String,
+    val fecha_nacimiento: String,
+    val sexo: String,
+    val fecha_entrada: String? = null,
+    val fecha_salida: String? = null,
+    val observaciones: String? = null,
+    val email: String? = null,
+    val activo: Boolean
+)
+
+data class ParticipantAdminPage(
+    val items: List<ParticipantAdminOut>,
+    val total: Int,
+    val offset: Int,
+    val limit: Int
+)
+
+data class DocumentTypeOut(val codigo: Int, val descripcion: String)
+
 data class FaceTemplateEnrollIn(
     val client_uuid: String,
     val id_participante: Int,

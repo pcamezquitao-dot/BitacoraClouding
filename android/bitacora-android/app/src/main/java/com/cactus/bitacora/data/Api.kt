@@ -58,6 +58,38 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("admin/participantes")
+    suspend fun getAdminParticipants(
+        @Query("search") search: String,
+        @Query("offset") offset: Int,
+        @Query("limit") limit: Int
+    ): com.cactus.bitacora.model.ParticipantAdminPage
+
+    @GET("admin/participantes/tipos-documento")
+    suspend fun getAdminDocumentTypes(): List<com.cactus.bitacora.model.DocumentTypeOut>
+
+    @POST("admin/participantes")
+    suspend fun createAdminParticipant(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: com.cactus.bitacora.model.ParticipantAdminIn
+    ): com.cactus.bitacora.model.ParticipantAdminOut
+
+    @PUT("admin/participantes/{participantId}")
+    suspend fun updateAdminParticipant(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("participantId") participantId: Int,
+        @Body payload: com.cactus.bitacora.model.ParticipantAdminIn
+    ): com.cactus.bitacora.model.ParticipantAdminOut
+
+    @DELETE("admin/participantes/{participantId}")
+    suspend fun retireAdminParticipant(
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("participantId") participantId: Int
+    ): com.cactus.bitacora.model.ParticipantAdminOut
+
     @GET("bitacora_diaria")
     suspend fun getBitacoras(
         @Query("offset") offset: Int,
