@@ -161,7 +161,7 @@ internal val citizenEventTypes = listOf(
     CitizenEventType(idTipoNovedad = 5, label = "SALIDA"),
     CitizenEventType(idTipoNovedad = 6, label = "REPORTE DE CULTIVO"),
     CitizenEventType(idTipoNovedad = 7, label = "AUTORIZA HORAS EXTRAS"),
-    CitizenEventType(idTipoNovedad = 8, label = "REPORTE DE CARRETERA"),
+    CitizenEventType(idTipoNovedad = 8, label = "REPORTE GPS"),
     CitizenEventType(idTipoNovedad = 9, label = "SATELITAL")
 )
 
@@ -543,7 +543,7 @@ private fun eventVisual(eventType: CitizenEventType): Pair<String, String> = whe
     5 -> "←" to "Salida"
     6 -> "♧" to "Reporte de cultivo"
     7 -> "◷" to "Autorización de horas extras"
-    8 -> "▤" to "Reporte de cartera"
+    8 -> "▤" to "Reporte GPS"
     else -> "•" to eventType.label
 }
 

@@ -92,7 +92,7 @@ class EnvironmentNavigationTest {
                 5 to "SALIDA",
                 6 to "REPORTE DE CULTIVO",
                 7 to "AUTORIZA HORAS EXTRAS",
-                8 to "REPORTE DE CARRETERA",
+                8 to "REPORTE GPS",
                 9 to "SATELITAL"
             ),
             citizenEventTypes.map { it.idTipoNovedad to it.label }
