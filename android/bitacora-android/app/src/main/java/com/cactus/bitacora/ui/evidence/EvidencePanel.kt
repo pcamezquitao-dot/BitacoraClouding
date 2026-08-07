@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -127,6 +128,9 @@ fun EvidencePanel(
     var menu by remember { mutableStateOf(false) }
     var textDialog by remember { mutableStateOf(false) }
     var selectedText by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
+    var selectedSavedVideo by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
+    var savedVideoError by remember { mutableStateOf<String?>(null) }
+    var savedVideoRetry by remember { mutableStateOf(0) }
     var observation by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
@@ -516,6 +520,25 @@ fun EvidencePanel(
                                     val file = File(path)
                                     if (evidence.evidenceType == EvidenceType.AUDIO) {
                                         playAudio(file)
+                                    } else if (
+                                        shouldOpenPersistedVideoInternally(evidence.evidenceType)
+                                    ) {
+                                        val problem = evidenceFileProblem(file)
+                                        if (problem != null) {
+                                            message = problem
+                                        } else {
+                                            val uri = fileUri(file)
+                                            Log.i(
+                                                EVIDENCE_LOG_TAG,
+                                                "Video persistido listo localId=${evidence.localId} " +
+                                                    "uriScheme=${uri.scheme} existe=${file.isFile} " +
+                                                    "bytes=${file.length()} mime=${evidence.mimeType} " +
+                                                    "sync=${evidence.syncStatus}"
+                                            )
+                                            savedVideoError = null
+                                            savedVideoRetry = 0
+                                            selectedSavedVideo = evidence
+                                        }
                                     } else {
                                         message = openEvidenceSafely(
                                             context = context,
@@ -632,6 +655,45 @@ fun EvidencePanel(
             },
             confirmButton = {
                 Button(onClick = { previewVideo = null }) { Text("Volver") }
+            }
+        )
+    }
+
+    selectedSavedVideo?.let { evidence ->
+        val file = evidence.localFilePath?.let(::File)
+        val problem = if (file == null) {
+            "El archivo de evidencia no existe o está vacío"
+        } else {
+            evidenceFileProblem(file)
+        }
+        AlertDialog(
+            onDismissRequest = { selectedSavedVideo = null },
+            title = { Text("Video guardado") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (problem == null) {
+                        val playableFile = requireNotNull(file)
+                        val uri = fileUri(playableFile)
+                        key(evidence.localId, uri, savedVideoRetry) {
+                            VideoViewer(
+                                uri = uri,
+                                onError = { savedVideoError = it }
+                            )
+                        }
+                    } else {
+                        Text(problem, color = MaterialTheme.colorScheme.error)
+                    }
+                    savedVideoError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                        OutlinedButton(onClick = {
+                            savedVideoError = null
+                            savedVideoRetry += 1
+                        }) { Text("Reintentar") }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { selectedSavedVideo = null }) { Text("Cerrar") }
             }
         )
     }
@@ -763,6 +825,9 @@ internal fun evidenceFileProblem(file: File): String? =
     } else {
         null
     }
+
+internal fun shouldOpenPersistedVideoInternally(type: EvidenceType): Boolean =
+    type == EvidenceType.VIDEO
 
 private const val EVIDENCE_LOG_TAG = "BitacoraEvidence"
 

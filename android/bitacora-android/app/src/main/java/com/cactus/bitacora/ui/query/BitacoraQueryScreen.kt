@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import android.view.LayoutInflater
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -667,6 +668,10 @@ internal fun VideoViewer(uri: Uri, onError: (String) -> Unit) {
             setMediaItem(MediaItem.fromUri(uri))
             addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    Log.d(
+                        "EvidenceVideoPlayer",
+                        "state=$playbackState uriScheme=${uri.scheme}"
+                    )
                     loading = playbackState == Player.STATE_BUFFERING ||
                         playbackState == Player.STATE_IDLE
                     if (
@@ -681,6 +686,10 @@ internal fun VideoViewer(uri: Uri, onError: (String) -> Unit) {
 
                 override fun onPlayerError(error: PlaybackException) {
                     loading = false
+                    Log.e(
+                        "EvidenceVideoPlayer",
+                        "error=${error.errorCodeName} uriScheme=${uri.scheme}"
+                    )
                     onError("No fue posible reproducir el video: ${error.errorCodeName}")
                 }
             })

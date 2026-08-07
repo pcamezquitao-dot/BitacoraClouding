@@ -11,6 +11,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EvidenceReviewPolicyTest {
+
+    @Test
+    fun persistedVideoUsesTheSameInternalViewerAsQuery() {
+        assertTrue(shouldOpenPersistedVideoInternally(EvidenceType.VIDEO))
+        assertFalse(shouldOpenPersistedVideoInternally(EvidenceType.PHOTO))
+        assertFalse(shouldOpenPersistedVideoInternally(EvidenceType.AUDIO))
+        assertFalse(shouldOpenPersistedVideoInternally(EvidenceType.TEXT))
+    }
+
     @Test
     fun photoPersistsOnlyAfterSave() {
         assertTrue(shouldPersistEvidence(EvidenceReviewAction.SAVE))
