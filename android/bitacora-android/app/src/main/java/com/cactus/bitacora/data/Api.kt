@@ -58,6 +58,27 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @POST("supervisor/identificar")
+    suspend fun identifySupervisor(
+        @Body payload: com.cactus.bitacora.model.SupervisorIdentifyIn
+    ): com.cactus.bitacora.model.SupervisorSessionOut
+
+    @GET("supervisor/{code}/participantes")
+    suspend fun getSupervisedParticipants(
+        @Path("code") code: String,
+        @Query("search") search: String = ""
+    ): List<com.cactus.bitacora.model.SupervisedParticipantOut>
+
+    @POST("supervisor/movimientos")
+    suspend fun createSupervisorMovement(
+        @Body payload: com.cactus.bitacora.model.SupervisorMovementIn
+    ): com.cactus.bitacora.model.SupervisorMovementOut
+
+    @GET("supervisor/{code}/movimientos-hoy")
+    suspend fun getSupervisorTodayMovements(
+        @Path("code") code: String
+    ): List<com.cactus.bitacora.model.SupervisorTodayMovementOut>
+
     @GET("admin/participantes")
     suspend fun getAdminParticipants(
         @Query("search") search: String,
@@ -67,6 +88,11 @@ interface BitacoraApi {
 
     @GET("admin/participantes/tipos-documento")
     suspend fun getAdminDocumentTypes(): List<com.cactus.bitacora.model.DocumentTypeOut>
+
+    @GET("admin/participantes/{participantId}")
+    suspend fun getAdminParticipantDetail(
+        @Path("participantId") participantId: Int
+    ): com.cactus.bitacora.model.ParticipantAdminOut
 
     @POST("admin/participantes")
     suspend fun createAdminParticipant(

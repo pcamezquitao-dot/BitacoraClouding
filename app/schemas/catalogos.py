@@ -23,6 +23,7 @@ class CatalogAreaOut(BaseModel):
 
 
 class CatalogAssignmentOut(BaseModel):
+    id_empleado_area: int
     id_participante: int
     id_area: int
     cargo: int | None = None
@@ -39,9 +40,26 @@ class CatalogParticipantTypeOut(BaseModel):
     capacidades: list[str]
 
 
+class CatalogCalendarPeriodOut(BaseModel):
+    id_periodo: int
+    id_padre: int | None = None
+    nivel: str
+    codigo: str
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    numero_dia_semana: int | None = None
+    nombre_dia_semana: str | None = None
+    es_fin_semana: bool | None = None
+    es_festivo: bool = False
+    nombre_festivo: str | None = None
+    activo: bool = True
+
+
 class OfflineCatalogOut(BaseModel):
     generated_at: datetime
     participantes: list[CatalogParticipantOut]
     areas: list[CatalogAreaOut]
     empleado_areas: list[CatalogAssignmentOut]
     tipos_participante: list[CatalogParticipantTypeOut]
+    calendario: list[CatalogCalendarPeriodOut]

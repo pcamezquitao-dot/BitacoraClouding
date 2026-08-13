@@ -2,11 +2,12 @@ from datetime import date
 
 import pytest
 from fastapi import HTTPException
+from unittest.mock import MagicMock
 
 from app.main import app
 from app.routers.participants_admin import participant_admin_identity, router
 from app.schemas.participante import ParticipantAdminIn
-from app.services.participant_admin_service import _clean
+from app.services.participant_admin_service import _clean, list_participants
 
 
 def valid_payload(**changes):
@@ -50,3 +51,34 @@ def test_rejects_invalid_dates_and_sex():
         _clean(valid_payload(sexo="X"))
     with pytest.raises(ValueError):
         _clean(valid_payload(fecha_salida=date(2025, 12, 31)))
+
+
+def test_nullable_database_fields_become_null():
+    values = _clean(valid_payload(
+        fecha_entrada=None,
+        fecha_salida=None,
+        observaciones="   ",
+    ))
+    assert values["fecha_entrada"] is None
+    assert values["fecha_salida"] is None
+    assert values["observaciones"] is None
+
+
+def test_mariadb_required_fields_remain_required():
+    for field in ("apellido", "fecha_nacimiento", "sexo"):
+        with pytest.raises((ValueError, TypeError)):
+            valid_payload(**{field: None})
+
+
+def test_participant_list_is_ordered_by_id_participante():
+    db = MagicMock()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 0
+    rows_result = MagicMock()
+    rows_result.mappings.return_value.all.return_value = []
+    db.execute.side_effect = [count_result, rows_result]
+
+    list_participants(db, "", 0, 100)
+
+    query = str(db.execute.call_args_list[1].args[0])
+    assert "ORDER BY id_participante" in query

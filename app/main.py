@@ -30,6 +30,7 @@ from app.routers.employee_area import router as employee_area_admin_router
 from app.routers.calendar_general import router as calendar_general_router
 from app.routers.participants_admin import router as participants_admin_router
 from app.routers.satelital import router as satelital_router
+from app.routers.supervisor import router as supervisor_router
 from app.services.evidencia_file_service import evidencia_root
 from app.services.audio_transcription_service import recover_pending_transcriptions
 
@@ -69,6 +70,7 @@ app.include_router(employee_area_admin_router)
 app.include_router(calendar_general_router)
 app.include_router(participants_admin_router)
 app.include_router(satelital_router)
+app.include_router(supervisor_router)
 
 
 @app.on_event("startup")

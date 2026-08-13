@@ -11,6 +11,10 @@ from app.services.jerarquia_service import get_supervisor_for_empleado
 from app.services.storage_service import save_upload
 from app.services.evidencia_file_service import candidate_evidence_paths
 from app.services.empleado_area_service import require_asignacion_activa
+from app.services.supervisor_service import (
+    SupervisorAuthorizationError,
+    require_supervised_participant_by_id,
+)
 from app.schemas.bitacora import (
     BitacoraAreaObsCreate,
     BitacoraAreaObsOut,
@@ -21,6 +25,24 @@ from app.schemas.bitacora import (
 from app.schemas.evidencia import EvidenciaOut, BitacoraCompletaOut
 
 router = APIRouter(tags=["bitacora_uc03"])
+
+
+def _resolve_bao_table(db: Session) -> str:
+    """Respeta BAO_TABLE y usa el nombre histórico real si quedó desactualizado."""
+    fallback = "bitacora_area_observacion"
+    if settings.BAO_TABLE == fallback:
+        return fallback
+    configured_exists = db.execute(
+        text(
+            """
+            SELECT 1 FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA=:schema AND TABLE_NAME=:table
+            LIMIT 1
+            """
+        ),
+        {"schema": settings.DB_NAME, "table": settings.BAO_TABLE},
+    ).first()
+    return settings.BAO_TABLE if configured_exists else fallback
 
 
 def _get_bitacora_by_client_uuid(db: Session, client_uuid: str | None):
@@ -90,8 +112,21 @@ def _crear_bitacora_diaria(
             )
 
     normalized_origin = (origen_bitacora or "MANUAL").strip().upper()
-    if normalized_origin not in {"MANUAL", "SATELITAL"}:
+    if normalized_origin not in {"MANUAL", "SATELITAL", "SUPERVISOR"}:
         raise HTTPException(status_code=422, detail="origen_bitacora inválido")
+    if normalized_origin == "SUPERVISOR":
+        if id_supervisor is None or not qr_area:
+            raise HTTPException(
+                status_code=422,
+                detail="SUPERVISOR requiere responsable y área",
+            )
+        try:
+            parsed_supervisor_area = parse_area_qr(qr_area)
+            require_supervised_participant_by_id(
+                db, id_supervisor, id_empleado, parsed_supervisor_area.id_area
+            )
+        except (ValueError, SupervisorAuthorizationError) as error:
+            raise HTTPException(status_code=403, detail=str(error)) from error
     if normalized_origin == "SATELITAL":
         if id_objeto_monitoreo is None or not tipo_seguimiento_satelital:
             raise HTTPException(
@@ -236,7 +271,7 @@ def _crear_observacion_area_si_aplica(
         )
     id_bitacora_db = int(bitacora_row["id_bitacora"])
 
-    bao = settings.BAO_TABLE
+    bao = _resolve_bao_table(db)
     existe = db.execute(
         text(f"SELECT 1 FROM {bao} WHERE id_empleado=:e AND id_supervisor=:s AND ts_in_min=:t LIMIT 1"),
         {"e": id_empleado, "s": id_supervisor, "t": ts_in_min},

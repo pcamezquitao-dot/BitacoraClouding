@@ -44,7 +44,7 @@ def search_participantes(q: str, db: Session = Depends(get_db)):
            OR UPPER(COALESCE(nombre, '')) LIKE :pattern
            OR UPPER(COALESCE(apellido, '')) LIKE :pattern
            OR UPPER(CONCAT_WS(' ', nombre, apellido)) LIKE :pattern
-        ORDER BY nombre, apellido, id_participante
+        ORDER BY id_participante
         LIMIT 25
     """)
     rows = db.execute(

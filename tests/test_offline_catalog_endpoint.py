@@ -6,6 +6,16 @@ from app.routers.catalogos import catalogos_offline
 
 
 class OfflineCatalogEndpointTest(unittest.TestCase):
+    def test_participant_query_uses_only_configured_participante_table(self):
+        db = MagicMock()
+        empty = MagicMock()
+        empty.mappings.return_value.all.return_value = []
+        db.execute.return_value = empty
+        with patch("app.routers.catalogos.participant_document_expression", return_value="NULL"):
+            catalogos_offline(db)
+        participant_sql = str(db.execute.call_args_list[0].args[0])
+        self.assertIn("FROM participante", participant_sql)
+
     def test_openapi_expone_un_solo_endpoint_de_catalogos(self):
         schema = app.openapi()
         self.assertIn("/catalogos/offline", schema["paths"])
@@ -40,6 +50,7 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
         assignment_result = MagicMock()
         assignment_result.mappings.return_value.all.return_value = [
             {
+                "id_empleado_area": 9,
                 "id_participante": 2,
                 "id_area": 3,
                 "cargo": 1,
@@ -58,11 +69,14 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
                 "capacidades": "EMPLEADO",
             }
         ]
+        calendar_result = MagicMock()
+        calendar_result.mappings.return_value.all.return_value = []
         db.execute.side_effect = [
             participant_result,
             area_result,
             assignment_result,
             type_result,
+            calendar_result,
         ]
 
         with patch(
@@ -79,7 +93,8 @@ class OfflineCatalogEndpointTest(unittest.TestCase):
             ["EMPLEADO"],
             result["tipos_participante"][0]["capacidades"],
         )
-        self.assertEqual(4, db.execute.call_count)
+        self.assertEqual([], result["calendario"])
+        self.assertEqual(5, db.execute.call_count)
         db.commit.assert_not_called()
 
         assignment_sql = str(db.execute.call_args_list[2].args[0]).upper()

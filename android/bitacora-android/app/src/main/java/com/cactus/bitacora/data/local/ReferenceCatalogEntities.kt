@@ -19,7 +19,15 @@ data class ParticipanteLocalEntity(
     val documento: String?,
     val activo: Boolean = true,
     val updatedAtServer: String? = null,
-    val syncedAtMillis: Long
+    val syncedAtMillis: Long,
+    val tipoDocumento: Int = 1,
+    val fechaNacimiento: String? = null,
+    val sexo: String? = null,
+    val fechaEntrada: String? = null,
+    val fechaSalida: String? = null,
+    val observaciones: String? = null,
+    val email: String? = null,
+    val pendingAdminUpdate: Boolean = false
 )
 
 @Entity(
@@ -43,7 +51,7 @@ data class AreaAdministrativaLocalEntity(
 
 @Entity(
     tableName = "empleado_area_locales",
-    primaryKeys = ["idParticipante", "idArea"],
+    primaryKeys = ["idEmpleadoArea"],
     indices = [
         Index(value = ["idParticipante"]),
         Index(value = ["idArea"]),
@@ -58,7 +66,8 @@ data class EmpleadoAreaLocalEntity(
     val activo: Boolean = true,
     val updatedAtServer: String? = null,
     val syncedAtMillis: Long,
-    val fechaInicia: String? = null
+    val fechaInicia: String? = null,
+    val idEmpleadoArea: Int = -(idParticipante * 1_000_000 + idArea)
 )
 
 @Entity(
@@ -81,6 +90,28 @@ data class TipoParticipanteLocalEntity(
             .toSet()
 }
 
+@Entity(
+    tableName = "calendario_general_local",
+    primaryKeys = ["idPeriodo"],
+    indices = [Index(value = ["idPadre"]), Index(value = ["nivel"]), Index(value = ["activo"])]
+)
+data class CalendarioGeneralLocalEntity(
+    val idPeriodo: Long,
+    val idPadre: Long?,
+    val nivel: String,
+    val codigo: String,
+    val nombre: String,
+    val fechaInicio: String,
+    val fechaFin: String,
+    val numeroDiaSemana: Int?,
+    val nombreDiaSemana: String?,
+    val esFinSemana: Boolean?,
+    val esFestivo: Boolean,
+    val nombreFestivo: String?,
+    val activo: Boolean,
+    val syncedAtMillis: Long
+)
+
 @Entity(tableName = "catalog_sync_state")
 data class CatalogSyncStateEntity(
     @androidx.room.PrimaryKey val catalogKey: String = "reference_catalogs",
@@ -89,5 +120,6 @@ data class CatalogSyncStateEntity(
     val areaCount: Int = 0,
     val assignmentCount: Int = 0,
     val participantTypeCount: Int = 0,
+    val calendarCount: Int = 0,
     val lastError: String? = null
 )

@@ -7,6 +7,8 @@ import androidx.room.Upsert
 
 @Dao
 interface ReferenceCatalogDao {
+    @Query("SELECT * FROM participantes_locales WHERE activo = 1 ORDER BY idParticipante")
+    suspend fun activeParticipants(): List<ParticipanteLocalEntity>
     @Query("SELECT * FROM participantes_locales WHERE codigoQr = :code LIMIT 1")
     suspend fun participantByCode(code: String): ParticipanteLocalEntity?
 
@@ -24,6 +26,12 @@ interface ReferenceCatalogDao {
 
     @Query("SELECT * FROM tipos_participante_locales ORDER BY descripcion, codigo")
     suspend fun participantTypes(): List<TipoParticipanteLocalEntity>
+
+    @Query("SELECT * FROM empleado_area_locales WHERE activo = 1 ORDER BY idArea, idParticipante")
+    suspend fun activeAssignments(): List<EmpleadoAreaLocalEntity>
+
+    @Query("SELECT * FROM calendario_general_local WHERE activo = 1 ORDER BY fechaInicio, idPeriodo")
+    suspend fun activeCalendar(): List<CalendarioGeneralLocalEntity>
 
     @Query(
         "SELECT * FROM empleado_area_locales " +
@@ -46,6 +54,24 @@ interface ReferenceCatalogDao {
     @Upsert
     suspend fun upsertParticipant(item: ParticipanteLocalEntity)
 
+    @Query("""
+        UPDATE participantes_locales SET tipoDocumento=:tipoDocumento, documento=:documento,
+            codigoQr=:codigo, nombre=:nombre, apellido=:apellido,
+            fechaNacimiento=:fechaNacimiento, sexo=:sexo, fechaEntrada=:fechaEntrada,
+            fechaSalida=:fechaSalida, observaciones=:observaciones, email=:email,
+            activo=:activo, pendingAdminUpdate=:pending
+        WHERE idParticipante=:id
+    """)
+    suspend fun updateAdminParticipant(
+        id: Int, tipoDocumento: Int, documento: String, codigo: String, nombre: String,
+        apellido: String?, fechaNacimiento: String?, sexo: String?, fechaEntrada: String?,
+        fechaSalida: String?, observaciones: String?, email: String?, activo: Boolean,
+        pending: Boolean
+    ): Int
+
+    @Query("SELECT * FROM participantes_locales WHERE pendingAdminUpdate = 1 ORDER BY idParticipante")
+    suspend fun pendingAdminParticipants(): List<ParticipanteLocalEntity>
+
     @Upsert
     suspend fun upsertArea(item: AreaAdministrativaLocalEntity)
 
@@ -65,6 +91,9 @@ interface ReferenceCatalogDao {
     suspend fun upsertParticipantTypes(items: List<TipoParticipanteLocalEntity>)
 
     @Upsert
+    suspend fun upsertCalendar(items: List<CalendarioGeneralLocalEntity>)
+
+    @Upsert
     suspend fun upsertSyncState(state: CatalogSyncStateEntity)
 
     @Query("UPDATE participantes_locales SET activo = 0")
@@ -79,6 +108,9 @@ interface ReferenceCatalogDao {
     @Query("UPDATE tipos_participante_locales SET activo = 0")
     suspend fun markAllParticipantTypesInactive()
 
+    @Query("UPDATE calendario_general_local SET activo = 0")
+    suspend fun markAllCalendarInactive()
+
     @Query("SELECT COUNT(*) FROM participantes_locales WHERE activo = 1")
     suspend fun participantCount(): Int
 
@@ -91,6 +123,9 @@ interface ReferenceCatalogDao {
     @Query("SELECT COUNT(*) FROM tipos_participante_locales WHERE activo = 1")
     suspend fun participantTypeCount(): Int
 
+    @Query("SELECT COUNT(*) FROM calendario_general_local WHERE activo = 1")
+    suspend fun calendarCount(): Int
+
     @Query("SELECT * FROM catalog_sync_state WHERE catalogKey = 'reference_catalogs' LIMIT 1")
     suspend fun syncState(): CatalogSyncStateEntity?
 
@@ -100,16 +135,19 @@ interface ReferenceCatalogDao {
         areas: List<AreaAdministrativaLocalEntity>,
         assignments: List<EmpleadoAreaLocalEntity>,
         participantTypes: List<TipoParticipanteLocalEntity>,
-        state: CatalogSyncStateEntity
+        state: CatalogSyncStateEntity,
+        calendar: List<CalendarioGeneralLocalEntity> = emptyList()
     ) {
         markAllParticipantsInactive()
         markAllAreasInactive()
         markAllAssignmentsInactive()
         markAllParticipantTypesInactive()
+        markAllCalendarInactive()
         upsertParticipants(participants)
         upsertAreas(areas)
         upsertAssignments(assignments)
         upsertParticipantTypes(participantTypes)
+        upsertCalendar(calendar)
         upsertSyncState(state)
     }
 }

@@ -325,6 +325,7 @@ fun AdminCatalogScreen(
     var actor by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var participantRefreshToken by remember { mutableStateOf(0) }
     var types by remember { mutableStateOf<List<ParticipantTypeAdminOut>>(emptyList()) }
     var areas by remember { mutableStateOf<List<AreaTreeNodeOut>>(emptyList()) }
     var typeDescription by remember { mutableStateOf("") }
@@ -727,6 +728,21 @@ fun AdminCatalogScreen(
         }
     }
 
+    fun refreshParticipants() {
+        loading = true
+        message = null
+        scope.launch {
+            val result = repository.syncParticipants()
+            if (result.success) {
+                participantRefreshToken++
+                message = "Participantes actualizados: ${result.participants}"
+            } else {
+                message = result.error ?: "No fue posible actualizar participantes"
+            }
+            loading = false
+        }
+    }
+
     LaunchedEffect(section) {
         if (section == AdminMasterSection.ADMINISTRATIVE_AREAS) {
             loadAreas()
@@ -790,7 +806,7 @@ fun AdminCatalogScreen(
             enabled = !loading,
             onClick = {
                 when (section) {
-                    AdminMasterSection.PARTICIPANTS -> Unit
+                    AdminMasterSection.PARTICIPANTS -> refreshParticipants()
                     AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
                     AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
                     AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
@@ -802,7 +818,11 @@ fun AdminCatalogScreen(
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
         if (section == AdminMasterSection.PARTICIPANTS) {
-            ParticipantsAdminPanel(repository = repository, actor = actor)
+            ParticipantsAdminPanel(
+                repository = repository,
+                actor = actor,
+                refreshToken = participantRefreshToken
+            )
         }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {

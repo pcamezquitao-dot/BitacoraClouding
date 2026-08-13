@@ -50,6 +50,7 @@ class BitacoraRepository(
     context: Context,
     private val api: BitacoraApi = Api.create()
 ) {
+    private val supervisorPreferences = context.getSharedPreferences("supervisor_session", Context.MODE_PRIVATE)
     private val database = BitacoraDatabase.getInstance(context)
     private val bitacoraDao: BitacoraDao =
         database.bitacoraDao()
@@ -61,21 +62,98 @@ class BitacoraRepository(
 
     private companion object {
         val syncMutex = Mutex()
+        const val CATALOG_NOT_SYNCED_MESSAGE =
+            "Este catálogo todavía no ha sido sincronizado. Conéctese y pulse Actualizar."
     }
 
     suspend fun checkHealth() =
         api.health()
 
-    suspend fun adminParticipants(search: String, offset: Int = 0, limit: Int = 50) =
-        api.getAdminParticipants(search.trim(), offset, limit)
+    fun savedSupervisorCode(): String? = supervisorPreferences.getString("code", null)
+    fun clearSupervisorSession() = supervisorPreferences.edit().clear().apply()
+
+    suspend fun identifySupervisor(code: String): com.cactus.bitacora.model.SupervisorSessionOut {
+        val normalized = normalizeCatalogCode(code)
+        val session = try {
+            api.identifySupervisor(com.cactus.bitacora.model.SupervisorIdentifyIn(normalized))
+        } catch (error: Exception) {
+            if (error is IOException || error is HttpException && (error.code() == 404 || error.code() >= 500)) {
+                referenceCatalogRepository.localSupervisorSession(normalized)
+            } else throw error
+        }
+        supervisorPreferences.edit().putString("code", session.codigo).apply()
+        return session
+    }
+
+    suspend fun supervisedParticipants(code: String): List<com.cactus.bitacora.model.SupervisedParticipantOut> =
+        try { api.getSupervisedParticipants(code) }
+        catch (error: Exception) {
+            if (error is IOException || error is HttpException && (error.code() == 404 || error.code() >= 500)) {
+                referenceCatalogRepository.localSupervisedParticipants(code)
+            } else throw error
+        }
+
+    suspend fun supervisorTodayMovements(code: String) = api.getSupervisorTodayMovements(code)
+
+    suspend fun createSupervisorMovement(
+        session: com.cactus.bitacora.model.SupervisorSessionOut,
+        participant: com.cactus.bitacora.model.SupervisedParticipantOut,
+        type: String
+    ): CreateBitacoraResult {
+        val timestamp = (System.currentTimeMillis() / 60_000L).toInt()
+        return crearBitacoraDiaria(
+            BitacoraDiariaCreate(
+                id_empleado = participant.id_participante,
+                id_supervisor = session.id_supervisor,
+                ts_in_min = timestamp,
+                ts_out_min = timestamp.takeIf { type == "SALIDA" },
+                tipo_anotacion = if (type == "ENTRADA") 4 else 5,
+                client_uuid = java.util.UUID.randomUUID().toString(),
+                qr_area = "AREA_ADMINISTRATIVA|${participant.id_area}|${participant.area}",
+                origen_bitacora = "SUPERVISOR"
+            )
+        )
+    }
+
+    suspend fun adminParticipants(search: String): com.cactus.bitacora.model.ParticipantAdminPage {
+        var local = referenceCatalogRepository.localAdminParticipants(search)
+        if (local.total == 0 && search.isBlank()) {
+            referenceCatalogRepository.syncCatalogs()
+            local = referenceCatalogRepository.localAdminParticipants(search)
+            if (local.total == 0) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+        }
+        return local
+    }
 
     suspend fun adminDocumentTypes() = api.getAdminDocumentTypes()
 
     suspend fun createAdminParticipant(actor: String, payload: ParticipantAdminIn) =
         api.createAdminParticipant(actor.trim(), Build.MODEL, payload)
 
-    suspend fun updateAdminParticipant(actor: String, id: Int, payload: ParticipantAdminIn) =
-        api.updateAdminParticipant(actor.trim(), Build.MODEL, id, payload)
+    suspend fun updateAdminParticipant(
+        actor: String,
+        id: Int,
+        payload: ParticipantAdminIn
+    ): ParticipantUpdateResult {
+        val local = referenceCatalogRepository.updateAdminParticipantLocal(id, payload)
+        return try {
+            val currentRemote = api.getAdminParticipantDetail(id)
+            val completePayload = payload.normalizedNulls().completeForServer(currentRemote)
+            val remote = api.updateAdminParticipant(actor.trim(), Build.MODEL, id, completePayload)
+            ParticipantUpdateResult(
+                referenceCatalogRepository.markAdminParticipantSynced(id, remote), true
+            )
+        } catch (error: Exception) {
+            val explanation = if (error is HttpException) {
+                val detail = error.response()?.errorBody()?.string()
+                    ?.take(600)?.takeIf(String::isNotBlank)
+                "HTTP ${error.code()}: ${detail ?: "el servidor rechazó la actualización"}"
+            } else {
+                "No fue posible sincronizar con el servidor"
+            }
+            ParticipantUpdateResult(local, false, explanation)
+        }
+    }
 
     suspend fun retireAdminParticipant(actor: String, id: Int) =
         api.retireAdminParticipant(actor.trim(), Build.MODEL, id)
@@ -124,6 +202,14 @@ class BitacoraRepository(
     )
 
     suspend fun adminAreaTree(actor: String): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
+        var localAreas = referenceCatalogRepository.localAreaTree()
+        if (localAreas.isEmpty()) {
+            referenceCatalogRepository.syncCatalogs()
+            localAreas = referenceCatalogRepository.localAreaTree()
+            if (localAreas.isEmpty()) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+        }
+        return localAreas
+        @Suppress("UNREACHABLE_CODE")
         val url = "${AppConfig.BASE_URL}admin/areas/arbol"
         val normalizedActor = actor.trim().ifBlank { "administrador-consulta" }
         Log.i("AdminAreaTree", "URL consultada: $url")
@@ -161,17 +247,26 @@ class BitacoraRepository(
         }
     }
 
-    suspend fun adminCalendarTree(actor: String): List<CalendarTreeNodeOut> =
-        adminMutation(
-            action = "CALENDAR_TREE",
-            areaId = null,
-            endpoint = "${AppConfig.BASE_URL}admin/calendario/arbol"
-        ) {
-            api.getAdminCalendarTree(
-                actor.trim().ifBlank { "administrador-consulta" },
-                Build.MODEL
-            )
-        }.orEmpty()
+    suspend fun adminCalendarTree(actor: String): List<CalendarTreeNodeOut> {
+        var local = referenceCatalogRepository.localCalendarTree()
+        if (local.isEmpty()) {
+            referenceCatalogRepository.syncCatalogs()
+            local = referenceCatalogRepository.localCalendarTree()
+            if (local.isEmpty()) {
+                val response = runCatching {
+                    api.getAdminCalendarTree(
+                        actor.trim().ifBlank { "administrador-consulta" }, Build.MODEL
+                    )
+                }.getOrNull()
+                if (response?.isSuccessful == true) {
+                    referenceCatalogRepository.cacheCalendarTree(response.body().orEmpty())
+                    local = referenceCatalogRepository.localCalendarTree()
+                }
+            }
+            if (local.isEmpty()) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+        }
+        return local
+    }
 
     suspend fun updateAdminCalendarHoliday(
         actor: String,
@@ -249,47 +344,28 @@ class BitacoraRepository(
         payload
     )
 
-    suspend fun adminEmployeeAreaTree(actor: String): List<EmployeeAreaTreeNodeOut> =
-        adminMutation(
-            action = "EMPLOYEE_AREA_TREE",
-            areaId = null,
-            endpoint = "${AppConfig.BASE_URL}admin/empleado-area/tree"
-        ) {
-            api.getAdminEmployeeAreaTree(
-                actor.trim().ifBlank { "administrador-consulta" },
-                Build.MODEL
-            )
-        }.orEmpty()
+    suspend fun adminEmployeeAreaTree(actor: String): List<EmployeeAreaTreeNodeOut> {
+        var local = referenceCatalogRepository.localEmployeeAreaTree()
+        if (local.isEmpty()) {
+            referenceCatalogRepository.syncCatalogs()
+            local = referenceCatalogRepository.localEmployeeAreaTree()
+            if (local.isEmpty()) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+        }
+        return local
+    }
 
     suspend fun adminEmployeeAreaTypes(
         actor: String
     ): List<com.cactus.bitacora.model.ParticipantTypeAdminOut> =
-        adminMutation(
-            action = "EMPLOYEE_AREA_TYPES",
-            areaId = null,
-            endpoint = "${AppConfig.BASE_URL}admin/empleado-area/tipos-participante"
-        ) {
-            api.getAdminEmployeeAreaTypes(
-                actor.trim().ifBlank { "administrador-consulta" },
-                Build.MODEL
-            )
-        }.orEmpty()
+        referenceCatalogRepository.localParticipantTypes()
 
     suspend fun adminParticipantOptions(
         actor: String,
         search: String = ""
-    ): List<ParticipantOptionOut> =
-        adminMutation(
-            action = "PARTICIPANT_OPTIONS",
-            areaId = null,
-            endpoint = "${AppConfig.BASE_URL}admin/participantes/options"
-        ) {
-            api.getAdminParticipantOptions(
-                actor.trim().ifBlank { "administrador-consulta" },
-                Build.MODEL,
-                search
-            )
-        }.orEmpty()
+    ): List<ParticipantOptionOut> = referenceCatalogRepository.localParticipantOptions().filter {
+        search.isBlank() || it.nombre_completo.contains(search, ignoreCase = true) ||
+            it.codigo.contains(search, ignoreCase = true)
+    }
 
     suspend fun updateAdminEmployeeArea(
         actor: String,
@@ -481,6 +557,8 @@ class BitacoraRepository(
 
     suspend fun syncReferenceCatalogs() = referenceCatalogRepository.syncCatalogs()
 
+    suspend fun syncParticipants() = referenceCatalogRepository.syncParticipants()
+
     suspend fun getCatalogStatus() = referenceCatalogRepository.status()
 
     suspend fun crearBitacoraDiaria(
@@ -587,6 +665,25 @@ class BitacoraRepository(
             errores++
             if (catalogSync.retryable) reintentables++
             catalogSync.error?.let { mensajes += "Catálogos: $it" }
+        }
+        referenceCatalogRepository.pendingAdminParticipantUpdates().forEach { (id, payload) ->
+            try {
+                val currentRemote = api.getAdminParticipantDetail(id)
+                val remote = api.updateAdminParticipant(
+                    "sincronizacion-offline", Build.MODEL, id,
+                    payload.normalizedNulls().completeForServer(currentRemote)
+                )
+                referenceCatalogRepository.markAdminParticipantSynced(id, remote)
+                sincronizados++
+            } catch (error: Exception) {
+                errores++
+                if (error is IOException || error is HttpException && error.code() >= 500) reintentables++
+                mensajes += if (error is HttpException) {
+                    "Participante $id: HTTP ${error.code()} al sincronizar"
+                } else {
+                    "Participante $id: pendiente de sincronización"
+                }
+            }
         }
 
         pendientes.forEach { local ->
@@ -997,6 +1094,24 @@ sealed interface CreateBitacoraResult {
     data class Sincronizada(val localId: Long, val bitacora: BitacoraDiariaOut) : CreateBitacoraResult
     data class Pendiente(val localId: Long, val message: String) : CreateBitacoraResult
 }
+
+internal fun ParticipantAdminIn.normalizedNulls() = copy(
+    apellido = apellido?.trim()?.ifBlank { null },
+    fecha_nacimiento = fecha_nacimiento?.trim()?.ifBlank { null },
+    sexo = sexo?.trim()?.uppercase()?.ifBlank { null },
+    fecha_entrada = fecha_entrada?.trim()?.ifBlank { null },
+    fecha_salida = fecha_salida?.trim()?.ifBlank { null },
+    observaciones = observaciones?.trim()?.ifBlank { null },
+    email = email?.trim()?.ifBlank { null }
+)
+
+internal fun ParticipantAdminIn.completeForServer(current: com.cactus.bitacora.model.ParticipantAdminOut) =
+    copy(
+        apellido = apellido?.takeIf(String::isNotBlank) ?: current.apellido,
+        fecha_nacimiento = fecha_nacimiento?.takeIf(String::isNotBlank)
+            ?: current.fecha_nacimiento,
+        sexo = sexo?.takeIf(String::isNotBlank) ?: current.sexo
+    )
 
 data class SyncSummary(
     val bitacorasPendientes: Int,

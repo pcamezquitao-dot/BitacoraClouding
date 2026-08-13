@@ -54,7 +54,7 @@ def list_participants(db: Session, search: str, offset: int, limit: int) -> dict
     rows = db.execute(text(f"""SELECT id_participante,tipo_documento,documento,
         identificacion_participante,nombre,apellido,fecha_nacimiento,sexo,
         fecha_entrada,fecha_salida,observaciones,email FROM participante {where}
-        ORDER BY apellido,nombre,id_participante LIMIT :limit OFFSET :offset"""), params).mappings().all()
+        ORDER BY id_participante LIMIT :limit OFFSET :offset"""), params).mappings().all()
     return {"items": [_out(row) for row in rows], "total": total, "offset": offset, "limit": limit}
 
 

@@ -61,6 +61,54 @@ data class SupervisorEmpleadoOut(
     val id_supervisor: Int
 )
 
+data class SupervisorIdentifyIn(val codigo: String)
+data class SupervisorAreaOut(val id_area: Int, val area: String)
+data class SupervisorSessionOut(
+    val id_supervisor: Int,
+    val codigo: String,
+    val nombre_completo: String,
+    val estado: String,
+    val areas: List<SupervisorAreaOut>
+)
+data class SupervisedParticipantOut(
+    val id_participante: Int,
+    val codigo: String,
+    val nombre: String? = null,
+    val apellido: String? = null,
+    val id_area: Int,
+    val area: String
+)
+data class SupervisorMovementIn(
+    val codigo_supervisor: String,
+    val id_participante: Int,
+    val id_area: Int,
+    val tipo: String,
+    val timestamp_min: Int? = null,
+    val client_uuid: String,
+    val dispositivo: String? = null
+)
+data class SupervisorMovementOut(
+    val id_bitacora: Int,
+    val id_participante: Int,
+    val id_supervisor: Int,
+    val id_area: Int,
+    val tipo: String,
+    val timestamp_min: Int,
+    val client_uuid: String
+)
+data class SupervisorTodayMovementOut(
+    val id_bitacora: Int,
+    val id_participante: Int,
+    val id_supervisor: Int,
+    val id_area: Int,
+    val tipo: String,
+    val timestamp_min: Int,
+    val client_uuid: String,
+    val codigo_participante: String,
+    val nombre_completo: String,
+    val area: String
+)
+
 data class BitacoraDiariaSyncOut(
     val id_bitacora: Int,
     val id_empleado: Int,
@@ -160,7 +208,8 @@ data class CatalogAssignmentOut(
     val fecha_inicia: String? = null,
     val fecha_final: String? = null,
     val activo: Boolean = true,
-    val updated_at: String? = null
+    val updated_at: String? = null,
+    val id_empleado_area: Int = -(id_participante * 1_000_000 + id_area)
 )
 
 data class CatalogParticipantTypeOut(
@@ -175,7 +224,24 @@ data class OfflineCatalogOut(
     val participantes: List<CatalogParticipantOut>,
     val areas: List<CatalogAreaOut>,
     val empleado_areas: List<CatalogAssignmentOut>,
-    val tipos_participante: List<CatalogParticipantTypeOut> = emptyList()
+    val tipos_participante: List<CatalogParticipantTypeOut> = emptyList(),
+    val calendario: List<CatalogCalendarPeriodOut> = emptyList()
+)
+
+data class CatalogCalendarPeriodOut(
+    val id_periodo: Long,
+    val id_padre: Long? = null,
+    val nivel: String,
+    val codigo: String,
+    val nombre: String,
+    val fecha_inicio: String,
+    val fecha_fin: String,
+    val numero_dia_semana: Int? = null,
+    val nombre_dia_semana: String? = null,
+    val es_fin_semana: Boolean? = null,
+    val es_festivo: Boolean = false,
+    val nombre_festivo: String? = null,
+    val activo: Boolean = true
 )
 
 data class ParticipantTypeAdminOut(
@@ -300,9 +366,9 @@ data class ParticipantAdminIn(
     val documento: String,
     val identificacion_participante: String,
     val nombre: String,
-    val apellido: String,
-    val fecha_nacimiento: String,
-    val sexo: String,
+    val apellido: String? = null,
+    val fecha_nacimiento: String? = null,
+    val sexo: String? = null,
     val fecha_entrada: String? = null,
     val fecha_salida: String? = null,
     val observaciones: String? = null,
@@ -315,9 +381,9 @@ data class ParticipantAdminOut(
     val documento: String,
     val identificacion_participante: String,
     val nombre: String,
-    val apellido: String,
-    val fecha_nacimiento: String,
-    val sexo: String,
+    val apellido: String? = null,
+    val fecha_nacimiento: String? = null,
+    val sexo: String? = null,
     val fecha_entrada: String? = null,
     val fecha_salida: String? = null,
     val observaciones: String? = null,

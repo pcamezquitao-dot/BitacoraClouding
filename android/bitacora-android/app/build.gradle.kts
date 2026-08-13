@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 31
-        versionName = "maria29-participante-observaciones-scroll"
+        versionCode = 32
+        versionName = "maria30-modo-supervisor-fase2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

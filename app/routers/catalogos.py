@@ -44,7 +44,7 @@ def catalogos_offline(db: Session = Depends(get_db)):
     asignaciones = db.execute(
         text(
             f"""
-            SELECT id_participante, id_area, cargo,
+            SELECT id_empleado_area, id_participante, id_area, cargo,
                    fecha_inicia, fecha_final,
                    TRUE AS activo, NULL AS updated_at
             FROM {empleado_area}
@@ -69,6 +69,19 @@ def catalogos_offline(db: Session = Depends(get_db)):
             """
         )
     ).mappings().all()
+    calendario = db.execute(
+        text(
+            """
+            SELECT id_periodo, id_padre, nivel, codigo, nombre,
+                   fecha_inicio, fecha_fin, numero_dia_semana,
+                   nombre_dia_semana, es_fin_semana, es_festivo,
+                   nombre_festivo, activo
+            FROM dimension_calendario
+            WHERE activo = TRUE
+            ORDER BY orden_periodo, fecha_inicio, id_periodo
+            """
+        )
+    ).mappings().all()
     return {
         "generated_at": datetime.now(timezone.utc),
         "participantes": participantes,
@@ -86,4 +99,5 @@ def catalogos_offline(db: Session = Depends(get_db)):
             }
             for row in tipos_rows
         ],
+        "calendario": calendario,
     }

@@ -669,7 +669,7 @@ def list_employee_area_tree(db: Session) -> list[dict]:
             WHERE ea.activo = TRUE
               AND ea.fecha_inicia <= CURDATE()
               AND (ea.fecha_final IS NULL OR ea.fecha_final >= CURDATE())
-            ORDER BY p.apellido, p.nombre, p.id_participante
+            ORDER BY p.id_participante
             """
         )
     ).mappings().all()
@@ -729,7 +729,7 @@ def list_participant_options(db: Session, search: str) -> list[dict]:
                   OR UPPER(apellido) LIKE :pattern
                   OR UPPER(CONCAT_WS(' ', nombre, apellido)) LIKE :pattern
               )
-            ORDER BY apellido, nombre, id_participante
+            ORDER BY id_participante
             LIMIT 100
             """
         ),

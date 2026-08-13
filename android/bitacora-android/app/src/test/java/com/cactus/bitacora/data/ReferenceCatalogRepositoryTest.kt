@@ -12,6 +12,9 @@ import com.cactus.bitacora.model.CatalogParticipantOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.OfflineCatalogOut
 import com.cactus.bitacora.model.ParticipanteOut
+import com.cactus.bitacora.model.ParticipantAdminIn
+import com.cactus.bitacora.model.ParticipantAdminOut
+import com.cactus.bitacora.model.ParticipantAdminPage
 import java.io.IOException
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.runBlocking
@@ -21,6 +24,48 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReferenceCatalogRepositoryTest {
+    @Test
+    fun supervisorModeResolvesCargoTwoOnceAndIncludesOwnAndDescendantAreas() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participantTypes[1] = participantType(1, "operario")
+            participantTypes[2] = participantType(2, "supervisor")
+            participantTypes[3] = participantType(3, "directivo")
+            participants[2] = participant(2, "P0002")
+            participants[10] = participant(10, "P0010")
+            participants[11] = participant(11, "P0011")
+            participants[12] = participant(12, "P0012").copy(activo = false)
+            areas[2] = area(2)
+            areas[10] = area(10).copy(idPadre = 2)
+            areas[20] = area(20)
+            assignments[2 to 2] = assignment(2, 2, 2)
+            assignments[10 to 10] = assignment(10, 10, 1)
+            assignments[11 to 20] = assignment(11, 20, 1)
+            assignments[12 to 10] = assignment(12, 10, 1)
+        }
+        val repository = repository(dao, FakeCatalogApi(failNetwork = true))
+
+        assertEquals(2, repository.supervisorTypeCode())
+        assertEquals(2, repository.localSupervisorSession(" p0002 ").id_supervisor)
+        assertEquals(listOf(2, 10), repository.localSupervisedParticipants("P0002")
+            .map { it.id_participante })
+    }
+
+    @Test
+    fun participantMasterReturnsAll513RowsInNumericIdOrder() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            (513 downTo 1).forEach { id ->
+                participants[id] = participant(id, "P${id.toString().padStart(4, '0')}")
+            }
+        }
+        val repository = repository(dao, FakeCatalogApi())
+
+        val page = repository.localAdminParticipants("")
+
+        assertEquals(513, page.total)
+        assertEquals(513, page.items.size)
+        assertEquals((1..513).toList(), page.items.map { it.id_participante })
+    }
+
     @Test
     fun employeeAndSupervisorValidateLocallyWithoutNetwork() = runBlocking {
         val dao = FakeCatalogDao().apply {
@@ -139,6 +184,57 @@ class ReferenceCatalogRepositoryTest {
         assertEquals(1, dao.participantCount())
     }
 
+    @Test
+    fun participantRefreshReplacesFakeLocalNameWithServerValue() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[1] = participant(1, "P0001").copy(
+                nombre = "Nombre1", apellido = "Apellido1", documento = "000001"
+            )
+        }
+        val realSnapshot = snapshot().copy(
+            participantes = listOf(
+                CatalogParticipantOut(1, "P0001", "ALVARO", "BERNAL BAYONA ALVARO", "1042592")
+            )
+        )
+        val result = repository(dao, FakeCatalogApi(snapshot = realSnapshot)).syncParticipants()
+        assertTrue(result.success)
+        assertEquals(1, result.participants)
+        assertEquals("ALVARO", dao.participants[1]!!.nombre)
+        assertEquals("1042592", dao.participants[1]!!.documento)
+    }
+
+    @Test
+    fun failedParticipantRefreshPreservesLocalCatalog() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[1] = participant(1, "P0001").copy(nombre = "Nombre1")
+        }
+        val result = repository(dao, FakeCatalogApi(failNetwork = true)).syncParticipants()
+        assertEquals(false, result.success)
+        assertEquals("Nombre1", dao.participants[1]!!.nombre)
+    }
+
+    @Test
+    fun offlineParticipantUpdatePreservesIdAndOtherRows() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            participants[3] = participant(3, "P0003")
+        }
+        val repository = repository(dao, FakeCatalogApi(failNetwork = true))
+        val result = repository.updateAdminParticipantLocal(
+            2, ParticipantAdminIn(1, "123", "P0002", "Patricia editada", null,
+                null, null, null, null, "Observación local")
+        )
+        assertEquals(2, result.id_participante)
+        assertEquals("Patricia editada", result.nombre)
+        assertEquals("Nombre", dao.participants[3]!!.nombre)
+        assertEquals(2, dao.participants.size)
+        assertTrue(dao.participants[2]!!.pendingAdminUpdate)
+
+        val restarted = repository(dao, FakeCatalogApi(failNetwork = true))
+        assertEquals("Patricia editada", restarted.localAdminParticipants("", 0, 50).items
+            .first { it.id_participante == 2 }.nombre)
+    }
+
     private fun repository(dao: FakeCatalogDao, api: FakeCatalogApi) =
         ReferenceCatalogRepository(null, api.proxy(), dao)
 }
@@ -157,6 +253,16 @@ private class FakeCatalogApi(
         calls++
         if (failNetwork) throw IOException("sin red")
         when (method.name) {
+            "getAdminParticipants" -> {
+                val items = snapshot?.participantes.orEmpty().map {
+                    ParticipantAdminOut(
+                        it.id_participante, 1, it.documento.orEmpty(),
+                        it.identificacion_participante, it.nombre.orEmpty(), it.apellido,
+                        null, null, null, null, null, null, it.activo
+                    )
+                }
+                ParticipantAdminPage(items, items.size, 0, 100)
+            }
             "getParticipanteByQr" -> participant
                 ?: throw IOException("participante no configurado")
             "getOfflineCatalogs" -> snapshot ?: snapshot()
@@ -168,12 +274,16 @@ private class FakeCatalogApi(
 }
 
 private class FakeCatalogDao : ReferenceCatalogDao {
+    val calendar = linkedMapOf<Long, com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity>()
     val participants = linkedMapOf<Int, ParticipanteLocalEntity>()
     val areas = linkedMapOf<Int, AreaAdministrativaLocalEntity>()
     val assignments = linkedMapOf<Pair<Int, Int>, EmpleadoAreaLocalEntity>()
     val participantTypes =
         linkedMapOf<Int, com.cactus.bitacora.data.local.TipoParticipanteLocalEntity>()
     var state: CatalogSyncStateEntity? = null
+
+    override suspend fun activeParticipants() =
+        participants.values.filter { it.activo }.sortedBy { it.idParticipante }
 
     override suspend fun participantByCode(code: String) =
         participants.values.firstOrNull { it.codigoQr == code }
@@ -183,6 +293,8 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun activeAreas() =
         areas.values.filter { it.activo }.sortedBy { it.nombreArea }
     override suspend fun participantTypes() = participantTypes.values.toList()
+    override suspend fun activeAssignments() = assignments.values.filter { it.activo }
+    override suspend fun activeCalendar() = calendar.values.filter { it.activo }
     override suspend fun activeAssignmentsForParticipant(participantId: Int) =
         assignments.values.filter { it.idParticipante == participantId && it.activo }
     override suspend fun activeAssignmentsForArea(areaId: Int) =
@@ -192,6 +304,23 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun upsertParticipant(item: ParticipanteLocalEntity) {
         participants[item.idParticipante] = item
     }
+    override suspend fun updateAdminParticipant(
+        id: Int, tipoDocumento: Int, documento: String, codigo: String, nombre: String,
+        apellido: String?, fechaNacimiento: String?, sexo: String?, fechaEntrada: String?,
+        fechaSalida: String?, observaciones: String?, email: String?, activo: Boolean,
+        pending: Boolean
+    ): Int {
+        val current = participants[id] ?: return 0
+        participants[id] = current.copy(
+            tipoDocumento = tipoDocumento, documento = documento, codigoQr = codigo,
+            nombre = nombre, apellido = apellido, fechaNacimiento = fechaNacimiento,
+            sexo = sexo, fechaEntrada = fechaEntrada, fechaSalida = fechaSalida,
+            observaciones = observaciones, email = email, activo = activo,
+            pendingAdminUpdate = pending
+        )
+        return 1
+    }
+    override suspend fun pendingAdminParticipants() = participants.values.filter { it.pendingAdminUpdate }
     override suspend fun upsertArea(item: AreaAdministrativaLocalEntity) {
         areas[item.idArea] = item
     }
@@ -209,6 +338,9 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     ) {
         items.forEach { participantTypes[it.codigo] = it }
     }
+    override suspend fun upsertCalendar(items: List<com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity>) {
+        items.forEach { calendar[it.idPeriodo] = it }
+    }
     override suspend fun upsertSyncState(state: CatalogSyncStateEntity) {
         this.state = state
     }
@@ -224,11 +356,15 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun markAllParticipantTypesInactive() {
         participantTypes.replaceAll { _, value -> value.copy(activo = false) }
     }
+    override suspend fun markAllCalendarInactive() {
+        calendar.replaceAll { _, value -> value.copy(activo = false) }
+    }
     override suspend fun participantCount() = participants.values.count { it.activo }
     override suspend fun areaCount() = areas.values.count { it.activo }
     override suspend fun assignmentCount() = assignments.values.count { it.activo }
     override suspend fun participantTypeCount() =
         participantTypes.values.count { it.activo }
+    override suspend fun calendarCount() = calendar.values.count { it.activo }
     override suspend fun syncState() = state
 }
 
@@ -247,6 +383,11 @@ private fun area(id: Int) =
 
 private fun assignment(participantId: Int, areaId: Int, cargo: Int) =
     EmpleadoAreaLocalEntity(participantId, areaId, cargo, null, true, null, 1)
+
+private fun participantType(code: Int, description: String) =
+    com.cactus.bitacora.data.local.TipoParticipanteLocalEntity(
+        code, description, "EMPLEADO", true, 1
+    )
 
 private fun snapshot() = OfflineCatalogOut(
     generated_at = "2026-07-19T00:00:00Z",

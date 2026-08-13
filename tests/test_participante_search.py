@@ -30,6 +30,7 @@ class ParticipanteSearchTest(unittest.TestCase):
         result = search_participantes("Ana", db)
 
         self.assertEqual(expected, result)
+        self.assertIn("ORDER BY id_participante", str(db.execute.call_args.args[0]))
         parameters = db.execute.call_args.args[1]
         self.assertEqual("%ANA%", parameters["pattern"])
 

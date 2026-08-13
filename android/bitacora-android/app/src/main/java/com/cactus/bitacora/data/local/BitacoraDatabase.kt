@@ -17,8 +17,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EmpleadoAreaLocalEntity::class,
         TipoParticipanteLocalEntity::class,
         CatalogSyncStateEntity::class
+        ,CalendarioGeneralLocalEntity::class
     ],
-    version = 13,
+    version = 15,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -50,6 +51,8 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13
+                    ,MIGRATION_13_14,
+                    MIGRATION_14_15
                 ).build().also { instance = it }
             }
 
@@ -358,6 +361,56 @@ abstract class BitacoraDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE bitacoras_locales ADD COLUMN tipoSeguimientoSatelital TEXT"
                 )
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_sync_state ADD COLUMN calendarCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE empleado_area_locales RENAME TO empleado_area_locales_v13")
+                db.execSQL("""
+                    CREATE TABLE empleado_area_locales (
+                        idEmpleadoArea INTEGER NOT NULL PRIMARY KEY, idParticipante INTEGER NOT NULL,
+                        idArea INTEGER NOT NULL, cargo INTEGER, fechaFinal TEXT,
+                        activo INTEGER NOT NULL, updatedAtServer TEXT, syncedAtMillis INTEGER NOT NULL,
+                        fechaInicia TEXT
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO empleado_area_locales
+                    SELECT -(idParticipante * 1000000 + idArea), idParticipante, idArea, cargo,
+                           fechaFinal, activo, updatedAtServer, syncedAtMillis, fechaInicia
+                    FROM empleado_area_locales_v13
+                """.trimIndent())
+                db.execSQL("DROP TABLE empleado_area_locales_v13")
+                db.execSQL("CREATE INDEX index_empleado_area_locales_idParticipante ON empleado_area_locales(idParticipante)")
+                db.execSQL("CREATE INDEX index_empleado_area_locales_idArea ON empleado_area_locales(idArea)")
+                db.execSQL("CREATE INDEX index_empleado_area_locales_activo ON empleado_area_locales(activo)")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS calendario_general_local (
+                        idPeriodo INTEGER NOT NULL PRIMARY KEY, idPadre INTEGER, nivel TEXT NOT NULL,
+                        codigo TEXT NOT NULL, nombre TEXT NOT NULL, fechaInicio TEXT NOT NULL,
+                        fechaFin TEXT NOT NULL, numeroDiaSemana INTEGER, nombreDiaSemana TEXT,
+                        esFinSemana INTEGER, esFestivo INTEGER NOT NULL, nombreFestivo TEXT,
+                        activo INTEGER NOT NULL, syncedAtMillis INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_calendario_general_local_idPadre ON calendario_general_local(idPadre)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_calendario_general_local_nivel ON calendario_general_local(nivel)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_calendario_general_local_activo ON calendario_general_local(activo)")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN tipoDocumento INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN fechaNacimiento TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN sexo TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN fechaEntrada TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN fechaSalida TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN observaciones TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN email TEXT")
+                db.execSQL("ALTER TABLE participantes_locales ADD COLUMN pendingAdminUpdate INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

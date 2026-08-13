@@ -145,6 +145,7 @@ internal enum class AppScreen {
 internal enum class AppEnvironment(val label: String) {
     ADMINISTRADOR("Administrador"),
     CIUDADANO("Ciudadano"),
+    SUPERVISOR("Supervisor"),
     SEGUIMIENTO_SATELITAL("Seguimiento satelital de embalses")
 }
 
@@ -270,7 +271,8 @@ fun BitacoraApp() {
     LaunchedEffect(activeEnvironment, currentScreen) {
         backendOnline = if (
             activeEnvironment == AppEnvironment.ADMINISTRADOR ||
-            activeEnvironment == AppEnvironment.CIUDADANO
+            activeEnvironment == AppEnvironment.CIUDADANO ||
+            activeEnvironment == AppEnvironment.SUPERVISOR
         ) {
             try {
                 repository.checkHealth()
@@ -368,6 +370,11 @@ fun BitacoraApp() {
 
             if (environment == null) {
                 EnvironmentSelectionScreen(onSelect = ::selectEnvironment)
+                return@Column
+            }
+
+            if (environment == AppEnvironment.SUPERVISOR) {
+                SupervisorModeScreen(repository = repository, onExit = ::changeEnvironment)
                 return@Column
             }
 
@@ -619,6 +626,10 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.CIUDADANO) }
         ) { Text("Ciudadano") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.SUPERVISOR) }
+        ) { Text("SUPERVISOR") }
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.SEGUIMIENTO_SATELITAL) }
