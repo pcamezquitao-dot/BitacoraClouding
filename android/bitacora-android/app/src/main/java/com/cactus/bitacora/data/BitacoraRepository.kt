@@ -93,7 +93,44 @@ class BitacoraRepository(
             } else throw error
         }
 
-    suspend fun supervisorTodayMovements(code: String) = api.getSupervisorTodayMovements(code)
+    suspend fun supervisorTodayMovements(
+        session: com.cactus.bitacora.model.SupervisorSessionOut
+    ): List<com.cactus.bitacora.model.SupervisorTodayMovementOut> {
+        val zone = java.time.ZoneId.of("America/Bogota")
+        val today = java.time.LocalDate.now(zone)
+        val start = today.atStartOfDay(zone).toEpochSecond().div(60).toInt()
+        val end = today.plusDays(1).atStartOfDay(zone).toEpochSecond().div(60).toInt()
+        val local = bitacoraDao.supervisorMovementsBetween(
+            session.id_supervisor, start, end
+        ).mapNotNull { movement ->
+            val timestamp = movement.tsInMin ?: return@mapNotNull null
+            val participant = runCatching {
+                referenceCatalogRepository.participantById(movement.idEmpleado)
+            }.getOrNull() ?: return@mapNotNull null
+            val areaParts = movement.qrArea.orEmpty().split("|", limit = 3)
+            val areaId = areaParts.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+            com.cactus.bitacora.model.SupervisorTodayMovementOut(
+                id_bitacora = movement.backendId ?: -movement.localId.toInt(),
+                id_participante = movement.idEmpleado,
+                id_supervisor = session.id_supervisor,
+                id_area = areaId,
+                tipo = if (movement.tipoAnotacion == 4) "ENTRADA" else "SALIDA",
+                timestamp_min = timestamp,
+                client_uuid = movement.clientUuid,
+                codigo_participante = participant.identificacion_participante.orEmpty(),
+                nombre_completo = listOfNotNull(participant.nombre, participant.apellido)
+                    .joinToString(" ").trim(),
+                area = areaParts.getOrNull(2).orEmpty(),
+                sync_status = movement.syncStatus.name
+            )
+        }
+        val remote = runCatching {
+            api.getSupervisorTodayMovements(session.codigo)
+        }.getOrElse { emptyList() }
+        return mergeSupervisorTodayMovements(
+            session.id_supervisor, start, end, local, remote
+        )
+    }
 
     suspend fun createSupervisorMovement(
         session: com.cactus.bitacora.model.SupervisorSessionOut,
@@ -1044,6 +1081,22 @@ class BitacoraRepository(
             this
         }
 }
+
+internal fun mergeSupervisorTodayMovements(
+    supervisorId: Int,
+    startMinute: Int,
+    endMinute: Int,
+    local: List<com.cactus.bitacora.model.SupervisorTodayMovementOut>,
+    remote: List<com.cactus.bitacora.model.SupervisorTodayMovementOut>
+): List<com.cactus.bitacora.model.SupervisorTodayMovementOut> =
+    (local + remote)
+        .filter {
+            it.id_supervisor == supervisorId &&
+                it.timestamp_min >= startMinute && it.timestamp_min < endMinute &&
+                (it.tipo == "ENTRADA" || it.tipo == "SALIDA")
+        }
+        .distinctBy { it.client_uuid }
+        .sortedByDescending { it.timestamp_min }
 
 internal data class SyncItemResult(
     val success: Boolean,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -24,11 +24,13 @@ from app.services.supervisor_service import (
     SupervisorAuthorizationError,
     identify_supervisor,
     require_supervised_participant,
+    resolve_supervisor_type_code,
     supervised_participants,
 )
 
 
 router = APIRouter(prefix="/supervisor", tags=["supervisor"])
+COLOMBIA_TIMEZONE = timezone(timedelta(hours=-5), name="America/Bogota")
 
 
 def _authorization_error(error: SupervisorAuthorizationError):
@@ -107,26 +109,52 @@ def movimientos_hoy(codigo: str, db: Session = Depends(get_db)):
     except SupervisorAuthorizationError as error:
         _authorization_error(error)
     bao_table = _resolve_bao_table(db)
+    colombia_today = datetime.now(COLOMBIA_TIMEZONE).date()
     rows = db.execute(
         text(
             f"""
+            WITH RECURSIVE areas_supervisadas AS (
+                SELECT ea.id_area
+                FROM {settings.EMPLEADO_AREA_TABLE} ea
+                WHERE ea.id_participante=:id_supervisor
+                  AND ea.cargo=:supervisor_type
+                  AND ea.activo=TRUE
+                  AND ea.fecha_inicia<=:today
+                  AND (ea.fecha_final IS NULL OR ea.fecha_final>=:today)
+                UNION
+                SELECT hija.id_Area_Administrativa
+                FROM {settings.AREAS_TABLE} hija
+                JOIN areas_supervisadas padre ON hija.nodo_padre=padre.id_area
+            )
             SELECT bd.id_bitacora, bd.id_empleado id_participante,
-                   bd.id_supervisor, bao.id_area,
+                   bd.id_supervisor, COALESCE(bao.id_area, ea.id_area) id_area,
                    CASE WHEN bd.tipo_anotacion=4 THEN 'ENTRADA' ELSE 'SALIDA' END tipo,
                    bd.ts_in_min timestamp_min, bd.client_uuid,
                    p.identificacion_participante codigo_participante,
                    TRIM(CONCAT_WS(' ',p.nombre,p.apellido)) nombre_completo,
-                   aa.descripcion area
+                   aa.descripcion area, 'SINCRONIZADO' sync_status
             FROM {settings.BITACORA_DIARIA_TABLE} bd
-            JOIN {bao_table} bao ON bao.id_bitacora=bd.id_bitacora
+            LEFT JOIN {bao_table} bao ON bao.id_bitacora=bd.id_bitacora
+            LEFT JOIN {settings.EMPLEADO_AREA_TABLE} ea
+              ON bao.id_area IS NULL AND ea.id_participante=bd.id_empleado
+             AND ea.activo=TRUE AND ea.fecha_inicia<=:today
+             AND (ea.fecha_final IS NULL OR ea.fecha_final>=:today)
+            JOIN areas_supervisadas ars
+              ON ars.id_area=COALESCE(bao.id_area, ea.id_area)
             JOIN {settings.PARTICIPANTE_TABLE} p ON p.id_participante=bd.id_empleado
-            JOIN {settings.AREAS_TABLE} aa ON aa.id_Area_Administrativa=bao.id_area
+            JOIN {settings.AREAS_TABLE} aa
+              ON aa.id_Area_Administrativa=COALESCE(bao.id_area, ea.id_area)
             WHERE bd.id_supervisor=:id_supervisor
               AND bd.tipo_anotacion IN (4,5)
-              AND bd.fecha_in=CURDATE()
+              AND DATE(DATE_ADD('1970-01-01 00:00:00', INTERVAL bd.ts_in_min MINUTE)
+                       - INTERVAL 5 HOUR)=:today
             ORDER BY bd.ts_in_min DESC, bd.id_bitacora DESC
             """
         ),
-        {"id_supervisor": session["id_supervisor"]},
+        {
+            "id_supervisor": session["id_supervisor"],
+            "supervisor_type": resolve_supervisor_type_code(db),
+            "today": colombia_today,
+        },
     ).mappings().all()
     return [dict(row) for row in rows]

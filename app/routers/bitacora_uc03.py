@@ -389,6 +389,16 @@ def crear_bitacora_diaria(payload: BitacoraDiariaCreate, db: Session = Depends(g
             origen_bitacora=payload.origen_bitacora,
             tipo_seguimiento_satelital=payload.tipo_seguimiento_satelital,
         )
+        if payload.origen_bitacora.strip().upper() == "SUPERVISOR" and payload.qr_area:
+            _crear_observacion_area_si_aplica(
+                db=db,
+                id_bitacora=out.id_bitacora,
+                id_empleado=out.id_empleado,
+                id_supervisor=int(out.id_supervisor),
+                ts_in_min=out.ts_in_min,
+                qr_area=payload.qr_area,
+                observaciones=payload.observaciones,
+            )
         db.commit()
         return out
     except IntegrityError:

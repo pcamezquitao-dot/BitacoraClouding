@@ -85,8 +85,12 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             if (view == SupervisorView.TODAY) {
                 LaunchedEffect(activeSession.codigo, view) {
                     message = try {
-                        repository.supervisorTodayMovements(activeSession.codigo).joinToString("\n") {
-                            "${it.tipo} · ${it.codigo_participante} · ${it.nombre_completo} · ${it.area}"
+                        repository.supervisorTodayMovements(activeSession).joinToString("\n") {
+                            val time = java.time.Instant.ofEpochSecond(it.timestamp_min * 60L)
+                                .atZone(java.time.ZoneId.of("America/Bogota"))
+                                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                            "${it.tipo} · ${it.codigo_participante} · ${it.nombre_completo} · " +
+                                "$time · ${it.area} · ${it.sync_status}"
                         }.ifBlank { "No hay movimientos del día" }
                     } catch (_: Exception) { "Movimientos remotos no disponibles temporalmente" }
                 }

@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+from datetime import datetime
 
 import pytest
 
@@ -9,6 +10,7 @@ from app.services.supervisor_service import (
     resolve_supervisor_type_code,
     supervised_participants,
 )
+from app.routers.supervisor import COLOMBIA_TIMEZONE, movimientos_hoy
 
 
 def scalar_result(values):
@@ -91,3 +93,32 @@ def test_hierarchical_query_filters_active_and_uses_parameterized_type():
     assert "P.FECHA_SALIDA IS NULL" in query
     assert "CARGO=:SUPERVISOR_TYPE" in query
     assert "CARGO=2" not in query
+
+
+def test_today_movements_uses_colombia_day_and_keeps_row_without_area_observation():
+    db = MagicMock()
+    db.execute.side_effect = [
+        scalar_result([2]),
+        mapping_result([{
+            "id_participante": 2, "identificacion_participante": "P0002",
+            "nombre_completo": "AURELIO", "id_area": 2, "area": "Finca1",
+        }]),
+        scalar_result([2]),
+        mapping_result([{
+            "id_bitacora": 115, "id_participante": 37, "id_supervisor": 2,
+            "id_area": 10, "tipo": "ENTRADA", "timestamp_min": 29777248,
+            "client_uuid": "existing", "codigo_participante": "P0037",
+            "nombre_completo": "PARTICIPANTE", "area": "F1_Cultivo",
+            "sync_status": "SINCRONIZADO",
+        }]),
+    ]
+
+    result = movimientos_hoy("P0002", db)
+
+    assert result[0]["id_bitacora"] == 115
+    query = str(db.execute.call_args_list[3].args[0]).upper()
+    params = db.execute.call_args_list[3].args[1]
+    assert "LEFT JOIN" in query
+    assert "INTERVAL 5 HOUR" in query
+    assert "CURDATE()" not in query
+    assert params["today"] == datetime.now(COLOMBIA_TIMEZONE).date()

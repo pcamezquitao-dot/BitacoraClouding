@@ -51,3 +51,4 @@ class SupervisorTodayMovementOut(SupervisorMovementOut):
     codigo_participante: str
     nombre_completo: str
     area: str
+    sync_status: str = "SINCRONIZADO"

@@ -106,7 +106,8 @@ data class SupervisorTodayMovementOut(
     val client_uuid: String,
     val codigo_participante: String,
     val nombre_completo: String,
-    val area: String
+    val area: String,
+    val sync_status: String = "SINCRONIZADO"
 )
 
 data class BitacoraDiariaSyncOut(
