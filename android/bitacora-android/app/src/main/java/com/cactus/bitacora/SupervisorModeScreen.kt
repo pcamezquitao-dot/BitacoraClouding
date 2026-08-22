@@ -1,5 +1,7 @@
 package com.cactus.bitacora
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,9 +28,10 @@ import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.CreateBitacoraResult
 import com.cactus.bitacora.model.SupervisedParticipantOut
 import com.cactus.bitacora.model.SupervisorSessionOut
+import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import kotlinx.coroutines.launch
 
-private enum class SupervisorView { MENU, PARTICIPANTS, ENTRADA, SALIDA, TODAY }
+private enum class SupervisorView { MENU, PARTICIPANTS, QUERY, ENTRADA, SALIDA, TODAY }
 
 @Composable
 internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> Unit) {
@@ -70,6 +73,10 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
         return
     }
 
+    BackHandler(enabled = view != SupervisorView.MENU) {
+        view = SupervisorView.MENU
+    }
+
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("SUPERVISOR", style = MaterialTheme.typography.headlineSmall)
         Text("${activeSession.codigo} · ${activeSession.nombre_completo}")
@@ -79,6 +86,7 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             Button({ view = SupervisorView.ENTRADA }, modifier = Modifier.fillMaxWidth()) { Text("Registrar entrada") }
             Button({ view = SupervisorView.SALIDA }, modifier = Modifier.fillMaxWidth()) { Text("Registrar salida") }
             Button({ view = SupervisorView.PARTICIPANTS }, modifier = Modifier.fillMaxWidth()) { Text("Consultar participantes bajo su mando") }
+            Button({ view = SupervisorView.QUERY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar marcaciones") }
             Button({ view = SupervisorView.TODAY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar movimientos del día") }
         } else {
             OutlinedButton({ view = SupervisorView.MENU }, modifier = Modifier.fillMaxWidth()) { Text("Volver al menú") }
@@ -95,6 +103,12 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
                     } catch (_: Exception) { "Movimientos remotos no disponibles temporalmente" }
                 }
                 Text(message.orEmpty())
+            } else if (view == SupervisorView.QUERY) {
+                BitacoraQueryScreen(
+                    repository = repository,
+                    allowDelete = false,
+                    authorizedParticipants = participants
+                )
             } else {
                 OutlinedTextField(search, { search = it }, label = { Text("Código, nombre o apellido") }, modifier = Modifier.fillMaxWidth())
                 val filtered = participants.filter {

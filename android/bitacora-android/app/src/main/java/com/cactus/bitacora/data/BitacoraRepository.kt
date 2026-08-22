@@ -664,6 +664,17 @@ class BitacoraRepository(
         return bitacoraDao.getAllForQuery()
     }
 
+    suspend fun getLocalMovementBitacoras(
+        participantIds: Set<Int>? = null
+    ): List<BitacoraQueryHeader> {
+        runCatching { remoteBitacoraRepository.refreshAndGet() }
+        return when {
+            participantIds == null -> bitacoraDao.getAllMovementsForQuery()
+            participantIds.isEmpty() -> emptyList()
+            else -> bitacoraDao.getMovementsForParticipants(participantIds.sorted())
+        }
+    }
+
     suspend fun getSyncSummary(): SyncSummary {
         val catalogs = referenceCatalogRepository.status()
         return SyncSummary(

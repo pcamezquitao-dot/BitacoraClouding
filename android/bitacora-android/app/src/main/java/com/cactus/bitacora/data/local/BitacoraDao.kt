@@ -71,6 +71,45 @@ interface BitacoraDao {
     )
     suspend fun getAllForQuery(): List<BitacoraQueryHeader>
 
+    @Query(
+        """
+        SELECT b.*,
+            (SELECT COUNT(DISTINCT CASE
+                WHEN TRIM(e.clientUuid) <> '' THEN 'u:' || e.clientUuid
+                WHEN e.remoteId IS NOT NULL THEN 'r:' || e.remoteId
+                ELSE 'l:' || e.localId END)
+             FROM bitacora_evidences e
+             WHERE e.syncStatus != 'PENDIENTE_ELIMINAR'
+                AND (e.bitacoraLocalId = b.localId
+                OR (b.backendId IS NOT NULL AND e.bitacoraServerId = b.backendId))) AS evidenceCount
+        FROM bitacoras_locales b
+        WHERE b.tipoAnotacion IN (4, 5)
+        ORDER BY b.tsInMin DESC, b.createdAtMillis DESC, b.localId DESC
+        """
+    )
+    suspend fun getAllMovementsForQuery(): List<BitacoraQueryHeader>
+
+    @Query(
+        """
+        SELECT b.*,
+            (SELECT COUNT(DISTINCT CASE
+                WHEN TRIM(e.clientUuid) <> '' THEN 'u:' || e.clientUuid
+                WHEN e.remoteId IS NOT NULL THEN 'r:' || e.remoteId
+                ELSE 'l:' || e.localId END)
+             FROM bitacora_evidences e
+             WHERE e.syncStatus != 'PENDIENTE_ELIMINAR'
+                AND (e.bitacoraLocalId = b.localId
+                OR (b.backendId IS NOT NULL AND e.bitacoraServerId = b.backendId))) AS evidenceCount
+        FROM bitacoras_locales b
+        WHERE b.tipoAnotacion IN (4, 5)
+          AND b.idEmpleado IN (:participantIds)
+        ORDER BY b.tsInMin DESC, b.createdAtMillis DESC, b.localId DESC
+        """
+    )
+    suspend fun getMovementsForParticipants(
+        participantIds: List<Int>
+    ): List<BitacoraQueryHeader>
+
     @Query("SELECT * FROM bitacoras_locales WHERE syncStatus = :status ORDER BY createdAtMillis ASC")
     suspend fun getByStatus(status: SyncStatus): List<BitacoraLocalEntity>
 

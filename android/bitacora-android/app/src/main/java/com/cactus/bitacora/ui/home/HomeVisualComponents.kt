@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cactus.bitacora.AppEnvironment
 import com.cactus.bitacora.AppScreen
+import com.cactus.bitacora.ui.navigation.primaryDestinations
 
 private val DarkGreen = Color(0xFF1B5E20)
 private val LightGreen = Color(0xFFE8F5E9)
@@ -136,26 +137,13 @@ internal fun MainHeader(
     }
 }
 
-private data class BottomDestination(
-    val screen: AppScreen,
-    val symbol: String,
-    val label: String
-)
-
 @Composable
 internal fun MainBottomBar(
     currentScreen: AppScreen,
     onNavigate: (AppScreen) -> Unit
 ) {
-    val destinations = listOf(
-        BottomDestination(AppScreen.Health, "⌂", "Inicio"),
-        BottomDestination(AppScreen.CreateDailyLog, "＋", "Crear"),
-        BottomDestination(AppScreen.QueryDailyLog, "⌕", "Consultar"),
-        BottomDestination(AppScreen.Sync, "↻", "Sincronizar"),
-        BottomDestination(AppScreen.More, "•••", "Más")
-    )
     NavigationBar(containerColor = Color.White) {
-        destinations.forEach { destination ->
+        primaryDestinations.forEach { destination ->
             NavigationBarItem(
                 selected = currentScreen == destination.screen,
                 onClick = { onNavigate(destination.screen) },

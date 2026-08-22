@@ -29,6 +29,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +64,9 @@ import com.cactus.bitacora.data.local.BitacoraLocalEntity
 import com.cactus.bitacora.data.local.BitacoraQueryHeader
 import com.cactus.bitacora.data.local.EvidenceType
 import com.cactus.bitacora.data.local.SyncStatus
+import com.cactus.bitacora.model.SupervisedParticipantOut
+import com.cactus.bitacora.ui.navigation.MovementQuerySelection
+import com.cactus.bitacora.ui.navigation.resolveMovementQuery
 import com.cactus.bitacora.util.AppConfig
 import java.io.File
 import java.text.DateFormat
@@ -130,9 +134,15 @@ private sealed interface QueryLoadState {
 }
 
 @Composable
-fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = false) {
+fun BitacoraQueryScreen(
+    repository: BitacoraRepository,
+    allowDelete: Boolean = false,
+    authorizedParticipants: List<SupervisedParticipantOut>? = null
+) {
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf<QueryLoadState>(QueryLoadState.Loading) }
+    var state by remember { mutableStateOf<QueryLoadState>(QueryLoadState.Ready(emptyList())) }
+    var query by remember { mutableStateOf("") }
+    var queryMessage by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<BitacoraLocalEntity?>(null) }
     var evidences by remember { mutableStateOf(emptyList<BitacoraEvidenceEntity>()) }
     var selectedEvidence by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
@@ -146,10 +156,39 @@ fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = f
     var deletionError by remember { mutableStateOf<String?>(null) }
 
     fun load() {
+        val normalized = query.trim().uppercase()
+        if (normalized.isEmpty()) {
+            queryMessage = "Ingrese un código de participante o *"
+            state = QueryLoadState.Ready(emptyList())
+            return
+        }
         state = QueryLoadState.Loading
+        queryMessage = null
         scope.launch {
             state = try {
-                QueryLoadState.Ready(repository.getLocalBitacoras())
+                val authorizedByCode = authorizedParticipants
+                    ?.distinctBy { it.id_participante }
+                    ?.associate { it.codigo.trim().uppercase() to it.id_participante }
+                val resolvedId = if (authorizedByCode == null && normalized != "*") {
+                    runCatching { repository.getParticipanteByQr(normalized).id_participante }
+                        .getOrNull()
+                } else null
+                when (val selection = resolveMovementQuery(query, authorizedByCode, resolvedId)) {
+                    MovementQuerySelection.Empty -> {
+                        queryMessage = "Ingrese un código de participante o *"
+                        QueryLoadState.Ready(emptyList())
+                    }
+                    MovementQuerySelection.NotFound -> {
+                        queryMessage = "Participante no encontrado"
+                        QueryLoadState.Ready(emptyList())
+                    }
+                    is MovementQuerySelection.Participant -> QueryLoadState.Ready(
+                        repository.getLocalMovementBitacoras(setOf(selection.participantId))
+                    )
+                    is MovementQuerySelection.All -> QueryLoadState.Ready(
+                        repository.getLocalMovementBitacoras(selection.authorizedParticipantIds)
+                    )
+                }
             } catch (error: Exception) {
                 QueryLoadState.Error(error.message ?: "No fue posible cargar las bitácoras")
             }
@@ -195,11 +234,13 @@ fun BitacoraQueryScreen(repository: BitacoraRepository, allowDelete: Boolean = f
     }
 
     BackHandler(enabled = level != QueryLevel.LIST) { goBack() }
-    LaunchedEffect(Unit) { load() }
-
     when (level) {
         QueryLevel.LIST -> QueryList(
             state = state,
+            query = query,
+            queryMessage = queryMessage,
+            onQueryChange = { query = it; queryMessage = null },
+            onSearch = ::load,
             allowDelete = allowDelete,
             deletionInProgress = deletionInProgress,
             deletionError = deletionError,
@@ -335,6 +376,10 @@ private fun DeleteConfirmationDialog(
 @Composable
 private fun QueryList(
     state: QueryLoadState,
+    query: String,
+    queryMessage: String?,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
     allowDelete: Boolean,
     deletionInProgress: Boolean,
     deletionError: String?,
@@ -344,6 +389,17 @@ private fun QueryList(
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Consultar bitácoras", style = MaterialTheme.typography.titleLarge)
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text("Código del participante o * para consultar todos") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(onClick = onSearch, modifier = Modifier.fillMaxWidth()) {
+            Text("Consultar")
+        }
+        queryMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (allowDelete) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
