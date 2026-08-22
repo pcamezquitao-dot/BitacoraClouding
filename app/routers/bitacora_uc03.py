@@ -112,7 +112,7 @@ def _crear_bitacora_diaria(
             )
 
     normalized_origin = (origen_bitacora or "MANUAL").strip().upper()
-    if normalized_origin not in {"MANUAL", "SATELITAL", "SUPERVISOR"}:
+    if normalized_origin not in {"MANUAL", "SATELITAL", "SUPERVISOR", "PRUEBA"}:
         raise HTTPException(status_code=422, detail="origen_bitacora inválido")
     if normalized_origin == "SUPERVISOR":
         if id_supervisor is None or not qr_area:

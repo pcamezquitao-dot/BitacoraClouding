@@ -12,6 +12,9 @@ interface BitacoraDao {
     @Insert
     suspend fun insert(bitacora: BitacoraLocalEntity): Long
 
+    @Insert
+    suspend fun insertAll(bitacoras: List<BitacoraLocalEntity>): List<Long>
+
     @Query("SELECT * FROM bitacoras_locales WHERE localId = :localId LIMIT 1")
     suspend fun getById(localId: Long): BitacoraLocalEntity?
 
@@ -20,6 +23,19 @@ interface BitacoraDao {
 
     @Query("SELECT * FROM bitacoras_locales WHERE clientUuid = :clientUuid LIMIT 1")
     suspend fun getByClientUuid(clientUuid: String): BitacoraLocalEntity?
+
+    @Query("SELECT * FROM bitacoras_locales WHERE clientUuid IN (:clientUuids)")
+    suspend fun getByClientUuids(clientUuids: List<String>): List<BitacoraLocalEntity>
+
+    @Query(
+        "SELECT * FROM bitacoras_locales WHERE idEmpleado = :participantId " +
+            "AND tsInMin >= :startMinute AND tsInMin < :endMinute ORDER BY tsInMin, localId"
+    )
+    suspend fun participantRecordsBetween(
+        participantId: Int,
+        startMinute: Int,
+        endMinute: Int
+    ): List<BitacoraLocalEntity>
 
     @Update
     suspend fun update(bitacora: BitacoraLocalEntity)
@@ -143,6 +159,9 @@ interface BitacoraDao {
 
     @Query("SELECT COUNT(*) FROM bitacoras_locales WHERE syncStatus = 'ERROR'")
     suspend fun countErrors(): Int
+
+    @Query("SELECT COUNT(*) FROM bitacoras_locales")
+    suspend fun countAll(): Int
 
     @Query("DELETE FROM bitacoras_locales WHERE localId = :localId")
     suspend fun deleteById(localId: Long)

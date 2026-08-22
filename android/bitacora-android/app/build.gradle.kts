@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 33
-        versionName = "maria31-movimientos-supervisor"
+        versionCode = 49
+        versionName = "maria49-c22-bitacora-prueba-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -49,6 +49,15 @@ android {
             dimension = "edition"
             applicationId = "com.cactus.bitacora.facial1"
             manifestPlaceholders["appLabel"] = "Bitacora Facial 1"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            buildConfigField("boolean", "ENABLE_TEST_BITACORA_INSERTION", "true")
+        }
+        getByName("release") {
+            buildConfigField("boolean", "ENABLE_TEST_BITACORA_INSERTION", "false")
         }
     }
 

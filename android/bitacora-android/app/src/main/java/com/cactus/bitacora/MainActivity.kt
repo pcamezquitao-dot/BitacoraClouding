@@ -92,6 +92,7 @@ import com.cactus.bitacora.location.LocationSnapshot
 import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import com.cactus.bitacora.ui.admin.AdminCatalogScreen
+import com.cactus.bitacora.feature.testdata.TestBitacoraAdminScreen
 import com.cactus.bitacora.ui.home.BitacoraVisualTheme
 import com.cactus.bitacora.ui.home.MainBottomBar
 import com.cactus.bitacora.ui.home.MainHeader
@@ -135,6 +136,7 @@ internal enum class AppScreen {
     Health,
     FaceEnrollment,
     AdminCatalog,
+    TestBitacoraInsertion,
     CreateDailyLog,
     QueryDailyLog,
     Sync,
@@ -193,7 +195,7 @@ internal fun canAccessEnrollment(environment: AppEnvironment?): Boolean =
 
 internal fun isScreenAllowed(environment: AppEnvironment?, screen: AppScreen): Boolean =
     when (screen) {
-        AppScreen.FaceEnrollment, AppScreen.AdminCatalog ->
+        AppScreen.FaceEnrollment, AppScreen.AdminCatalog, AppScreen.TestBitacoraInsertion ->
             environment == AppEnvironment.ADMINISTRADOR
         AppScreen.ReservoirSatellite ->
             environment == AppEnvironment.SEGUIMIENTO_SATELITAL
@@ -209,6 +211,10 @@ internal fun environmentMenuScreens(environment: AppEnvironment): List<AppScreen
             add(AppScreen.Health)
             if (canAccessEnrollment(environment)) add(AppScreen.FaceEnrollment)
             if (environment == AppEnvironment.ADMINISTRADOR) add(AppScreen.AdminCatalog)
+            if (
+                environment == AppEnvironment.ADMINISTRADOR &&
+                BuildConfig.ENABLE_TEST_BITACORA_INSERTION
+            ) add(AppScreen.TestBitacoraInsertion)
             add(AppScreen.CreateDailyLog)
             add(AppScreen.QueryDailyLog)
             add(AppScreen.Sync)
@@ -420,6 +426,19 @@ fun BitacoraApp() {
                             onBack = { currentScreen = mainDestinationAfterBack() }
                         )
                     }
+                    AppScreen.TestBitacoraInsertion -> if (
+                        environment == AppEnvironment.ADMINISTRADOR &&
+                        BuildConfig.ENABLE_TEST_BITACORA_INSERTION
+                    ) {
+                        TestBitacoraAdminScreen(
+                            repository = repository,
+                            onBack = { currentScreen = AppScreen.More }
+                        )
+                    } else {
+                        RestrictedEnrollmentScreen(
+                            onBack = { currentScreen = mainDestinationAfterBack() }
+                        )
+                    }
                     AppScreen.CreateDailyLog -> CrearBitacoraDiariaScreen(
                         repository = repository,
                         citizenEventType = selectedCitizenEvent
@@ -439,6 +458,7 @@ fun BitacoraApp() {
                         deletionMessage = oldestDeletionMessage,
                         onEnrollment = { openScreen(AppScreen.FaceEnrollment) },
                         onAdminCatalog = { openScreen(AppScreen.AdminCatalog) },
+                        onInsertTestBitacora = { openScreen(AppScreen.TestBitacoraInsertion) },
                         onRefreshCatalogs = { openScreen(AppScreen.Sync) },
                         onDeleteOldest = { confirmOldestDeletion = true },
                         onChangeEnvironment = ::changeEnvironment
@@ -561,6 +581,7 @@ private fun MoreScreen(
     deletionMessage: String?,
     onEnrollment: () -> Unit,
     onAdminCatalog: () -> Unit,
+    onInsertTestBitacora: () -> Unit,
     onRefreshCatalogs: () -> Unit,
     onDeleteOldest: () -> Unit,
     onChangeEnvironment: () -> Unit
@@ -586,6 +607,12 @@ private fun MoreScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 onClick = onAdminCatalog
             ) { Text("Administrar maestros") }
+            if (BuildConfig.ENABLE_TEST_BITACORA_INSERTION) {
+                Button(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                    onClick = onInsertTestBitacora
+                ) { Text("INSERTAR BITÁCORA DE PRUEBA") }
+            }
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 onClick = onRefreshCatalogs

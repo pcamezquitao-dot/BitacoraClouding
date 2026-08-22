@@ -23,7 +23,7 @@ internal class RemoteBitacoraRepository(
         return dao.getAllForQuery()
     }
 
-    private suspend fun downloadAll(): List<BitacoraDiariaSyncOut> {
+    suspend fun downloadAllForValidation(): List<BitacoraDiariaSyncOut> {
         val result = mutableListOf<BitacoraDiariaSyncOut>()
         var offset = 0
         while (true) {
@@ -33,6 +33,8 @@ internal class RemoteBitacoraRepository(
             offset += page.size
         }
     }
+
+    private suspend fun downloadAll(): List<BitacoraDiariaSyncOut> = downloadAllForValidation()
 
     private fun BitacoraDiariaSyncOut.toLocal() = BitacoraLocalEntity(
         backendId = id_bitacora,

@@ -4,6 +4,17 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.room.withTransaction
+import com.cactus.bitacora.BuildConfig
+import com.cactus.bitacora.feature.testdata.GeneratedTestBitacoraBatch
+import com.cactus.bitacora.feature.testdata.TestBitacoraAccessPolicy
+import com.cactus.bitacora.feature.testdata.TestBitacoraConflictPolicy
+import com.cactus.bitacora.feature.testdata.TestBitacoraGenerator
+import com.cactus.bitacora.feature.testdata.TestBitacoraInsertResult
+import com.cactus.bitacora.feature.testdata.TestBitacoraParameters
+import com.cactus.bitacora.feature.testdata.TestBitacoraPreview
+import com.cactus.bitacora.feature.testdata.TestBitacoraValidationException
+import com.cactus.bitacora.feature.testdata.toCreateRequests
+import com.cactus.bitacora.sync.OfflineSyncScheduler
 import com.cactus.bitacora.biometric.local.LocalFaceTemplateRepository
 import com.cactus.bitacora.data.local.BitacoraDao
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
@@ -50,6 +61,7 @@ class BitacoraRepository(
     context: Context,
     private val api: BitacoraApi = Api.create()
 ) {
+    private val applicationContext = context.applicationContext
     private val supervisorPreferences = context.getSharedPreferences("supervisor_session", Context.MODE_PRIVATE)
     private val database = BitacoraDatabase.getInstance(context)
     private val bitacoraDao: BitacoraDao =
@@ -598,6 +610,111 @@ class BitacoraRepository(
 
     suspend fun getCatalogStatus() = referenceCatalogRepository.status()
 
+    suspend fun previewTestBitacoraBatch(
+        parameters: TestBitacoraParameters,
+        isAdministrator: Boolean
+    ): TestBitacoraPreview {
+        requireTestInsertionAuthorization(isAdministrator)
+        val batch = TestBitacoraGenerator.generate(parameters)
+        val participant = getParticipanteByQr(batch.parameters.participantCode)
+        val assignment = referenceCatalogRepository.assignmentsForParticipant(
+            participant.id_participante
+        ).minByOrNull { it.id_area }
+            ?: throw TestBitacoraValidationException(
+                "El participante no tiene una asignación activa"
+            )
+        val supervisor = try {
+            getSupervisorForEmployee(participant.id_participante).first
+        } catch (error: Exception) {
+            throw TestBitacoraValidationException(
+                "No fue posible resolver el supervisor mediante la regla funcional existente: " +
+                    (error.message ?: "sin detalle")
+            )
+        }
+        val area = getAdministrativeAreas().firstOrNull { it.area.id_area == assignment.id_area }
+            ?: throw TestBitacoraValidationException(
+                "El área activa del participante no está disponible en el catálogo local"
+            )
+        val preview = TestBitacoraPreview(
+            participant = participant,
+            supervisorId = supervisor.id_participante,
+            areaId = assignment.id_area,
+            areaQr = area.qr,
+            batch = batch
+        )
+        validateTestBatchHasNoConflicts(preview)
+        return preview
+    }
+
+    suspend fun insertTestBitacoraBatch(
+        preview: TestBitacoraPreview,
+        isAdministrator: Boolean
+    ): TestBitacoraInsertResult {
+        requireTestInsertionAuthorization(isAdministrator)
+        validateTestBatchHasNoConflicts(preview)
+        val entities = preview.toLocalTestEntities()
+        database.withTransaction {
+            validateLocalTestBatchHasNoConflicts(preview)
+            val ids = bitacoraDao.insertAll(entities)
+            check(ids.size == entities.size && ids.all { it > 0 }) {
+                "No se insertaron todos los registros del lote de prueba"
+            }
+        }
+        OfflineSyncScheduler.enqueueNow(applicationContext)
+        return TestBitacoraInsertResult(
+            insertedRecords = entities.size,
+            entryCount = preview.batch.entryCount,
+            exitCount = preview.batch.exitCount
+        )
+    }
+
+    private fun requireTestInsertionAuthorization(isAdministrator: Boolean) {
+        TestBitacoraAccessPolicy.requireAuthorized(
+            isAdministrator = isAdministrator,
+            enabledForBuild = BuildConfig.ENABLE_TEST_BITACORA_INSERTION
+        )
+    }
+
+    private suspend fun validateTestBatchHasNoConflicts(preview: TestBitacoraPreview) {
+        val range = preview.batch.minuteRange()
+        val remote = try {
+            remoteBitacoraRepository.downloadAllForValidation()
+        } catch (error: Exception) {
+            throw TestBitacoraValidationException(
+                "Se requiere conexión para comprobar que el periodo no contiene registros remotos"
+            )
+        }
+        val participantRemote = remote.filter {
+            it.id_empleado == preview.participant.id_participante &&
+                it.ts_in_min >= range.first && it.ts_in_min < range.second
+        }
+        val expectedUuids = preview.batch.clientUuids
+        val remoteUuidCollisions = remote.filter { it.client_uuid in expectedUuids }
+        TestBitacoraConflictPolicy.requireNoConflict(
+            periodRecordUuids = participantRemote.mapNotNull { it.client_uuid }.toSet(),
+            periodRecordCount = participantRemote.size,
+            uuidCollisionCount = remoteUuidCollisions.size,
+            expectedUuids = expectedUuids
+        )
+        validateLocalTestBatchHasNoConflicts(preview)
+    }
+
+    private suspend fun validateLocalTestBatchHasNoConflicts(preview: TestBitacoraPreview) {
+        val range = preview.batch.minuteRange()
+        val localPeriod = bitacoraDao.participantRecordsBetween(
+            preview.participant.id_participante,
+            range.first,
+            range.second
+        )
+        val localUuidCollisions = bitacoraDao.getByClientUuids(preview.batch.clientUuids.toList())
+        TestBitacoraConflictPolicy.requireNoConflict(
+            periodRecordUuids = localPeriod.map { it.clientUuid }.toSet(),
+            periodRecordCount = localPeriod.size,
+            uuidCollisionCount = localUuidCollisions.size,
+            expectedUuids = preview.batch.clientUuids
+        )
+    }
+
     suspend fun crearBitacoraDiaria(
         request: BitacoraDiariaCreate,
         openLocation: LocationSnapshot? = null,
@@ -1091,6 +1208,23 @@ class BitacoraRepository(
         } else {
             this
         }
+}
+
+private fun GeneratedTestBitacoraBatch.minuteRange(): Pair<Int, Int> {
+    val zone = java.time.ZoneId.of(com.cactus.bitacora.feature.testdata.TEST_BITACORA_ZONE)
+    val start = parameters.startDate.atStartOfDay(zone).toEpochSecond().div(60).toInt()
+    val end = parameters.endDate.plusDays(1).atStartOfDay(zone).toEpochSecond().div(60).toInt()
+    return start to end
+}
+
+private fun TestBitacoraPreview.toLocalTestEntities(): List<BitacoraLocalEntity> {
+    val now = System.currentTimeMillis()
+    return toCreateRequests().map { request ->
+        request.toLocalEntity(syncStatus = SyncStatus.PENDIENTE_CREAR).copy(
+            createdAtMillis = now,
+            updatedAtMillis = now
+        )
+    }
 }
 
 internal fun mergeSupervisorTodayMovements(
