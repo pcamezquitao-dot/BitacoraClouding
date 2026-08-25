@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "bitacora"
+    APP_ENV: str = "production"
 
     PARTICIPANTE_TABLE: str = "participante"
     EMPLEADO_AREA_TABLE: str = "empleado_area"
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
     FACE_TEMPLATE_API_TOKEN: str = ""
     FACE_TEMPLATE_MASTER_KEY: str = ""
     ADMIN_API_TOKEN: str = ""
+    # Prototipo C20A: debe habilitarse y configurarse solo en desarrollo.
+    SUPERVISOR_DEV_AUTH_ENABLED: bool = False
+    SUPERVISOR_TOKEN_SECRET: str = ""
+    SUPERVISOR_TOKEN_TTL_SECONDS: int = 600
 
     FFMPEG_PATH: str = "/usr/bin/ffmpeg"
     WHISPER_CLI_PATH: str = "/srv/bitacora/tools/whisper.cpp/build/bin/whisper-cli"

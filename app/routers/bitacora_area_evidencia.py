@@ -46,7 +46,7 @@ from app.services.audio_transcription_service import (
 router = APIRouter(prefix="/bitacora-area-evidencias", tags=["Bitácora área evidencias"])
 
 COLUMNAS = """
-    id_evidencia, id_bitacora, id_area, ts_in_min, id_tipo_evidencia,
+    id_evidencia, id_bitacora, id_supervisor_actor, id_area, ts_in_min, id_tipo_evidencia,
     archivo_url, contenido_texto, archivo_nombre, archivo_hash, mime_type, duracion_seg,
     tamanio_bytes, orden, latitud, longitud, precision_gps,
     uuid_cliente, created_at

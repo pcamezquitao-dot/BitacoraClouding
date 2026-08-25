@@ -31,7 +31,7 @@ import com.cactus.bitacora.model.SupervisorSessionOut
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import kotlinx.coroutines.launch
 
-private enum class SupervisorView { MENU, PARTICIPANTS, QUERY, ENTRADA, SALIDA, TODAY }
+private enum class SupervisorView { MENU, PARTICIPANTS, QUERY, ENTRADA, SALIDA, TODAY, CONTROL }
 
 @Composable
 internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> Unit) {
@@ -88,6 +88,7 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             Button({ view = SupervisorView.PARTICIPANTS }, modifier = Modifier.fillMaxWidth()) { Text("Consultar participantes bajo su mando") }
             Button({ view = SupervisorView.QUERY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar marcaciones") }
             Button({ view = SupervisorView.TODAY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar movimientos del día") }
+            Button({ view = SupervisorView.CONTROL }, modifier = Modifier.fillMaxWidth()) { Text("CONTROL") }
         } else {
             OutlinedButton({ view = SupervisorView.MENU }, modifier = Modifier.fillMaxWidth()) { Text("Volver al menú") }
             if (view == SupervisorView.TODAY) {
@@ -103,6 +104,8 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
                     } catch (_: Exception) { "Movimientos remotos no disponibles temporalmente" }
                 }
                 Text(message.orEmpty())
+            } else if (view == SupervisorView.CONTROL) {
+                ControlSupervisorScreen(repository, activeSession) { view = SupervisorView.MENU }
             } else if (view == SupervisorView.QUERY) {
                 BitacoraQueryScreen(
                     repository = repository,

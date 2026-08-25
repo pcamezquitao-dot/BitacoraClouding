@@ -79,6 +79,32 @@ interface BitacoraApi {
         @Path("code") code: String
     ): List<com.cactus.bitacora.model.SupervisorTodayMovementOut>
 
+    @POST("control/supervisor/session")
+    suspend fun createSupervisorControlSession(
+        @Body payload: com.cactus.bitacora.model.ControlSupervisorSessionIn
+    ): com.cactus.bitacora.model.ControlSupervisorTokenOut
+
+    @GET("control/supervisor/me")
+    suspend fun getSupervisorControl(
+        @Header("Authorization") authorization: String,
+        @Query("anio") year: Int,
+        @Query("mes") month: Int
+    ): com.cactus.bitacora.model.ControlSupervisorReportOut
+
+    @GET("control/supervisor/me/participantes/{participantId}/bitacoras")
+    suspend fun getSupervisorControlDayBitacoras(
+        @Header("Authorization") authorization: String,
+        @Path("participantId") participantId: Int,
+        @Query("fecha") date: String
+    ): List<com.cactus.bitacora.model.ControlBitacoraOut>
+
+    @PATCH("control/supervisor/me/bitacoras/{bitacoraId}/observaciones")
+    suspend fun updateSupervisorControlObservation(
+        @Header("Authorization") authorization: String,
+        @Path("bitacoraId") bitacoraId: Int,
+        @Body payload: com.cactus.bitacora.model.ControlObservationUpdateIn
+    ): com.cactus.bitacora.model.ControlObservationUpdateOut
+
     @GET("admin/participantes")
     suspend fun getAdminParticipants(
         @Query("search") search: String,

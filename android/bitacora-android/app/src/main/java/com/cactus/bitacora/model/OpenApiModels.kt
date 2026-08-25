@@ -110,6 +110,77 @@ data class SupervisorTodayMovementOut(
     val sync_status: String = "SINCRONIZADO"
 )
 
+data class ControlSupervisorTotalsOut(
+    val supervisados: Int,
+    val total_minutos: Int,
+    val jornadas_incompletas: Int
+)
+data class WorkerEventOut(
+    val id_anotacion: String,
+    val timestamp_min: Int,
+    val tipo_anotacion: Int,
+    val client_uuid: String? = null,
+    val utilizado: Boolean = false,
+    val inconsistencia: String? = null
+)
+data class WorkerDayOut(
+    val fecha: String,
+    val dia_semana: Int,
+    val laborable: Boolean,
+    val sabado: Boolean,
+    val domingo: Boolean,
+    val festivo: Boolean,
+    val nombre_festivo: String? = null,
+    val minutos_trabajados: Int,
+    val registro_incompleto: Boolean,
+    val eventos: List<WorkerEventOut>
+)
+data class ControlSupervisedWorkerOut(
+    val id_participante: Int,
+    val codigo: String,
+    val nombre_completo: String,
+    val areas: List<String>,
+    val total_minutos: Int,
+    val jornadas_incompletas: Int,
+    val dias: List<WorkerDayOut>
+)
+data class ControlSupervisorReportOut(
+    val id_supervisor: Int,
+    val codigo_supervisor: String,
+    val nombre_supervisor: String,
+    val anio: Int,
+    val mes: Int,
+    val zona_horaria: String,
+    val acumulado: ControlSupervisorTotalsOut,
+    val supervisados: List<ControlSupervisedWorkerOut>
+)
+data class ControlSupervisorSessionIn(val codigo: String)
+data class ControlSupervisorTokenOut(
+    val access_token: String,
+    val token_type: String,
+    val expires_at: Long,
+    val supervisor: SupervisorSessionOut,
+    val advertencia: String
+)
+data class ControlBitacoraOut(
+    val id_bitacora: Int,
+    val id_participante: Int,
+    val codigo_participante: String,
+    val fecha: String,
+    val timestamp_min: Long,
+    val tipo_anotacion: Int,
+    val observaciones: String?
+)
+data class ControlObservationUpdateIn(
+    val observacion_anterior: String?,
+    val observacion_nueva: String?
+)
+data class ControlObservationUpdateOut(
+    val bitacora: ControlBitacoraOut,
+    val modificada: Boolean,
+    val id_evidencia: Int?
+)
+
 data class BitacoraDiariaSyncOut(
     val id_bitacora: Int,
     val id_empleado: Int,

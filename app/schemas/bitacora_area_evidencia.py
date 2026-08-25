@@ -37,4 +37,5 @@ class BitacoraAreaEvidenciaUpdate(BaseModel):
 
 class BitacoraAreaEvidenciaResponse(BitacoraAreaEvidenciaCreate):
     id_evidencia: int
+    id_supervisor_actor: int | None = None
     created_at: datetime

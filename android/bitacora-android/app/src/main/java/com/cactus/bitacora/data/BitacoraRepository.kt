@@ -105,6 +105,65 @@ class BitacoraRepository(
             } else throw error
         }
 
+    suspend fun supervisorControl(
+        session: com.cactus.bitacora.model.SupervisorSessionOut,
+        year: Int,
+        month: Int
+    ): com.cactus.bitacora.model.ControlSupervisorReportOut = withControlToken(session) { token ->
+        api.getSupervisorControl("Bearer $token", year, month)
+    }
+
+    suspend fun supervisorControlDayBitacoras(
+        session: com.cactus.bitacora.model.SupervisorSessionOut,
+        participantId: Int,
+        date: String
+    ): List<com.cactus.bitacora.model.ControlBitacoraOut> = withControlToken(session) { token ->
+        api.getSupervisorControlDayBitacoras("Bearer $token", participantId, date)
+    }
+
+    suspend fun updateSupervisorControlObservation(
+        session: com.cactus.bitacora.model.SupervisorSessionOut,
+        bitacora: com.cactus.bitacora.model.ControlBitacoraOut,
+        newObservation: String?
+    ): com.cactus.bitacora.model.ControlObservationUpdateOut = withControlToken(session) { token ->
+        api.updateSupervisorControlObservation(
+            "Bearer $token", bitacora.id_bitacora,
+            com.cactus.bitacora.model.ControlObservationUpdateIn(
+                bitacora.observaciones, newObservation
+            )
+        )
+    }
+
+    private var controlToken: ControlToken? = null
+
+    private suspend fun controlToken(session: com.cactus.bitacora.model.SupervisorSessionOut): String {
+        val now = System.currentTimeMillis() / 1000
+        controlToken?.takeIf { it.supervisorId == session.id_supervisor && it.expiresAt > now + 5 }
+            ?.let { return it.value }
+        val issued = api.createSupervisorControlSession(
+            com.cactus.bitacora.model.ControlSupervisorSessionIn(session.codigo)
+        )
+        check(issued.supervisor.id_supervisor == session.id_supervisor) {
+            "La identidad emitida por el servidor no coincide con el supervisor identificado"
+        }
+        return issued.access_token.also {
+            controlToken = ControlToken(session.id_supervisor, it, issued.expires_at)
+        }
+    }
+
+    private suspend fun <T> withControlToken(
+        session: com.cactus.bitacora.model.SupervisorSessionOut,
+        block: suspend (String) -> T
+    ): T {
+        val token = controlToken(session)
+        return try {
+            block(token)
+        } catch (error: HttpException) {
+            if (error.code() == 401) controlToken = null
+            throw error
+        }
+    }
+
     suspend fun supervisorTodayMovements(
         session: com.cactus.bitacora.model.SupervisorSessionOut
     ): List<com.cactus.bitacora.model.SupervisorTodayMovementOut> {
@@ -1334,3 +1393,5 @@ data class SyncRunResult(
     val erroresReintentables: Int = 0,
     val mensajes: List<String> = emptyList()
 )
+
+private data class ControlToken(val supervisorId: Int, val value: String, val expiresAt: Long)
