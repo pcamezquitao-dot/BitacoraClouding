@@ -106,28 +106,19 @@ internal fun ControlSupervisorScreen(
             Text("Jornadas incompletas: ${data.acumulado.jornadas_incompletas}")
             if (data.supervisados.isEmpty()) Text("No hay supervisados activos para este supervisor")
             data.supervisados.forEach { worker ->
-                ControlWorkerDailyChart(worker, session.id_supervisor, selected) { selected = it }
-            }
-        }
-        selected?.let { selection ->
-            Text("Registros del ${selection.date}", style = MaterialTheme.typography.titleMedium)
-            dayError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (dayRows.isEmpty() && dayError == null) Text("No hay registros tipo 4 o 5 para esta fecha")
-            dayRows.forEach { row ->
-                OutlinedButton(
-                    onClick = {
+                ControlWorkerDailyChart(
+                    worker = worker,
+                    supervisorId = session.id_supervisor,
+                    selected = selected,
+                    dayRows = dayRows,
+                    dayError = dayError,
+                    onSelect = { selected = it },
+                    onOpenEditor = { row ->
                         editing = row
                         editedText = row.observaciones.orEmpty()
                         saveError = null
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.fillMaxWidth()) {
-                        Text("Bitacora ${row.id_bitacora} · Tipo ${row.tipo_anotacion}")
-                        Text(formatControlTimestamp(row.timestamp_min, zone))
-                        Text("Observacion: ${row.observaciones.orEmpty().ifEmpty { "(vacia)" }}")
                     }
-                }
+                )
             }
         }
         OutlinedButton(onBack, modifier = Modifier.fillMaxWidth()) { Text("Volver al menu") }
@@ -182,7 +173,10 @@ private fun ControlWorkerDailyChart(
     worker: ControlSupervisedWorkerOut,
     supervisorId: Int,
     selected: ControlDaySelection?,
-    onSelect: (ControlDaySelection) -> Unit
+    dayRows: List<ControlBitacoraOut>,
+    dayError: String?,
+    onSelect: (ControlDaySelection) -> Unit,
+    onOpenEditor: (ControlBitacoraOut) -> Unit,
 ) {
     Text("${worker.codigo} · ${worker.nombre_completo}", style = MaterialTheme.typography.titleMedium)
     Text("Areas: ${worker.areas.joinToString()}")
@@ -201,6 +195,28 @@ private fun ControlWorkerDailyChart(
                     day, max,
                     selected?.supervisedId == worker.id_participante && selected.date == day.fecha
                 ) { onSelect(ControlDaySelection(supervisorId, worker.id_participante, day.fecha)) }
+            }
+        }
+    }
+    if (selected?.supervisedId == worker.id_participante) {
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Registros del ${selected.date}", style = MaterialTheme.typography.titleMedium)
+            dayError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (dayRows.isEmpty() && dayError == null) Text("No hay registros tipo 4 o 5 para esta fecha")
+            dayRows.forEach { row ->
+                OutlinedButton(
+                    onClick = { onOpenEditor(row) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text("Bitacora ${row.id_bitacora} · Tipo ${row.tipo_anotacion}")
+                        Text(formatControlTimestamp(row.timestamp_min, ZoneId.of("America/Bogota")))
+                        Text("Observacion: ${row.observaciones.orEmpty().ifEmpty { "(vacia)" }}")
+                    }
+                }
             }
         }
     }

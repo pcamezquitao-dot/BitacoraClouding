@@ -41,6 +41,15 @@ class ControlSupervisorObservationContractTest {
     }
 
     @Test
+    fun selectedDetailRendersInsideSelectedWorkerBlock() {
+        val source = File("src/main/java/com/cactus/bitacora/ControlSupervisorScreen.kt").readText()
+        assertTrue(source.contains("selected?.supervisedId == worker.id_participante"))
+        assertTrue(
+            source.contains("Text(\"Registros del \${selected.date}\", style = MaterialTheme.typography.titleMedium)")
+        )
+    }
+
+    @Test
     fun timestampUsesBogotaZone() {
         val formatted = formatControlTimestamp(0, ZoneId.of("America/Bogota"))
         assertTrue(formatted.startsWith("1969-12-31T19:00"))
