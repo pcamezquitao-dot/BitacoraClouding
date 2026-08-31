@@ -27,11 +27,23 @@ interface ReferenceCatalogDao {
     @Query("SELECT * FROM tipos_participante_locales ORDER BY descripcion, codigo")
     suspend fun participantTypes(): List<TipoParticipanteLocalEntity>
 
+    @Query("SELECT * FROM jornadas_de_trabajo_locales ORDER BY codigoJornada")
+    suspend fun workSchedules(): List<WorkScheduleLocalEntity>
+
+    @Query("SELECT * FROM jornadas_de_trabajo_detalle_locales ORDER BY idJornada,diaSemanaNum,numeroTramo")
+    suspend fun workScheduleDetails(): List<WorkScheduleDetailLocalEntity>
+
     @Query("SELECT * FROM empleado_area_locales WHERE activo = 1 ORDER BY idArea, idParticipante")
     suspend fun activeAssignments(): List<EmpleadoAreaLocalEntity>
 
     @Query("SELECT * FROM calendario_general_local WHERE activo = 1 ORDER BY fechaInicio, idPeriodo")
     suspend fun activeCalendar(): List<CalendarioGeneralLocalEntity>
+
+    @Query(
+        "SELECT * FROM calendario_general_local WHERE activo = 1 AND nivel = 'DIA' " +
+            "AND fechaInicio >= :first AND fechaInicio <= :last ORDER BY fechaInicio"
+    )
+    suspend fun calendarDaysBetween(first: String, last: String): List<CalendarioGeneralLocalEntity>
 
     @Query(
         "SELECT * FROM empleado_area_locales " +
@@ -94,6 +106,27 @@ interface ReferenceCatalogDao {
     suspend fun upsertCalendar(items: List<CalendarioGeneralLocalEntity>)
 
     @Upsert
+    suspend fun upsertWorkSchedules(items: List<WorkScheduleLocalEntity>)
+
+    @Upsert
+    suspend fun upsertWorkScheduleDetails(items: List<WorkScheduleDetailLocalEntity>)
+
+    @Upsert
+    suspend fun upsertPreparationState(state: CatalogPreparationStateEntity)
+
+    @Query("DELETE FROM jornadas_de_trabajo_detalle_locales WHERE idDetalle NOT IN (:ids)")
+    suspend fun deleteStaleWorkScheduleDetails(ids: List<Long>)
+
+    @Query("DELETE FROM jornadas_de_trabajo_detalle_locales")
+    suspend fun deleteAllWorkScheduleDetails()
+
+    @Query("DELETE FROM empleado_area_locales WHERE idEmpleadoArea NOT IN (:ids)")
+    suspend fun deleteStaleAssignments(ids: List<Int>)
+
+    @Query("DELETE FROM empleado_area_locales")
+    suspend fun deleteAllAssignments()
+
+    @Upsert
     suspend fun upsertSyncState(state: CatalogSyncStateEntity)
 
     @Query("UPDATE participantes_locales SET activo = 0")
@@ -110,6 +143,9 @@ interface ReferenceCatalogDao {
 
     @Query("UPDATE calendario_general_local SET activo = 0")
     suspend fun markAllCalendarInactive()
+
+    @Query("UPDATE jornadas_de_trabajo_locales SET activo = 0")
+    suspend fun markAllWorkSchedulesInactive()
 
     @Query("SELECT COUNT(*) FROM participantes_locales WHERE activo = 1")
     suspend fun participantCount(): Int
@@ -135,19 +171,46 @@ interface ReferenceCatalogDao {
         areas: List<AreaAdministrativaLocalEntity>,
         assignments: List<EmpleadoAreaLocalEntity>,
         participantTypes: List<TipoParticipanteLocalEntity>,
+        workSchedules: List<WorkScheduleLocalEntity>,
+        workScheduleDetails: List<WorkScheduleDetailLocalEntity>,
         state: CatalogSyncStateEntity,
+        preparationState: CatalogPreparationStateEntity,
         calendar: List<CalendarioGeneralLocalEntity> = emptyList()
     ) {
+        upsertPreparationState(preparationState.copy(status = "PREPARING", preparedAtMillis = null))
         markAllParticipantsInactive()
         markAllAreasInactive()
         markAllAssignmentsInactive()
         markAllParticipantTypesInactive()
         markAllCalendarInactive()
+        markAllWorkSchedulesInactive()
         upsertParticipants(participants)
         upsertAreas(areas)
         upsertAssignments(assignments)
+        if (assignments.isEmpty()) deleteAllAssignments()
+        else deleteStaleAssignments(assignments.map { it.idEmpleadoArea })
         upsertParticipantTypes(participantTypes)
+        upsertWorkSchedules(workSchedules)
+        upsertWorkScheduleDetails(workScheduleDetails)
+        if (workScheduleDetails.isEmpty()) deleteAllWorkScheduleDetails()
+        else deleteStaleWorkScheduleDetails(workScheduleDetails.map { it.idDetalle })
         upsertCalendar(calendar)
         upsertSyncState(state)
+        val storedSchedules = this.workSchedules().filter { it.activo }.associateBy { it.idJornada }
+        val expectedSchedules = workSchedules.associateBy { it.idJornada }
+        check(storedSchedules == expectedSchedules) {
+            "Las cabeceras de jornadas no coinciden despues de persistir"
+        }
+        val storedDetails = this.workScheduleDetails().associateBy { it.idDetalle }
+        val expectedDetails = workScheduleDetails.associateBy { it.idDetalle }
+        check(storedDetails == expectedDetails) {
+            "Los detalles de jornadas no coinciden despues de persistir"
+        }
+        val storedAssignments = activeAssignments().associateBy { it.idEmpleadoArea }
+        val expectedAssignments = assignments.filter { it.activo }.associateBy { it.idEmpleadoArea }
+        check(storedAssignments == expectedAssignments) {
+            "Las asignaciones no coinciden despues de persistir"
+        }
+        upsertPreparationState(preparationState)
     }
 }

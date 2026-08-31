@@ -14,7 +14,12 @@ internal class RemoteBitacoraRepository(
 ) {
     suspend fun refreshAndGet(): List<BitacoraQueryHeader> {
         try {
-            downloadAll().forEach { dao.mergeRemoteBitacora(it.toLocal()) }
+            val remoteRows = downloadAll()
+            val remoteBackendIds = remoteRows.mapNotNull { it.id_bitacora }.toSet()
+            dao.getSyncedWithBackendId()
+                .filter { it.backendId != null && it.backendId !in remoteBackendIds }
+                .forEach { stale -> dao.deleteById(stale.localId) }
+            remoteRows.forEach { dao.mergeRemoteBitacora(it.toLocal()) }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

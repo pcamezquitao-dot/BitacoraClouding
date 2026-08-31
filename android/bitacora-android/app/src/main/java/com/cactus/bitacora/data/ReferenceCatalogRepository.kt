@@ -4,6 +4,7 @@ import android.content.Context
 import com.cactus.bitacora.data.local.AreaAdministrativaLocalEntity
 import com.cactus.bitacora.data.local.BitacoraDatabase
 import com.cactus.bitacora.data.local.CatalogSyncStateEntity
+import com.cactus.bitacora.data.local.CatalogPreparationStateEntity
 import com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity
 import com.cactus.bitacora.data.local.EmpleadoAreaLocalEntity
 import com.cactus.bitacora.data.local.ParticipanteLocalEntity
@@ -256,20 +257,32 @@ class ReferenceCatalogRepository(
                     it.nombre_festivo, it.activo, now
                 )
             }
+            val syncState = CatalogSyncStateEntity(
+                lastSuccessfulSyncMillis = now,
+                participantCount = participants.count { it.activo },
+                areaCount = areas.count { it.activo },
+                assignmentCount = assignments.count { it.activo },
+                participantTypeCount = participantTypes.count { it.activo },
+                calendarCount = calendar.count { it.activo }
+            )
+            val preparationState = CatalogPreparationStateEntity(
+                status = "READY",
+                preparedAtMillis = now,
+                assignmentCount = assignments.count { it.activo },
+                nullScheduleCount = 0,
+                orphanScheduleCount = 0,
+                validationMessage = null
+            )
             dao.applySnapshot(
-                participants,
-                areas,
-                assignments,
-                participantTypes,
-                CatalogSyncStateEntity(
-                    lastSuccessfulSyncMillis = now,
-                    participantCount = participants.count { it.activo },
-                    areaCount = areas.count { it.activo },
-                    assignmentCount = assignments.count { it.activo },
-                    participantTypeCount = participantTypes.count { it.activo },
-                    calendarCount = calendar.count { it.activo }
-                ),
-                calendar
+                participants = participants,
+                areas = areas,
+                assignments = assignments,
+                participantTypes = participantTypes,
+                workSchedules = emptyList(),
+                workScheduleDetails = emptyList(),
+                state = syncState,
+                preparationState = preparationState,
+                calendar = calendar
             )
             CatalogSyncResult(true, participants.size, areas.size, assignments.size)
         } catch (error: Exception) {

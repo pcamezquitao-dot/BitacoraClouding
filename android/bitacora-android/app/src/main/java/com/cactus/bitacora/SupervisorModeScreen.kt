@@ -26,16 +26,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.data.CreateBitacoraResult
+import com.cactus.bitacora.feature.supervisorevents.SupervisorEventForm
+import com.cactus.bitacora.feature.supervisorevents.rememberSupervisorEventRepository
+import com.cactus.bitacora.feature.supervisorevents.rememberSupervisorEventSyncAction
 import com.cactus.bitacora.model.SupervisedParticipantOut
 import com.cactus.bitacora.model.SupervisorSessionOut
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import kotlinx.coroutines.launch
 
-private enum class SupervisorView { MENU, PARTICIPANTS, QUERY, ENTRADA, SALIDA, TODAY, CONTROL }
+private enum class SupervisorView { MENU, PARTICIPANTS, QUERY, ENTRADA, SALIDA, TODAY, CONTROL, NOVELTIES }
 
 @Composable
 internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val supervisorEventRepository = rememberSupervisorEventRepository()
+    val enqueueSupervisorEventSync = rememberSupervisorEventSyncAction()
     var code by remember { mutableStateOf(repository.savedSupervisorCode().orEmpty()) }
     var session by remember { mutableStateOf<SupervisorSessionOut?>(null) }
     var view by remember { mutableStateOf(SupervisorView.MENU) }
@@ -89,6 +94,7 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             Button({ view = SupervisorView.QUERY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar marcaciones") }
             Button({ view = SupervisorView.TODAY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar movimientos del día") }
             Button({ view = SupervisorView.CONTROL }, modifier = Modifier.fillMaxWidth()) { Text("CONTROL") }
+            Button({ view = SupervisorView.NOVELTIES }, modifier = Modifier.fillMaxWidth()) { Text("Novedades") }
         } else {
             OutlinedButton({ view = SupervisorView.MENU }, modifier = Modifier.fillMaxWidth()) { Text("Volver al menú") }
             if (view == SupervisorView.TODAY) {
@@ -106,6 +112,13 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
                 Text(message.orEmpty())
             } else if (view == SupervisorView.CONTROL) {
                 ControlSupervisorScreen(repository, activeSession) { view = SupervisorView.MENU }
+            } else if (view == SupervisorView.NOVELTIES) {
+                SupervisorEventForm(
+                    repository = supervisorEventRepository,
+                    session = activeSession,
+                    authorizedParticipants = participants,
+                    enqueueSync = enqueueSupervisorEventSync
+                )
             } else if (view == SupervisorView.QUERY) {
                 BitacoraQueryScreen(
                     repository = repository,

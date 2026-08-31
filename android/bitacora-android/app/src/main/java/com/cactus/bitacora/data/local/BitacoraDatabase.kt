@@ -16,10 +16,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AreaAdministrativaLocalEntity::class,
         EmpleadoAreaLocalEntity::class,
         TipoParticipanteLocalEntity::class,
-        CatalogSyncStateEntity::class
-        ,CalendarioGeneralLocalEntity::class
+        CatalogSyncStateEntity::class,
+        CalendarioGeneralLocalEntity::class,
+        SupervisorEventLocalEntity::class,
+        WorkScheduleLocalEntity::class,
+        WorkScheduleDetailLocalEntity::class,
+        CatalogPreparationStateEntity::class
     ],
-    version = 15,
+    version = 20,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -27,6 +31,8 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun evidenceDao(): BitacoraEvidenceDao
     abstract fun faceTemplateDao(): FaceTemplateDao
     abstract fun referenceCatalogDao(): ReferenceCatalogDao
+    abstract fun supervisorEventDao(): SupervisorEventDao
+    abstract fun workScheduleDao(): WorkScheduleDao
 
     companion object {
         @Volatile
@@ -50,9 +56,14 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
-                    MIGRATION_12_13
-                    ,MIGRATION_13_14,
-                    MIGRATION_14_15
+                    MIGRATION_12_13,
+                    MIGRATION_13_14,
+                    MIGRATION_14_15,
+                    MIGRATION_15_16,
+                    MIGRATION_16_17,
+                    MIGRATION_17_18,
+                    MIGRATION_18_19,
+                    MIGRATION_19_20
                 ).build().also { instance = it }
             }
 
@@ -411,6 +422,70 @@ abstract class BitacoraDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE participantes_locales ADD COLUMN observaciones TEXT")
                 db.execSQL("ALTER TABLE participantes_locales ADD COLUMN email TEXT")
                 db.execSQL("ALTER TABLE participantes_locales ADD COLUMN pendingAdminUpdate INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS supervisor_novedades_locales (
+                        localId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, backendId INTEGER,
+                        clientUuid TEXT NOT NULL, supervisorCode TEXT NOT NULL, tipoNovedad INTEGER NOT NULL,
+                        idParticipante INTEGER NOT NULL, idArea INTEGER NOT NULL, fechaInicio TEXT NOT NULL,
+                        fechaFinal TEXT NOT NULL, horaInicio TEXT, horaFinal TEXT, observaciones TEXT,
+                        syncStatus TEXT NOT NULL, syncAttempts INTEGER NOT NULL, errorMessage TEXT,
+                        createdAtMillis INTEGER NOT NULL, updatedAtMillis INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_supervisor_novedades_locales_clientUuid ON supervisor_novedades_locales(clientUuid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_supervisor_novedades_locales_syncStatus ON supervisor_novedades_locales(syncStatus)")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS jornadas_de_trabajo_locales (
+                    idJornada INTEGER NOT NULL PRIMARY KEY,codigoJornada TEXT NOT NULL,nombreJornada TEXT NOT NULL,
+                    minutosObjetivoSemana INTEGER NOT NULL,toleranciaEntradaMin INTEGER NOT NULL,
+                    toleranciaSalidaMin INTEGER NOT NULL,vigenciaDesde TEXT NOT NULL,vigenciaHasta TEXT,
+                    activo INTEGER NOT NULL,observaciones TEXT,fechaCreacion TEXT,fechaActualizacion TEXT,
+                    totalProgramadoSemana INTEGER NOT NULL,syncedAtMillis INTEGER NOT NULL)""".trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_jornadas_de_trabajo_locales_codigoJornada ON jornadas_de_trabajo_locales(codigoJornada)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_jornadas_de_trabajo_locales_activo ON jornadas_de_trabajo_locales(activo)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS jornadas_de_trabajo_detalle_locales (
+                    idDetalle INTEGER NOT NULL PRIMARY KEY,idJornada INTEGER NOT NULL,diaSemanaNum INTEGER NOT NULL,
+                    numeroTramo INTEGER NOT NULL,esLaborable INTEGER NOT NULL,horaEntradaMin INTEGER,
+                    horaSalidaMin INTEGER,salidaDiaSiguiente INTEGER NOT NULL,descansoMin INTEGER NOT NULL,
+                    descansoRemunerado INTEGER NOT NULL,observaciones TEXT,minutosProgramados INTEGER NOT NULL)""".trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_jornadas_de_trabajo_detalle_locales_idJornada ON jornadas_de_trabajo_detalle_locales(idJornada)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_jornadas_de_trabajo_detalle_locales_idJornada_diaSemanaNum_numeroTramo ON jornadas_de_trabajo_detalle_locales(idJornada,diaSemanaNum,numeroTramo)")
+            }
+        }
+
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE empleado_area_locales ADD COLUMN idJornada INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_empleado_area_locales_idJornada ON empleado_area_locales(idJornada)")
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE jornadas_de_trabajo_locales ADD COLUMN aplicaControlHorario INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS catalog_preparation_state (
+                    preparationKey TEXT NOT NULL PRIMARY KEY,status TEXT NOT NULL,
+                    preparedAtMillis INTEGER,assignmentCount INTEGER NOT NULL,
+                    nullScheduleCount INTEGER NOT NULL,orphanScheduleCount INTEGER NOT NULL,
+                    validationMessage TEXT)""".trimIndent())
+            }
+        }
+
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""UPDATE catalog_preparation_state
+                    SET status='STALE', preparedAtMillis=NULL,
+                        validationMessage='Maria47 requiere resincronizacion validada'
+                    WHERE preparationKey='work_schedules_not_null'""".trimIndent())
             }
         }
     }

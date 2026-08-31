@@ -79,6 +79,18 @@ class RemoteBitacoraRepositoryTest {
         assertEquals(SyncStatus.SINCRONIZADO, reconciled.syncStatus)
     }
 
+    @Test fun removesRemoteDeletedSynchronizedRowsButKeepsPendingLocalRows() = runBlocking {
+        database.bitacoraDao().insert(localSynced(68, "deleted-on-server"))
+        database.bitacoraDao().insert(localPending("local-only"))
+
+        val result = repository(FakeBitacoraServer(listOf(remoteBitacora(77, uuid = "uuid-77")))).refreshAndGet()
+
+        assertEquals(2, result.size)
+        assertTrue(result.none { it.bitacora.backendId == 68 })
+        assertTrue(result.any { it.bitacora.clientUuid == "local-only" && it.bitacora.backendId == null })
+        assertTrue(result.any { it.bitacora.backendId == 77 })
+    }
+
     @Test fun networkFailureAndDatabaseReopenPreserveRows() = runBlocking {
         database.bitacoraDao().insert(localPending("offline"))
         val offline = FakeBitacoraServer().apply { online = false }
@@ -139,4 +151,11 @@ private fun localPending(uuid: String) = BitacoraLocalEntity(
     idEmpleado = 14,
     clientUuid = uuid,
     syncStatus = SyncStatus.PENDIENTE_CREAR
+)
+
+private fun localSynced(backendId: Int, uuid: String) = BitacoraLocalEntity(
+    backendId = backendId,
+    idEmpleado = 14,
+    clientUuid = uuid,
+    syncStatus = SyncStatus.SINCRONIZADO
 )

@@ -133,6 +133,11 @@ interface BitacoraDao {
     suspend fun getByStatuses(statuses: List<SyncStatus>): List<BitacoraLocalEntity>
 
     @Query(
+        "SELECT * FROM bitacoras_locales WHERE syncStatus = 'SINCRONIZADO' AND backendId IS NOT NULL ORDER BY localId"
+    )
+    suspend fun getSyncedWithBackendId(): List<BitacoraLocalEntity>
+
+    @Query(
         """
         SELECT * FROM bitacoras_locales
         WHERE idSupervisor = :supervisorId

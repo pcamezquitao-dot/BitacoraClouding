@@ -1,10 +1,13 @@
 package com.cactus.bitacora.data
 
 import com.cactus.bitacora.data.local.AreaAdministrativaLocalEntity
+import com.cactus.bitacora.data.local.CatalogPreparationStateEntity
 import com.cactus.bitacora.data.local.CatalogSyncStateEntity
 import com.cactus.bitacora.data.local.EmpleadoAreaLocalEntity
 import com.cactus.bitacora.data.local.ParticipanteLocalEntity
 import com.cactus.bitacora.data.local.ReferenceCatalogDao
+import com.cactus.bitacora.data.local.WorkScheduleDetailLocalEntity
+import com.cactus.bitacora.data.local.WorkScheduleLocalEntity
 import com.cactus.bitacora.model.AreaOut
 import com.cactus.bitacora.model.CatalogAreaOut
 import com.cactus.bitacora.model.CatalogAssignmentOut
@@ -185,6 +188,26 @@ class ReferenceCatalogRepositoryTest {
     }
 
     @Test
+    fun catalogSnapshotMarksMissingRemoteRowsInactiveAndKeepsPendingLocals() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            participants[7] = participant(7, "P0007")
+            participants[8] = participant(8, "P0008").copy(pendingAdminUpdate = true)
+        }
+        val api = FakeCatalogApi(snapshot = snapshot().copy(
+            participantes = listOf(CatalogParticipantOut(2, "P0002", "Ana", "Prueba"))
+        ))
+        val repository = repository(dao, api)
+
+        repository.syncCatalogs()
+
+        assertEquals(true, dao.participants[2]!!.activo)
+        assertEquals(false, dao.participants[7]!!.activo)
+        assertEquals(true, dao.participants[8]!!.activo)
+        assertEquals(2, dao.participantCount())
+    }
+
+    @Test
     fun participantRefreshReplacesFakeLocalNameWithServerValue() = runBlocking {
         val dao = FakeCatalogDao().apply {
             participants[1] = participant(1, "P0001").copy(
@@ -280,10 +303,19 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     val assignments = linkedMapOf<Pair<Int, Int>, EmpleadoAreaLocalEntity>()
     val participantTypes =
         linkedMapOf<Int, com.cactus.bitacora.data.local.TipoParticipanteLocalEntity>()
+    val workSchedules = linkedMapOf<Long, WorkScheduleLocalEntity>()
+    val scheduleDetails = linkedMapOf<Long, WorkScheduleDetailLocalEntity>()
     var state: CatalogSyncStateEntity? = null
+    var preparationState: CatalogPreparationStateEntity? = null
 
     override suspend fun activeParticipants() =
         participants.values.filter { it.activo }.sortedBy { it.idParticipante }
+
+    override suspend fun workSchedules(): List<WorkScheduleLocalEntity> =
+        workSchedules.values.filter { it.activo }.sortedBy { it.idJornada }
+
+    override suspend fun workScheduleDetails(): List<WorkScheduleDetailLocalEntity> =
+        scheduleDetails.values.sortedBy { it.idDetalle }
 
     override suspend fun participantByCode(code: String) =
         participants.values.firstOrNull { it.codigoQr == code }
@@ -301,6 +333,8 @@ private class FakeCatalogDao : ReferenceCatalogDao {
         assignments.values.filter { it.idArea == areaId && it.activo }
     override suspend fun activeAssignment(participantId: Int, areaId: Int) =
         assignments[participantId to areaId]?.takeIf { it.activo }
+    override suspend fun calendarDaysBetween(first: String, last: String): List<com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity> =
+        calendar.values.filter { it.activo && it.fechaInicio >= first && it.fechaInicio <= last }
     override suspend fun upsertParticipant(item: ParticipanteLocalEntity) {
         participants[item.idParticipante] = item
     }
@@ -341,6 +375,59 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun upsertCalendar(items: List<com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity>) {
         items.forEach { calendar[it.idPeriodo] = it }
     }
+    override suspend fun upsertWorkSchedules(items: List<WorkScheduleLocalEntity>) {
+        items.forEach { workSchedules[it.idJornada] = it }
+    }
+    override suspend fun upsertWorkScheduleDetails(items: List<WorkScheduleDetailLocalEntity>) {
+        items.forEach { scheduleDetails[it.idDetalle] = it }
+    }
+    override suspend fun upsertPreparationState(state: CatalogPreparationStateEntity) {
+        preparationState = state
+    }
+    override suspend fun deleteStaleWorkScheduleDetails(ids: List<Long>) {
+        val allowed = ids.toHashSet()
+        scheduleDetails.entries.filter { it.key !in allowed }.forEach { scheduleDetails.remove(it.key) }
+    }
+    override suspend fun deleteAllWorkScheduleDetails() {
+        scheduleDetails.clear()
+    }
+    override suspend fun deleteStaleAssignments(ids: List<Int>) {
+        val allowed = ids.toHashSet()
+        assignments.entries.filter { it.value.idEmpleadoArea !in allowed }.forEach { assignments.remove(it.key) }
+    }
+    override suspend fun deleteAllAssignments() {
+        assignments.clear()
+    }
+    override suspend fun applySnapshot(
+        participants: List<ParticipanteLocalEntity>,
+        areas: List<AreaAdministrativaLocalEntity>,
+        assignments: List<EmpleadoAreaLocalEntity>,
+        participantTypes: List<com.cactus.bitacora.data.local.TipoParticipanteLocalEntity>,
+        workSchedules: List<WorkScheduleLocalEntity>,
+        workScheduleDetails: List<WorkScheduleDetailLocalEntity>,
+        state: CatalogSyncStateEntity,
+        preparationState: CatalogPreparationStateEntity,
+        calendar: List<com.cactus.bitacora.data.local.CalendarioGeneralLocalEntity>
+    ) {
+        upsertPreparationState(preparationState.copy(status = "PREPARING", preparedAtMillis = null))
+        markAllParticipantsInactive()
+        markAllAreasInactive()
+        markAllAssignmentsInactive()
+        markAllParticipantTypesInactive()
+        markAllCalendarInactive()
+        markAllWorkSchedulesInactive()
+        upsertParticipants(participants)
+        upsertAreas(areas)
+        upsertAssignments(assignments)
+        if (assignments.isEmpty()) deleteAllAssignments() else deleteStaleAssignments(assignments.map { it.idEmpleadoArea })
+        upsertParticipantTypes(participantTypes)
+        upsertWorkSchedules(workSchedules)
+        upsertWorkScheduleDetails(workScheduleDetails)
+        if (workScheduleDetails.isEmpty()) deleteAllWorkScheduleDetails() else deleteStaleWorkScheduleDetails(workScheduleDetails.map { it.idDetalle })
+        upsertCalendar(calendar)
+        upsertSyncState(state)
+        upsertPreparationState(preparationState)
+    }
     override suspend fun upsertSyncState(state: CatalogSyncStateEntity) {
         this.state = state
     }
@@ -358,6 +445,9 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     }
     override suspend fun markAllCalendarInactive() {
         calendar.replaceAll { _, value -> value.copy(activo = false) }
+    }
+    override suspend fun markAllWorkSchedulesInactive() {
+        workSchedules.replaceAll { _, value -> value.copy(activo = false) }
     }
     override suspend fun participantCount() = participants.values.count { it.activo }
     override suspend fun areaCount() = areas.values.count { it.activo }
