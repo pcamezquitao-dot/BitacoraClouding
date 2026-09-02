@@ -148,6 +148,8 @@ internal enum class AppEnvironment(val label: String) {
     ADMINISTRADOR("Administrador"),
     CIUDADANO("Ciudadano"),
     SUPERVISOR("Supervisor"),
+    TRABAJADOR("Trabajador"),
+    GERENCIA("Gerencia"),
     SEGUIMIENTO_SATELITAL("Seguimiento satelital de embalses")
 }
 
@@ -278,7 +280,9 @@ fun BitacoraApp() {
         backendOnline = if (
             activeEnvironment == AppEnvironment.ADMINISTRADOR ||
             activeEnvironment == AppEnvironment.CIUDADANO ||
-            activeEnvironment == AppEnvironment.SUPERVISOR
+            activeEnvironment == AppEnvironment.SUPERVISOR ||
+            activeEnvironment == AppEnvironment.TRABAJADOR ||
+            activeEnvironment == AppEnvironment.GERENCIA
         ) {
             try {
                 repository.checkHealth()
@@ -381,6 +385,15 @@ fun BitacoraApp() {
 
             if (environment == AppEnvironment.SUPERVISOR) {
                 SupervisorModeScreen(repository = repository, onExit = ::changeEnvironment)
+                return@Column
+            }
+
+            if (environment == AppEnvironment.TRABAJADOR) {
+                WorkerModeScreen(repository = repository, onExit = ::changeEnvironment)
+                return@Column
+            }
+            if (environment == AppEnvironment.GERENCIA) {
+                ManagementModeScreen(repository = repository, onExit = ::changeEnvironment)
                 return@Column
             }
 
@@ -657,6 +670,14 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.SUPERVISOR) }
         ) { Text("SUPERVISOR") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.TRABAJADOR) }
+        ) { Text("Trabajador") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.GERENCIA) }
+        ) { Text("Gerencia") }
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.SEGUIMIENTO_SATELITAL) }

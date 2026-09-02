@@ -153,6 +153,20 @@ interface BitacoraDao {
         endMinute: Int
     ): List<BitacoraLocalEntity>
 
+    @Query(
+        """
+        SELECT * FROM bitacoras_locales
+        WHERE idEmpleado = :participantId AND tipoAnotacion IN (4, 5)
+          AND tsInMin >= :startMinute AND tsInMin < :endMinute
+        ORDER BY tsInMin, localId
+        """
+    )
+    suspend fun workerMovementsBetween(
+        participantId: Int,
+        startMinute: Long,
+        endMinute: Long
+    ): List<BitacoraLocalEntity>
+
     @Query("SELECT COUNT(*) FROM bitacoras_locales WHERE syncStatus = :status")
     suspend fun countByStatus(status: SyncStatus): Int
 

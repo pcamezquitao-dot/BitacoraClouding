@@ -58,6 +58,27 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @POST("gerencia/identificar")
+    suspend fun identifyManagement(@Body payload: com.cactus.bitacora.model.ManagementIdentifyIn): com.cactus.bitacora.model.ManagementSessionOut
+
+    @GET("gerencia/{code}/informes/horas-laboradas/agregado")
+    suspend fun getManagementAggregateReport(
+        @Path("code") code: String, @Query("desde") from: String,
+        @Query("hasta") to: String, @Query("id_area") areaId: Int? = null
+    ): com.cactus.bitacora.model.ManagementAggregateReportOut
+
+    @POST("trabajador/identificar")
+    suspend fun identifyWorker(
+        @Body payload: com.cactus.bitacora.model.WorkerIdentifyIn
+    ): com.cactus.bitacora.model.WorkerSessionOut
+
+    @GET("trabajador/{code}/tiempo")
+    suspend fun getWorkerTime(
+        @Path("code") code: String,
+        @Query("anio") year: Int,
+        @Query("mes") month: Int
+    ): com.cactus.bitacora.model.WorkerTimeOut
+
     @POST("supervisor/identificar")
     suspend fun identifySupervisor(
         @Body payload: com.cactus.bitacora.model.SupervisorIdentifyIn

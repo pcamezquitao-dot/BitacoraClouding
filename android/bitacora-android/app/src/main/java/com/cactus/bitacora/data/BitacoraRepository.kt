@@ -84,6 +84,50 @@ class BitacoraRepository(
     fun savedSupervisorCode(): String? = supervisorPreferences.getString("code", null)
     fun clearSupervisorSession() = supervisorPreferences.edit().clear().apply()
 
+    suspend fun identifyWorker(reference: String): com.cactus.bitacora.model.WorkerSessionOut {
+        val local = referenceCatalogRepository.localWorkerSession(reference)
+        return try {
+            api.identifyWorker(com.cactus.bitacora.model.WorkerIdentifyIn(local.codigo))
+        } catch (error: Exception) {
+            if (error is IOException || error is HttpException && error.code() >= 500) local else throw error
+        }
+    }
+
+    suspend fun identifyManagement(reference: String): com.cactus.bitacora.model.ManagementSessionOut =
+        api.identifyManagement(com.cactus.bitacora.model.ManagementIdentifyIn(normalizeCatalogCode(reference)))
+
+    suspend fun managementAggregateReport(
+        session: com.cactus.bitacora.model.ManagementSessionOut,
+        from: java.time.LocalDate, to: java.time.LocalDate, areaId: Int? = null
+    ): com.cactus.bitacora.model.ManagementAggregateReportOut =
+        api.getManagementAggregateReport(session.codigo, from.toString(), to.toString(), areaId)
+
+    suspend fun workerTime(
+        session: com.cactus.bitacora.model.WorkerSessionOut,
+        year: Int,
+        month: Int
+    ): com.cactus.bitacora.model.WorkerTimeOut {
+        val remote = runCatching { api.getWorkerTime(session.codigo, year, month) }.getOrNull()
+        val zone = java.time.ZoneId.of("America/Bogota")
+        val first = java.time.LocalDate.of(year, month, 1)
+        val start = first.minusDays(1).atStartOfDay(zone).toEpochSecond().div(60)
+        val end = first.plusMonths(1).plusDays(1).atStartOfDay(zone).toEpochSecond().div(60)
+        val local = bitacoraDao.workerMovementsBetween(session.id_participante, start, end)
+        if (remote != null && local.none { it.syncStatus != SyncStatus.SINCRONIZADO }) return remote
+        val events = (remote?.dias.orEmpty().flatMap { it.eventos } + local.mapNotNull {
+            val timestamp = it.tsInMin ?: return@mapNotNull null
+            val type = it.tipoAnotacion ?: return@mapNotNull null
+            com.cactus.bitacora.model.WorkerEventOut(
+                it.backendId?.let { id -> "server:$id" } ?: "local:${it.localId}",
+                timestamp, type, it.clientUuid
+            )
+        }).distinctBy { it.client_uuid?.let { uuid -> "uuid:$uuid" } ?: it.id_anotacion }
+        val calendar = remote?.dias.orEmpty().ifEmpty {
+            referenceCatalogRepository.localWorkerCalendar(year, month)
+        }
+        return calculateWorkerTime(session.id_participante, year, month, events, calendar)
+    }
+
     suspend fun identifySupervisor(code: String): com.cactus.bitacora.model.SupervisorSessionOut {
         val normalized = normalizeCatalogCode(code)
         val session = try {

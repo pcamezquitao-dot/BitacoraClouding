@@ -115,6 +115,12 @@ data class ControlSupervisorTotalsOut(
     val total_minutos: Int,
     val jornadas_incompletas: Int
 )
+data class WorkerIdentifyIn(val codigo: String)
+data class WorkerSessionOut(
+    val id_participante: Int,
+    val codigo: String,
+    val nombre_completo: String
+)
 data class WorkerEventOut(
     val id_anotacion: String,
     val timestamp_min: Int,
@@ -134,6 +140,46 @@ data class WorkerDayOut(
     val minutos_trabajados: Int,
     val registro_incompleto: Boolean,
     val eventos: List<WorkerEventOut>
+)
+data class WorkerTimeOut(
+    val id_participante: Int,
+    val anio: Int,
+    val mes: Int,
+    val zona_horaria: String = "America/Bogota",
+    val dias: List<WorkerDayOut>
+)
+
+data class ManagementIdentifyIn(val codigo: String)
+data class ManagementSessionOut(val id_directivo: Int, val codigo: String, val nombre_completo: String)
+data class ManagementAggregateTotalsOut(
+    val total_minutos: Int, val ordinarios_minutos: Int, val extras_minutos: Int,
+    val dominicales_festivos_minutos: Int, val sabado_minutos: Int,
+    val domingo_minutos: Int, val festivo_minutos: Int,
+    val jornadas_incompletas: Int, val anomalias: Int,
+    val azul_claro_minutos: Int, val azul_oscuro_minutos: Int
+)
+data class ManagementTimeNodeOut(
+    val tipo: String, val codigo: String, val nombre: String,
+    val total_minutos: Int, val ordinarios_minutos: Int, val extras_minutos: Int,
+    val dominicales_festivos_minutos: Int, val sabado_minutos: Int,
+    val domingo_minutos: Int, val festivo_minutos: Int,
+    val jornadas_incompletas: Int, val anomalias: Int,
+    val azul_claro_minutos: Int, val azul_oscuro_minutos: Int,
+    val hijos: List<ManagementTimeNodeOut> = emptyList()
+)
+data class ManagementAreaAggregateOut(
+    val id_area: Int, val nombre: String, val ruta: String,
+    val total_minutos: Int, val ordinarios_minutos: Int, val extras_minutos: Int,
+    val dominicales_festivos_minutos: Int, val sabado_minutos: Int,
+    val domingo_minutos: Int, val festivo_minutos: Int,
+    val jornadas_incompletas: Int, val anomalias: Int,
+    val azul_claro_minutos: Int, val azul_oscuro_minutos: Int,
+    val hijos: List<ManagementAreaAggregateOut> = emptyList()
+)
+data class ManagementAggregateReportOut(
+    val generado_en: String, val zona_horaria: String, val desde: String, val hasta: String,
+    val fecha_corte: String, val resumen: ManagementAggregateTotalsOut,
+    val tiempo: List<ManagementTimeNodeOut>, val organizacion: List<ManagementAreaAggregateOut>
 )
 data class ControlSupervisedWorkerOut(
     val id_participante: Int,

@@ -55,6 +55,7 @@ data class AreaAdministrativaLocalEntity(
     indices = [
         Index(value = ["idParticipante"]),
         Index(value = ["idArea"]),
+        Index(value = ["idJornada"]),
         Index(value = ["activo"])
     ]
 )
@@ -67,6 +68,7 @@ data class EmpleadoAreaLocalEntity(
     val updatedAtServer: String? = null,
     val syncedAtMillis: Long,
     val fechaInicia: String? = null,
+    val idJornada: Long? = null,
     val idEmpleadoArea: Int = -(idParticipante * 1_000_000 + idArea)
 )
 

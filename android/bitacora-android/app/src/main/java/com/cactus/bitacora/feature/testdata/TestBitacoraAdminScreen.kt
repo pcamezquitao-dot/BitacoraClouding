@@ -207,8 +207,18 @@ fun TestBitacoraAdminScreen(
                                 preview = current,
                                 isAdministrator = true
                             )
-                            message = "Se insertaron ${result.insertedRecords} registros de prueba. " +
-                                "La sincronización oficial quedó programada."
+                            val syncResult = runCatching { repository.sincronizarPendientes() }
+                            message = syncResult.fold(
+                                onSuccess = { sync ->
+                                    "Se insertaron ${result.insertedRecords} registros de prueba. " +
+                                        "Sincronización inmediata: ${sync.sincronizados} registros sincronizados" +
+                                        if (sync.errores == 0) "." else "; ${sync.errores} errores."
+                                },
+                                onFailure = {
+                                    "Se insertaron ${result.insertedRecords} registros de prueba. " +
+                                        "La sincronización inmediata no fue posible; quedan pendientes."
+                                }
+                            )
                             preview = null
                         } catch (failure: Exception) {
                             error = failure.message ?: "No fue posible insertar el lote"

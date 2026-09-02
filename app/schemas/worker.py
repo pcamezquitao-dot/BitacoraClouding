@@ -1,4 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class WorkerIdentifyIn(BaseModel):
+    codigo: str = Field(min_length=1, max_length=100)
+
+
+class WorkerSessionOut(BaseModel):
+    id_participante: int
+    codigo: str
+    nombre_completo: str
 
 
 class WorkerEventOut(BaseModel):
@@ -21,3 +31,11 @@ class WorkerDayOut(BaseModel):
     minutos_trabajados: int
     registro_incompleto: bool
     eventos: list[WorkerEventOut]
+
+
+class WorkerTimeOut(BaseModel):
+    id_participante: int
+    anio: int
+    mes: int
+    zona_horaria: str = "America/Bogota"
+    dias: list[WorkerDayOut]

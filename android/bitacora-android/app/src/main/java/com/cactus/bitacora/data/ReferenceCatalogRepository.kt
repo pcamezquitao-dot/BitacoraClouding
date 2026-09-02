@@ -325,6 +325,41 @@ class ReferenceCatalogRepository(
         }
     }
 
+    suspend fun localWorkerSession(raw: String): com.cactus.bitacora.model.WorkerSessionOut {
+        val participant = participantByCode(raw)
+        if (assignmentsForParticipant(participant.id_participante).isEmpty()) {
+            throw CatalogValidationException("El participante no tiene una asignación activa como trabajador")
+        }
+        return com.cactus.bitacora.model.WorkerSessionOut(
+            participant.id_participante,
+            participant.identificacion_participante.orEmpty(),
+            listOfNotNull(participant.nombre, participant.apellido).joinToString(" ").trim()
+        )
+    }
+
+    suspend fun localWorkerCalendar(
+        year: Int,
+        month: Int
+    ): List<com.cactus.bitacora.model.WorkerDayOut> {
+        val first = java.time.LocalDate.of(year, month, 1)
+        return dao.calendarDaysBetween(first.toString(), first.withDayOfMonth(first.lengthOfMonth()).toString())
+            .map { day ->
+                val weekend = day.esFinSemana == true
+                com.cactus.bitacora.model.WorkerDayOut(
+                    day.fechaInicio,
+                    day.numeroDiaSemana ?: java.time.LocalDate.parse(day.fechaInicio).dayOfWeek.value,
+                    !weekend && !day.esFestivo,
+                    day.numeroDiaSemana == 6,
+                    day.numeroDiaSemana == 7,
+                    day.esFestivo,
+                    day.nombreFestivo,
+                    0,
+                    false,
+                    emptyList()
+                )
+            }
+    }
+
     suspend fun assignmentsForParticipant(participantId: Int): List<EmpleadoAreaActivaOut> {
         val local = dao.activeAssignmentsForParticipant(participantId)
         if (local.isNotEmpty()) return local.map { it.toApi() }
