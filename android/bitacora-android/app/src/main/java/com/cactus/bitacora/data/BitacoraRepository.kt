@@ -550,6 +550,25 @@ class BitacoraRepository(
             )
         }
 
+    suspend fun workSchedules(
+        search: String = "",
+        active: Boolean? = null
+    ) = api.getWorkSchedules(search, active)
+
+    suspend fun workSchedule(scheduleId: Long) = api.getWorkSchedule(scheduleId)
+
+    suspend fun createWorkSchedule(
+        payload: com.cactus.bitacora.model.WorkScheduleIn
+    ) = api.createWorkSchedule(payload)
+
+    suspend fun updateWorkSchedule(
+        scheduleId: Long,
+        payload: com.cactus.bitacora.model.WorkScheduleIn
+    ) = api.updateWorkSchedule(scheduleId, payload)
+
+    suspend fun setWorkScheduleStatus(scheduleId: Long, active: Boolean) =
+        api.setWorkScheduleStatus(scheduleId, com.cactus.bitacora.model.WorkScheduleStatusIn(active))
+
     private fun adminAuthorization(): String =
         AppConfig.ADMIN_AUTHORIZATION.takeIf(String::isNotBlank)
             ?: throw IllegalStateException(

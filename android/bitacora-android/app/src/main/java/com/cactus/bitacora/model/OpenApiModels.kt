@@ -376,6 +376,68 @@ data class ParticipantTypeAdminIn(
 
 data class ParticipantTypeStatusIn(val activo: Boolean)
 
+data class WorkScheduleDetailIn(
+    val id_detalle: Long? = null,
+    val dia_semana_num: Int,
+    val numero_tramo: Int,
+    val es_laborable: Boolean,
+    val hora_entrada_min: Int? = null,
+    val hora_salida_min: Int? = null,
+    val salida_dia_siguiente: Boolean = false,
+    val descanso_min: Int = 0,
+    val descanso_remunerado: Boolean = false,
+    val observaciones: String? = null
+)
+
+data class WorkScheduleIn(
+    val codigo_jornada: String,
+    val nombre_jornada: String,
+    val minutos_objetivo_semana: Int,
+    val tolerancia_entrada_min: Int = 0,
+    val tolerancia_salida_min: Int = 0,
+    val vigencia_desde: String,
+    val vigencia_hasta: String? = null,
+    val activo: Boolean = false,
+    val aplica_control_horario: Boolean = true,
+    val observaciones: String? = null,
+    val detalles: List<WorkScheduleDetailIn> = emptyList()
+)
+
+data class WorkScheduleDetailOut(
+    val id_detalle: Long,
+    val dia_semana_num: Int,
+    val numero_tramo: Int,
+    val es_laborable: Boolean,
+    val hora_entrada_min: Int? = null,
+    val hora_salida_min: Int? = null,
+    val salida_dia_siguiente: Boolean = false,
+    val descanso_min: Int = 0,
+    val descanso_remunerado: Boolean = false,
+    val observaciones: String? = null,
+    val minutos_programados: Int
+)
+
+data class WorkScheduleOut(
+    val id_jornada: Long,
+    val codigo_jornada: String,
+    val nombre_jornada: String,
+    val minutos_objetivo_semana: Int,
+    val tolerancia_entrada_min: Int,
+    val tolerancia_salida_min: Int,
+    val vigencia_desde: String,
+    val vigencia_hasta: String? = null,
+    val activo: Boolean,
+    val aplica_control_horario: Boolean,
+    val observaciones: String? = null,
+    val fecha_creacion: String? = null,
+    val fecha_actualizacion: String? = null,
+    val total_programado_semana: Int,
+    val referenciada_activa: Boolean,
+    val detalles: List<WorkScheduleDetailOut> = emptyList()
+)
+
+data class WorkScheduleStatusIn(val activo: Boolean)
+
 data class AreaTreeNodeOut(
     val id_area: Int,
     val descripcion: String,

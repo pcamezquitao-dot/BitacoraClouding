@@ -29,6 +29,7 @@ from app.routers.administrative_areas import router as administrative_areas_rout
 from app.routers.employee_area import router as employee_area_admin_router
 from app.routers.calendar_general import router as calendar_general_router
 from app.routers.participants_admin import router as participants_admin_router
+from app.routers.work_schedules_admin import router as work_schedules_admin_router
 from app.routers.satelital import router as satelital_router
 from app.routers.supervisor import router as supervisor_router
 from app.routers.worker import router as worker_router
@@ -73,6 +74,7 @@ app.include_router(administrative_areas_router)
 app.include_router(employee_area_admin_router)
 app.include_router(calendar_general_router)
 app.include_router(participants_admin_router)
+app.include_router(work_schedules_admin_router)
 app.include_router(satelital_router)
 app.include_router(supervisor_router)
 app.include_router(worker_router)

@@ -53,7 +53,8 @@ private enum class AdminMasterSection {
     PARTICIPANT_TYPES,
     EMPLOYEE_AREA,
     ADMINISTRATIVE_AREAS,
-    GENERAL_CALENDAR
+    GENERAL_CALENDAR,
+    WORK_SCHEDULES
 }
 
 internal fun canEditCalendarNode(node: CalendarTreeNodeOut): Boolean =
@@ -788,34 +789,40 @@ fun AdminCatalogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.GENERAL_CALENDAR }
             ) { Text("Calendario general") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.WORK_SCHEDULES }
+            ) { Text(WORK_SCHEDULES_LABEL) }
             return@Column
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = { section = null }
         ) { Text("Volver a maestros") }
-        Text("Las modificaciones requieren conexión y quedan auditadas.")
-        OutlinedTextField(
-            value = actor,
-            onValueChange = { actor = it },
-            label = { Text("Identificación del administrador") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        Button(
-            enabled = !loading,
-            onClick = {
-                when (section) {
-                    AdminMasterSection.PARTICIPANTS -> refreshParticipants()
-                    AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
-                    AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
-                    AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
-                    else -> refresh()
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text(if (loading || calendarLoading) "Cargando…" else "Actualizar") }
-        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        if (section != AdminMasterSection.WORK_SCHEDULES) {
+            Text("Las modificaciones requieren conexión y quedan auditadas.")
+            OutlinedTextField(
+                value = actor,
+                onValueChange = { actor = it },
+                label = { Text("Identificación del administrador") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Button(
+                enabled = !loading,
+                onClick = {
+                    when (section) {
+                        AdminMasterSection.PARTICIPANTS -> refreshParticipants()
+                        AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
+                        AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
+                        AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
+                        else -> refresh()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(if (loading || calendarLoading) "Cargando…" else "Actualizar") }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        }
 
         if (section == AdminMasterSection.PARTICIPANTS) {
             ParticipantsAdminPanel(
@@ -1054,6 +1061,10 @@ fun AdminCatalogScreen(
                 },
                 onEdit = ::beginCalendarEdit
             )
+        }
+
+        if (section == AdminMasterSection.WORK_SCHEDULES) {
+            WorkSchedulesAdminPanel(repository = repository)
         }
     }
 

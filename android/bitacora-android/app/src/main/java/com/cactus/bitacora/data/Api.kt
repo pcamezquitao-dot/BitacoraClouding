@@ -58,6 +58,34 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("admin/jornadas")
+    suspend fun getWorkSchedules(
+        @Query("search") search: String = "",
+        @Query("active") active: Boolean? = null
+    ): List<com.cactus.bitacora.model.WorkScheduleOut>
+
+    @GET("admin/jornadas/{id}")
+    suspend fun getWorkSchedule(
+        @Path("id") id: Long
+    ): com.cactus.bitacora.model.WorkScheduleOut
+
+    @POST("admin/jornadas")
+    suspend fun createWorkSchedule(
+        @Body payload: com.cactus.bitacora.model.WorkScheduleIn
+    ): com.cactus.bitacora.model.WorkScheduleOut
+
+    @PUT("admin/jornadas/{id}")
+    suspend fun updateWorkSchedule(
+        @Path("id") id: Long,
+        @Body payload: com.cactus.bitacora.model.WorkScheduleIn
+    ): com.cactus.bitacora.model.WorkScheduleOut
+
+    @PATCH("admin/jornadas/{id}/estado")
+    suspend fun setWorkScheduleStatus(
+        @Path("id") id: Long,
+        @Body payload: com.cactus.bitacora.model.WorkScheduleStatusIn
+    ): com.cactus.bitacora.model.WorkScheduleOut
+
     @POST("gerencia/identificar")
     suspend fun identifyManagement(@Body payload: com.cactus.bitacora.model.ManagementIdentifyIn): com.cactus.bitacora.model.ManagementSessionOut
 
