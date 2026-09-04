@@ -3,7 +3,7 @@ package com.cactus.bitacora.util
 import com.cactus.bitacora.BuildConfig
 
 object AppConfig {
-    const val BASE_URL = "http://161.22.47.89/bitacora/"
+    const val BASE_URL = "https://161-22-47-89.sslip.io/bitacora/"
     const val CONNECT_TIMEOUT_SECONDS = 30L
     const val READ_TIMEOUT_SECONDS = 300L
     const val WRITE_TIMEOUT_SECONDS = 300L
