@@ -528,9 +528,18 @@ class ReferenceCatalogRepository(
         fun build(area: AreaTreeNodeOut): EmployeeAreaTreeNodeOut {
             val assigned = assignments[area.id_area].orEmpty().map { item ->
                 val person = people[item.idParticipante]
-                EmployeeAreaAssignmentOut(item.idEmpleadoArea, item.idParticipante, person?.codigoQr.orEmpty(),
-                    listOfNotNull(person?.nombre, person?.apellido).joinToString(" "), item.cargo,
-                    types[item.cargo]?.descripcion, null, item.fechaInicia.orEmpty(), item.fechaFinal)
+                EmployeeAreaAssignmentOut(
+                    item.idEmpleadoArea,
+                    item.idParticipante,
+                    person?.codigoQr.orEmpty(),
+                    listOfNotNull(person?.nombre, person?.apellido).joinToString(" "),
+                    item.cargo,
+                    types[item.cargo]?.descripcion,
+                    null,
+                    item.fechaInicia.orEmpty(),
+                    item.fechaFinal,
+                    item.idJornada
+                )
             }
             val children = areas.filter { it.id_padre == area.id_area }.map(::build)
             return EmployeeAreaTreeNodeOut(area.id_area, area.descripcion, area.nombre_corto, area.id_padre,

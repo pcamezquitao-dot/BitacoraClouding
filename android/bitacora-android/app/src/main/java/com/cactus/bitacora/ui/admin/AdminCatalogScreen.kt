@@ -57,6 +57,64 @@ private enum class AdminMasterSection {
     WORK_SCHEDULES
 }
 
+internal fun validateAssignmentForm(
+    current: EmployeeAreaAssignmentOut?,
+    participant: ParticipantOptionOut?,
+    type: ParticipantTypeAdminOut?,
+    selectedScheduleId: Long?,
+    startDate: String
+): String? = when {
+    type == null -> "Seleccione un cargo"
+    selectedScheduleId == null -> "Seleccione una jornada de trabajo."
+    startDate.isBlank() -> "La fecha inicial es obligatoria"
+    current == null && participant == null -> "Seleccione un participante"
+    else -> null
+}
+
+internal fun normalizeAssignmentError(
+    message: String?,
+    isRetireAction: Boolean
+): String? = when {
+    message == null -> null
+    message == "La asignación ya está retirada" && !isRetireAction ->
+        "El participante ya tiene una asignación activa en esta área."
+    else -> message
+}
+
+internal fun buildCreateEmployeeAreaPayload(
+    participantId: Int,
+    areaId: Int,
+    typeCode: Int,
+    description: String?,
+    startDate: String,
+    endDate: String?,
+    scheduleId: Long?
+): EmployeeAreaAdminIn = EmployeeAreaAdminIn(
+    id_participante = participantId,
+    id_area = areaId,
+    codigo_tipo = typeCode,
+    descripcion = description,
+    fecha_inicia = startDate,
+    fecha_final = endDate,
+    id_jornada = scheduleId
+)
+
+internal fun buildUpdateEmployeeAreaPayload(
+    areaId: Int,
+    typeCode: Int,
+    description: String?,
+    startDate: String,
+    endDate: String?,
+    scheduleId: Long?
+): EmployeeAreaUpdateIn = EmployeeAreaUpdateIn(
+    id_area = areaId,
+    codigo_tipo = typeCode,
+    descripcion = description,
+    fecha_inicia = startDate,
+    fecha_final = endDate,
+    id_jornada = scheduleId
+)
+
 internal fun canEditCalendarNode(node: CalendarTreeNodeOut): Boolean =
     node.nivel == "DIA"
 
@@ -340,6 +398,8 @@ fun AdminCatalogScreen(
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
     var assignmentDescription by remember { mutableStateOf("") }
+    var selectedScheduleId by remember { mutableStateOf<Long?>(null) }
+    var workSchedules by remember { mutableStateOf<List<com.cactus.bitacora.model.WorkScheduleOut>>(emptyList()) }
     var section by remember { mutableStateOf<AdminMasterSection?>(null) }
     var expandedAreaIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var loadingAreas by remember { mutableStateOf(false) }
@@ -529,6 +589,7 @@ fun AdminCatalogScreen(
         selectedParticipantOption = null
         assignmentSearch = ""
         assignmentDescription = ""
+        selectedScheduleId = null
         startDate = java.text.SimpleDateFormat(
             "yyyy-MM-dd",
             java.util.Locale.US
@@ -541,9 +602,10 @@ fun AdminCatalogScreen(
         scope.launch {
             try {
                 participantOptions = repository.adminParticipantOptions(actor)
+                workSchedules = repository.workSchedules(active = true)
                 Log.i(
                     "AdminEmployeeArea",
-                    "Opciones de participantes=${participantOptions.size}; área=${area.id_area}"
+                    "Opciones de participantes=${participantOptions.size}; jornadas=${workSchedules.size}; área=${area.id_area}"
                 )
             } catch (error: Exception) {
                 assignmentError = error.message
@@ -563,60 +625,66 @@ fun AdminCatalogScreen(
         assignmentDescription = assignment.descripcion.orEmpty()
         startDate = assignment.fecha_inicia
         endDate = assignment.fecha_final.orEmpty()
+        selectedScheduleId = assignment.id_jornada
         selectedType = types.firstOrNull { it.codigo == assignment.codigo_tipo }
         assignmentError = null
         assignmentMessage = null
+        scope.launch {
+            try {
+                workSchedules = repository.workSchedules(active = true)
+            } catch (error: Exception) {
+                assignmentError = error.message ?: "Error al consultar jornadas" 
+            }
+        }
     }
 
     fun saveAssignment() {
         val area = assignmentArea ?: return
         val type = selectedType
+        val current = editingAssignment
+        val participant = selectedParticipantOption
         if (type == null) {
             assignmentError = "Seleccione un cargo"
             return
         }
-        if (startDate.isBlank()) {
-            assignmentError = "La fecha inicial es obligatoria"
-            return
-        }
-        val current = editingAssignment
-        val participant = selectedParticipantOption
-        if (current == null && participant == null) {
-            assignmentError = "Seleccione un participante"
+        val validationError = validateAssignmentForm(
+            current = current,
+            participant = participant,
+            type = type,
+            selectedScheduleId = selectedScheduleId,
+            startDate = startDate
+        )
+        if (validationError != null) {
+            assignmentError = validationError
             return
         }
         assignmentActionLoading = true
         assignmentError = null
         scope.launch {
             try {
-                val normalizedActor = requireActor()
+                val normalizedActor = actor.trim()
                 if (current == null) {
-                    repository.createAdminEmployeeArea(
-                        normalizedActor,
-                        EmployeeAreaAdminIn(
-                            id_participante = participant!!.id_participante,
-                            id_area = area.id_area,
-                            codigo_tipo = type.codigo,
-                            descripcion = assignmentDescription.trim()
-                                .takeIf(String::isNotEmpty),
-                            fecha_inicia = startDate.trim(),
-                            fecha_final = endDate.trim().takeIf(String::isNotEmpty)
-                        )
+                    val payload = buildCreateEmployeeAreaPayload(
+                        participantId = participant!!.id_participante,
+                        areaId = area.id_area,
+                        typeCode = type.codigo,
+                        description = assignmentDescription.trim().takeIf(String::isNotEmpty),
+                        startDate = startDate.trim(),
+                        endDate = endDate.trim().takeIf(String::isNotEmpty),
+                        scheduleId = selectedScheduleId
                     )
+                    repository.createAdminEmployeeArea(normalizedActor, payload)
                     assignmentMessage = "Asignación creada correctamente"
                 } else {
-                    repository.updateAdminEmployeeArea(
-                        normalizedActor,
-                        current.id_empleado_area,
-                        EmployeeAreaUpdateIn(
-                            id_area = area.id_area,
-                            codigo_tipo = type.codigo,
-                            descripcion = assignmentDescription.trim()
-                                .takeIf(String::isNotEmpty),
-                            fecha_inicia = startDate.trim(),
-                            fecha_final = endDate.trim().takeIf(String::isNotEmpty)
-                        )
+                    val payload = buildUpdateEmployeeAreaPayload(
+                        areaId = area.id_area,
+                        typeCode = type.codigo,
+                        description = assignmentDescription.trim().takeIf(String::isNotEmpty),
+                        startDate = startDate.trim(),
+                        endDate = endDate.trim().takeIf(String::isNotEmpty),
+                        scheduleId = selectedScheduleId
                     )
+                    repository.updateAdminEmployeeArea(normalizedActor, current.id_empleado_area, payload)
                     assignmentMessage = "Asignación actualizada correctamente"
                 }
                 val expandedArea = area.id_area
@@ -624,7 +692,10 @@ fun AdminCatalogScreen(
                 expandedEmployeeAreaIds = expandedEmployeeAreaIds + expandedArea
                 loadEmployeeAreaTree()
             } catch (error: Exception) {
-                assignmentError = error.message ?: "Error al guardar"
+                assignmentError = normalizeAssignmentError(
+                    error.message ?: "Error al guardar",
+                    isRetireAction = false
+                )
             } finally {
                 assignmentActionLoading = false
             }
@@ -1217,6 +1288,41 @@ fun AdminCatalogScreen(
                             label = { Text(type.descripcion) }
                         )
                     }
+                    var scheduleMenuExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !assignmentActionLoading,
+                            onClick = { scheduleMenuExpanded = true }
+                        ) {
+                            val selectedSchedule = workSchedules.firstOrNull { it.id_jornada == selectedScheduleId }
+                            Text(
+                                selectedSchedule?.let { "${it.codigo_jornada} — ${it.nombre_jornada}" }
+                                    ?: "Seleccione una jornada"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = scheduleMenuExpanded,
+                            onDismissRequest = { scheduleMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Seleccione una jornada") },
+                                onClick = {
+                                    selectedScheduleId = null
+                                    scheduleMenuExpanded = false
+                                }
+                            )
+                            workSchedules.forEach { schedule ->
+                                DropdownMenuItem(
+                                    text = { Text("${schedule.codigo_jornada} — ${schedule.nombre_jornada}") },
+                                    onClick = {
+                                        selectedScheduleId = schedule.id_jornada
+                                        scheduleMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = assignmentDescription,
                         onValueChange = { assignmentDescription = it },
@@ -1247,6 +1353,7 @@ fun AdminCatalogScreen(
                 Button(
                     enabled = !assignmentActionLoading &&
                         selectedType != null &&
+                        selectedScheduleId != null &&
                         startDate.isNotBlank() &&
                         (current != null || selectedParticipantOption != null),
                     onClick = ::saveAssignment
@@ -1416,15 +1523,17 @@ fun AdminCatalogScreen(
                         scope.launch {
                             try {
                                 repository.retireAdminEmployeeArea(
-                                    requireActor(),
+                                    actor.trim(),
                                     assignment.id_empleado_area
                                 )
                                 assignmentMessage = "Asignación retirada correctamente"
                                 deletingAssignment = null
                                 loadEmployeeAreaTree()
                             } catch (error: Exception) {
-                                assignmentError = error.message
-                                    ?: "No fue posible retirar la asignación"
+                                assignmentError = normalizeAssignmentError(
+                                    error.message ?: "No fue posible retirar la asignación",
+                                    isRetireAction = true
+                                )
                                 deletingAssignment = null
                             } finally {
                                 assignmentActionLoading = false

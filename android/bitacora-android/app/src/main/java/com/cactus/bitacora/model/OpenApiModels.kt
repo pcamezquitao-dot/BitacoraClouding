@@ -487,7 +487,8 @@ data class EmployeeAreaAdminIn(
     val codigo_tipo: Int,
     val descripcion: String? = null,
     val fecha_inicia: String,
-    val fecha_final: String? = null
+    val fecha_final: String? = null,
+    val id_jornada: Long? = null
 )
 
 data class EmployeeAreaAdminOut(
@@ -497,7 +498,8 @@ data class EmployeeAreaAdminOut(
     val codigo_tipo: Int,
     val descripcion: String? = null,
     val fecha_inicia: String,
-    val fecha_final: String? = null
+    val fecha_final: String? = null,
+    val id_jornada: Long? = null
 )
 
 data class EmployeeAreaAssignmentOut(
@@ -509,7 +511,8 @@ data class EmployeeAreaAssignmentOut(
     val cargo: String? = null,
     val descripcion: String? = null,
     val fecha_inicia: String,
-    val fecha_final: String? = null
+    val fecha_final: String? = null,
+    val id_jornada: Long? = null
 )
 
 data class EmployeeAreaTreeNodeOut(
@@ -529,7 +532,8 @@ data class EmployeeAreaUpdateIn(
     val codigo_tipo: Int,
     val descripcion: String? = null,
     val fecha_inicia: String,
-    val fecha_final: String? = null
+    val fecha_final: String? = null,
+    val id_jornada: Long? = null
 )
 
 data class ParticipantOptionOut(

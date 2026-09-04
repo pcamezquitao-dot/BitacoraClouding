@@ -17,6 +17,58 @@ El Decálogo permanente es:
 9. Hacer prueba física en celular antes de declarar una versión estable.
 10. Hacer commit o tag estable únicamente tras validar técnica y funcionalmente.
 
+REGLA — BLOQUEO ESTRICTO DEL ALCANCE
+
+Codex debe ejecutar únicamente la tarea solicitada por Patricia.
+
+- No debe investigar otros módulos ni otras células.
+- No debe agregar pruebas adicionales que Patricia no haya solicitado.
+- No debe mejorar, refactorizar, reorganizar ni corregir nada que no sea indispensable para cumplir exactamente la tarea autorizada.
+- No debe convertir una prueba sencilla en una auditoría o validación general.
+- La autonomía técnica permite resolver la tarea solicitada, pero nunca ampliar su alcance.
+- Si encuentra un problema ajeno, debe registrarlo brevemente y dejarlo intacto.
+- Solo puede revisar otro archivo cuando sea directamente indispensable para resolver la tarea autorizada, explicándolo en una sola línea.
+- Debe detenerse inmediatamente cuando obtenga el resultado concreto solicitado.
+
+REGLA — AUTONOMÍA TÉCNICA Y NO INTERRUPCIÓN
+
+Una vez Patricia haya autorizado una implementación y definido su alcance,
+Codex debe continuar autónomamente hasta completar la implementación, las
+pruebas, la compilación y la generación del artefacto solicitado.
+
+Codex no debe detener el trabajo ni trasladar a Patricia decisiones técnicas
+rutinarias que pueda resolver dentro del alcance autorizado, entre ellas:
+
+- configuración del SDK y herramientas locales;
+- local.properties y rutas del entorno;
+- comandos Gradle;
+- dependencias ya contempladas por el proyecto;
+- imports;
+- errores de sintaxis, tipos o compilación;
+- pruebas fallidas causadas por los cambios autorizados;
+- correcciones internas necesarias para cumplir el contrato aprobado;
+- repetición de pruebas;
+- generación y verificación de la APK.
+
+Codex no debe presentar como terminado un trabajo que no haya compilado y
+superado las pruebas correspondientes.
+
+Codex solo debe interrumpir y solicitar decisión de Patricia cuando exista:
+
+1. Necesidad de borrar o modificar datos reales.
+2. Migración o cambio estructural de MariaDB o Room no autorizado.
+3. Acción destructiva o difícilmente reversible.
+4. Decisión funcional no definida en el contrato.
+5. Ampliación necesaria fuera de la célula autorizada.
+6. Contradicción que permita resultados funcionales distintos y no pueda
+   resolverse con el CATALOGO o los contratos vigentes.
+7. Necesidad de desplegar, instalar, hacer commit o push sin autorización.
+8. Solicitud de credenciales o permisos que no estén disponibles.
+
+Los controles obligatorios de seguridad de la herramienta, como el botón
+“Allow”, pueden aparecer, pero Codex debe agrupar los comandos seguros cuando
+sea posible y no acompañarlos de preguntas funcionales innecesarias.
+
 ## Protocolo obligatorio de ejecución por células
 
 ### 1. Definición completa antes de implementar

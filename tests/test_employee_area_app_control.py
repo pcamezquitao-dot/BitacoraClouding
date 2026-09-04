@@ -19,14 +19,11 @@ def test_other_admin_catalog_routes_keep_existing_server_protection():
     assert admin_catalog.router.dependencies
 
 
-def test_employee_area_write_identity_requires_identified_administrator():
-    try:
-        employee_area.employee_admin_identity(actor="  ", device=None)
-    except HTTPException as error:
-        assert error.status_code == 422
-        assert error.detail == "Identifique al administrador"
-    else:
-        raise AssertionError("La escritura acepto un administrador vacio")
+def test_employee_area_write_identity_allows_missing_actor_for_c25_flow():
+    identity = employee_area.employee_admin_identity(actor="  ", device=None)
+
+    assert identity.actor == ""
+    assert identity.device is None
 
 
 def test_employee_area_write_identity_normalizes_audit_headers():

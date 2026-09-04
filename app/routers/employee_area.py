@@ -37,8 +37,6 @@ def employee_admin_identity(
     device: str | None = Header(None, alias="X-Admin-Device"),
 ) -> AdminIdentity:
     normalized_actor = (actor or "").strip()
-    if not normalized_actor:
-        raise HTTPException(status_code=422, detail="Identifique al administrador")
     return AdminIdentity(normalized_actor, (device or "").strip() or None)
 
 

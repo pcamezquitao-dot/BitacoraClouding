@@ -65,7 +65,7 @@ class AdminCatalogServiceTest(unittest.TestCase):
         audit_sql = str(db.execute.call_args_list[5].args[0]).upper()
         self.assertIn("ADMINISTRACION_CATALOGO_AUDITORIA", audit_sql)
 
-    def test_solapamiento_revierte_y_no_inserta(self):
+    def test_solapamiento_activo_devuelve_mensaje_claro(self):
         db = MagicMock()
         db.execute.side_effect = [
             scalar_result(1),
@@ -74,12 +74,32 @@ class AdminCatalogServiceTest(unittest.TestCase):
             scalar_result(7),
         ]
 
-        with self.assertRaisesRegex(ValueError, "solapa"):
+        with self.assertRaisesRegex(ValueError, "ya tiene una asignación activa"):
             create_employee_area(db, self.payload, self.identity)
 
         db.rollback.assert_called_once_with()
         db.commit.assert_not_called()
         self.assertEqual(4, db.execute.call_count)
+
+    def test_asignacion_retirada_no_bloquea_una_nueva_creacion(self):
+        db = MagicMock()
+        inserted = MagicMock()
+        inserted.lastrowid = 99
+        audit_result = MagicMock()
+        db.execute.side_effect = [
+            scalar_result(1),
+            scalar_result(1),
+            scalar_result(1),
+            scalar_result(None),
+            inserted,
+            audit_result,
+        ]
+
+        result = create_employee_area(db, self.payload, self.identity)
+
+        self.assertEqual(99, result["id_empleado_area"])
+        db.commit.assert_called_once_with()
+        db.rollback.assert_not_called()
 
     def test_tipo_inactivo_revierte_antes_de_buscar_solapamientos(self):
         db = MagicMock()

@@ -49,6 +49,7 @@ class EmployeeAreaCreate(BaseModel):
     descripcion: str | None = Field(default=None, max_length=100)
     fecha_inicia: date
     fecha_final: date | None = None
+    id_jornada: int | None = Field(default=None, gt=0)
 
 
 class EmployeeAreaOut(EmployeeAreaCreate):
@@ -66,6 +67,7 @@ class EmployeeAreaAssignmentOut(BaseModel):
     descripcion: str | None = None
     fecha_inicia: date
     fecha_final: date | None = None
+    id_jornada: int | None = None
 
 
 class EmployeeAreaTreeNodeOut(BaseModel):
@@ -86,6 +88,7 @@ class EmployeeAreaUpdate(BaseModel):
     descripcion: str | None = Field(default=None, max_length=100)
     fecha_inicia: date
     fecha_final: date | None = None
+    id_jornada: int | None = Field(default=None, gt=0)
 
 
 class CalendarHolidayUpdate(BaseModel):

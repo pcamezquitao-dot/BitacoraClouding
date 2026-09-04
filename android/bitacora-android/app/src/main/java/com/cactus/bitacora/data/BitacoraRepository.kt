@@ -497,13 +497,11 @@ class BitacoraRepository(
     )
 
     suspend fun adminEmployeeAreaTree(actor: String): List<EmployeeAreaTreeNodeOut> {
-        var local = referenceCatalogRepository.localEmployeeAreaTree()
-        if (local.isEmpty()) {
-            referenceCatalogRepository.syncCatalogs()
-            local = referenceCatalogRepository.localEmployeeAreaTree()
-            if (local.isEmpty()) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+        val response = api.getAdminEmployeeAreaTree(actor.trim(), Build.MODEL)
+        if (!response.isSuccessful) {
+            throw IOException("No fue posible consultar las asignaciones activas")
         }
-        return local
+        return response.body().orEmpty()
     }
 
     suspend fun adminEmployeeAreaTypes(

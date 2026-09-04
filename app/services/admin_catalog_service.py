@@ -547,6 +547,11 @@ def _ensure_area_not_duplicate(
         )
 
 
+ACTIVE_ASSIGNMENT_CONFLICT_MESSAGE = (
+    "El participante ya tiene una asignación activa en esta área."
+)
+
+
 def create_employee_area(
     db: Session,
     payload,
@@ -584,6 +589,20 @@ def create_employee_area(
         if type_exists is None:
             raise ValueError("El tipo no existe o está inactivo")
 
+        if payload.id_jornada is not None:
+            schedule_exists = db.execute(
+                text(
+                    "SELECT 1 FROM jornadas_de_trabajo "
+                    "WHERE id_jornada=:id AND activo=TRUE "
+                    "AND vigencia_desde <= CURDATE() "
+                    "AND (vigencia_hasta IS NULL OR vigencia_hasta >= CURDATE()) "
+                    "LIMIT 1"
+                ),
+                {"id": payload.id_jornada},
+            ).scalar_one_or_none()
+            if schedule_exists is None:
+                raise ValueError("La jornada seleccionada no está activa o vigente")
+
         overlap = db.execute(
             text(
                 """
@@ -606,17 +625,17 @@ def create_employee_area(
             },
         ).scalar_one_or_none()
         if overlap is not None:
-            raise ValueError("La asignación se solapa con otra vigencia")
+            raise ValueError(ACTIVE_ASSIGNMENT_CONFLICT_MESSAGE)
 
         inserted = db.execute(
             text(
                 """
                 INSERT INTO empleado_area
                     (id_participante, id_area, cargo, descripcion,
-                     fecha_inicia, fecha_final, activo)
+                     fecha_inicia, fecha_final, activo, id_jornada)
                 VALUES
                     (:id_participante, :id_area, :cargo, :descripcion,
-                     :fecha_inicia, :fecha_final, TRUE)
+                     :fecha_inicia, :fecha_final, TRUE, :id_jornada)
                 """
             ),
             {
@@ -626,6 +645,7 @@ def create_employee_area(
                 "descripcion": payload.descripcion,
                 "fecha_inicia": payload.fecha_inicia,
                 "fecha_final": payload.fecha_final,
+                "id_jornada": payload.id_jornada,
             },
         )
         assignment_id = int(inserted.lastrowid)
@@ -760,6 +780,19 @@ def update_employee_area(
         ).scalar_one_or_none()
         if type_exists is None:
             raise ValueError("El tipo no existe o está inactivo")
+        if payload.id_jornada is not None:
+            schedule_exists = db.execute(
+                text(
+                    "SELECT 1 FROM jornadas_de_trabajo "
+                    "WHERE id_jornada=:id AND activo=TRUE "
+                    "AND vigencia_desde <= CURDATE() "
+                    "AND (vigencia_hasta IS NULL OR vigencia_hasta >= CURDATE()) "
+                    "LIMIT 1"
+                ),
+                {"id": payload.id_jornada},
+            ).scalar_one_or_none()
+            if schedule_exists is None:
+                raise ValueError("La jornada seleccionada no está activa o vigente")
         overlap = db.execute(
             text(
                 """
@@ -783,15 +816,14 @@ def update_employee_area(
             },
         ).scalar_one_or_none()
         if overlap is not None:
-            raise ValueError(
-                "El participante ya tiene una asignación vigente en esta área."
-            )
+            raise ValueError(ACTIVE_ASSIGNMENT_CONFLICT_MESSAGE)
         db.execute(
             text(
                 """
                 UPDATE empleado_area
                 SET id_area=:id_area, cargo=:cargo, descripcion=:descripcion,
-                    fecha_inicia=:fecha_inicia, fecha_final=:fecha_final
+                    fecha_inicia=:fecha_inicia, fecha_final=:fecha_final,
+                    id_jornada=:id_jornada
                 WHERE id_empleado_area=:id_asignacion
                 """
             ),
@@ -801,6 +833,7 @@ def update_employee_area(
                 "descripcion": payload.descripcion,
                 "fecha_inicia": payload.fecha_inicia,
                 "fecha_final": payload.fecha_final,
+                "id_jornada": payload.id_jornada,
                 "id_asignacion": assignment_id,
             },
         )
@@ -855,7 +888,7 @@ def _employee_area_for_update(db: Session, assignment_id: int) -> dict | None:
             """
             SELECT id_empleado_area, id_participante, id_area,
                    cargo AS codigo_tipo, descripcion, fecha_inicia,
-                   fecha_final, activo
+                   fecha_final, activo, id_jornada
             FROM empleado_area
             WHERE id_empleado_area=:id_asignacion
             LIMIT 1 FOR UPDATE
@@ -874,7 +907,7 @@ def _employee_area_result(db: Session, assignment_id: int) -> dict:
                    p.identificacion_participante AS codigo_participante,
                    TRIM(CONCAT_WS(' ', p.nombre, p.apellido)) AS nombre_completo,
                    ea.cargo AS codigo_tipo, tp.descripcion AS cargo,
-                   ea.descripcion, ea.fecha_inicia, ea.fecha_final
+                   ea.descripcion, ea.fecha_inicia, ea.fecha_final, ea.id_jornada
             FROM empleado_area ea
             JOIN participante p ON p.id_participante=ea.id_participante
             LEFT JOIN tipos_participante tp ON tp.codigo=ea.cargo
