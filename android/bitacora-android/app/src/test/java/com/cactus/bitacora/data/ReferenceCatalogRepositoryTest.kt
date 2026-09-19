@@ -208,6 +208,67 @@ class ReferenceCatalogRepositoryTest {
     }
 
     @Test
+    fun emptyAreasReconcileLocalRowsAndRestoreSixSchedulesWithFiftySixDetails() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            areas[7] = area(7)
+            assignments[2 to 7] = assignment(2, 7, 1)
+        }
+        val remote = snapshot().copy(
+            areas = emptyList(),
+            empleado_areas = emptyList()
+        )
+
+        val result = repository(
+            dao,
+            FakeCatalogApi(snapshot = remote, workSchedules = workScheduleSnapshot())
+        ).syncCatalogs()
+
+        assertTrue(result.success)
+        assertEquals(1, dao.participantCount())
+        assertEquals(0, dao.areaCount())
+        assertEquals(0, dao.assignmentCount())
+        assertEquals(6, dao.workSchedules().size)
+        assertEquals(56, dao.workScheduleDetails().size)
+    }
+
+    @Test
+    fun emptyParticipantsRejectSnapshotWithoutMutatingLocalRows() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            areas[7] = area(7)
+            assignments[2 to 7] = assignment(2, 7, 1)
+        }
+        val remote = snapshot().copy(participantes = emptyList())
+
+        val result = repository(dao, FakeCatalogApi(snapshot = remote)).syncCatalogs()
+
+        assertEquals(false, result.success)
+        assertEquals(1, dao.participantCount())
+        assertEquals(1, dao.areaCount())
+        assertEquals(1, dao.assignmentCount())
+    }
+
+    @Test
+    fun failedWorkScheduleDownloadPreservesPreviousSnapshot() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            areas[7] = area(7)
+            assignments[2 to 7] = assignment(2, 7, 1)
+        }
+
+        val result = repository(
+            dao,
+            FakeCatalogApi(snapshot = snapshot(), failWorkSchedules = true)
+        ).syncCatalogs()
+
+        assertEquals(false, result.success)
+        assertEquals(1, dao.participantCount())
+        assertEquals(1, dao.areaCount())
+        assertEquals(1, dao.assignmentCount())
+    }
+
+    @Test
     fun participantRefreshReplacesFakeLocalNameWithServerValue() = runBlocking {
         val dao = FakeCatalogDao().apply {
             participants[1] = participant(1, "P0001").copy(
@@ -265,7 +326,10 @@ class ReferenceCatalogRepositoryTest {
 private class FakeCatalogApi(
     var failNetwork: Boolean = false,
     private val participant: ParticipanteOut? = null,
-    private val snapshot: OfflineCatalogOut? = null
+    private val snapshot: OfflineCatalogOut? = null,
+    private val workSchedules: List<com.cactus.bitacora.model.WorkScheduleOut> =
+        workScheduleSnapshot(),
+    private val failWorkSchedules: Boolean = false
 ) {
     var calls = 0
 
@@ -289,6 +353,10 @@ private class FakeCatalogApi(
             "getParticipanteByQr" -> participant
                 ?: throw IOException("participante no configurado")
             "getOfflineCatalogs" -> snapshot ?: snapshot()
+            "getWorkSchedules" -> {
+                if (failWorkSchedules) throw IOException("fallo descargando jornadas")
+                workSchedules
+            }
             "getAsignacionesActivas" -> emptyList<EmpleadoAreaActivaOut>()
             "getAreaByQr" -> AreaOut(7, "Administración")
             else -> throw UnsupportedOperationException(method.name)
@@ -478,6 +546,42 @@ private fun participantType(code: Int, description: String) =
     com.cactus.bitacora.data.local.TipoParticipanteLocalEntity(
         code, description, "EMPLEADO", true, 1
     )
+
+private fun workScheduleSnapshot() = (1L..6L).map { scheduleId ->
+    val detailCount = if (scheduleId == 6L) 11 else 9
+    com.cactus.bitacora.model.WorkScheduleOut(
+        id_jornada = scheduleId,
+        codigo_jornada = "jornada_$scheduleId",
+        nombre_jornada = "Jornada $scheduleId",
+        minutos_objetivo_semana = 2400,
+        tolerancia_entrada_min = 0,
+        tolerancia_salida_min = 0,
+        vigencia_desde = "2026-01-01",
+        vigencia_hasta = null,
+        activo = true,
+        aplica_control_horario = true,
+        observaciones = null,
+        fecha_creacion = null,
+        fecha_actualizacion = null,
+        total_programado_semana = detailCount * 480,
+        referenciada_activa = false,
+        detalles = (1..detailCount).map { number ->
+            com.cactus.bitacora.model.WorkScheduleDetailOut(
+                id_detalle = scheduleId * 100 + number.toLong(),
+                dia_semana_num = ((number - 1) % 7) + 1,
+                numero_tramo = ((number - 1) / 7) + 1,
+                es_laborable = true,
+                hora_entrada_min = 480,
+                hora_salida_min = 960,
+                salida_dia_siguiente = false,
+                descanso_min = 0,
+                descanso_remunerado = false,
+                observaciones = null,
+                minutos_programados = 480
+            )
+        }
+    )
+}
 
 private fun snapshot() = OfflineCatalogOut(
     generated_at = "2026-07-19T00:00:00Z",

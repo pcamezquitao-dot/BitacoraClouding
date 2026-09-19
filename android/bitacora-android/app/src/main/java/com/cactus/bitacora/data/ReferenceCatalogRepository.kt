@@ -241,13 +241,51 @@ class ReferenceCatalogRepository(
                     syncedAtMillis = now
                 )
             }
-            if (participants.isEmpty() || areas.isEmpty()) {
+            if (participants.isEmpty()) {
                 throw CatalogValidationException("El servidor devolvió un catálogo incompleto")
             }
             val participantIds = participants.mapTo(hashSetOf()) { it.idParticipante }
             val areaIds = areas.mapTo(hashSetOf()) { it.idArea }
             if (assignments.any { it.idParticipante !in participantIds || it.idArea !in areaIds }) {
                 throw CatalogValidationException("El servidor devolvió relaciones incompletas")
+            }
+            val remoteWorkSchedules = api.getWorkSchedules()
+            val workSchedules = remoteWorkSchedules.map {
+                com.cactus.bitacora.data.local.WorkScheduleLocalEntity(
+                    idJornada = it.id_jornada,
+                    codigoJornada = it.codigo_jornada,
+                    nombreJornada = it.nombre_jornada,
+                    minutosObjetivoSemana = it.minutos_objetivo_semana,
+                    toleranciaEntradaMin = it.tolerancia_entrada_min,
+                    toleranciaSalidaMin = it.tolerancia_salida_min,
+                    vigenciaDesde = it.vigencia_desde,
+                    vigenciaHasta = it.vigencia_hasta,
+                    activo = it.activo,
+                    aplicaControlHorario = it.aplica_control_horario,
+                    observaciones = it.observaciones,
+                    fechaCreacion = it.fecha_creacion,
+                    fechaActualizacion = it.fecha_actualizacion,
+                    totalProgramadoSemana = it.total_programado_semana,
+                    syncedAtMillis = now
+                )
+            }
+            val workScheduleDetails = remoteWorkSchedules.flatMap { schedule ->
+                schedule.detalles.map { detail ->
+                    com.cactus.bitacora.data.local.WorkScheduleDetailLocalEntity(
+                        idDetalle = detail.id_detalle,
+                        idJornada = schedule.id_jornada,
+                        diaSemanaNum = detail.dia_semana_num,
+                        numeroTramo = detail.numero_tramo,
+                        esLaborable = detail.es_laborable,
+                        horaEntradaMin = detail.hora_entrada_min,
+                        horaSalidaMin = detail.hora_salida_min,
+                        salidaDiaSiguiente = detail.salida_dia_siguiente,
+                        descansoMin = detail.descanso_min,
+                        descansoRemunerado = detail.descanso_remunerado,
+                        observaciones = detail.observaciones,
+                        minutosProgramados = detail.minutos_programados
+                    )
+                }
             }
             val calendar = remote.calendario.map {
                 CalendarioGeneralLocalEntity(
@@ -278,8 +316,8 @@ class ReferenceCatalogRepository(
                 areas = areas,
                 assignments = assignments,
                 participantTypes = participantTypes,
-                workSchedules = emptyList(),
-                workScheduleDetails = emptyList(),
+                workSchedules = workSchedules,
+                workScheduleDetails = workScheduleDetails,
                 state = syncState,
                 preparationState = preparationState,
                 calendar = calendar
