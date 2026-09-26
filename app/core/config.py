@@ -35,8 +35,8 @@ class Settings(BaseSettings):
 
     FFMPEG_PATH: str = "/usr/bin/ffmpeg"
     WHISPER_CLI_PATH: str = "/srv/bitacora/tools/whisper.cpp/build/bin/whisper-cli"
-    WHISPER_MODEL_PATH: str = "/srv/bitacora/tools/whisper.cpp/models/ggml-base.bin"
+    WHISPER_MODEL_PATH: str = "/srv/bitacora/tools/whisper.cpp/models/ggml-small.bin"
     TRANSCRIPTION_LANGUAGE: str = "es"
-    TRANSCRIPTION_ENGINE: str = "whisper.cpp/base"
+    TRANSCRIPTION_ENGINE: str = "whisper.cpp/small"
 
 settings = Settings()

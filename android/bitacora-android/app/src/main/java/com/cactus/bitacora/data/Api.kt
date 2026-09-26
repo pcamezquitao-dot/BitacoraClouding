@@ -21,6 +21,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import com.cactus.bitacora.model.EvidenciaOut
 import com.cactus.bitacora.model.EvidenciaTextoCreate
+import com.cactus.bitacora.model.EvidenceTranscriptionOut
 import com.cactus.bitacora.model.FaceTemplateAuthorizedOut
 import com.cactus.bitacora.model.FaceTemplateEnrollIn
 import com.cactus.bitacora.model.FaceTemplateMetadataOut
@@ -332,6 +333,17 @@ interface BitacoraApi {
         @Query("offset") offset: Int,
         @Query("limit") limit: Int
     ): List<EvidenciaOut>
+
+    @GET("bitacora-area-evidencias/{id_evidencia}/transcripcion")
+    suspend fun getEvidenceTranscription(
+        @Path("id_evidencia") idEvidence: Int
+    ): Response<EvidenceTranscriptionOut>
+
+    @PATCH("bitacora-area-evidencias/{id_evidencia}/transcripcion/correccion")
+    suspend fun correctEvidenceTranscription(
+        @Path("id_evidencia") idEvidence: Int,
+        @Body payload: com.cactus.bitacora.model.EvidenceTranscriptionCorrectionIn
+    ): EvidenceTranscriptionOut
 
     @POST("face-templates/enroll")
     suspend fun enrollFaceTemplate(

@@ -28,6 +28,7 @@ from app.schemas.bitacora_area_evidencia import (
 from app.schemas.evidencia_transcripcion import (
     EstadoTranscripcion,
     TranscripcionCreate,
+    TranscripcionCorreccion,
     TranscripcionResponse,
     TranscripcionUpdate,
 )
@@ -40,7 +41,7 @@ from app.services.audio_transcription_service import (
     ERROR as TRANSCRIPTION_ERROR,
     PENDING as TRANSCRIPTION_PENDING,
     ensure_pending_transcription,
-    transcribe_audio_evidence,
+    transcribe_media_evidence,
 )
 
 router = APIRouter(prefix="/bitacora-area-evidencias", tags=["Bitácora área evidencias"])
@@ -54,8 +55,9 @@ COLUMNAS = """
 logger = logging.getLogger("bitacora.sync")
 TRANSCRIPCION_COLUMNAS = """
     id_transcripcion, id_evidencia, id_bitacora, estado, proveedor, modelo,
-    idioma, confianza, texto_transcrito, numero_reintentos, ultimo_error,
-    creado_en, actualizado_en, completado_en
+    idioma, confianza, texto_transcrito, texto_automatico, texto_corregido,
+    numero_reintentos, ultimo_error, creado_en, actualizado_en, completado_en,
+    corregido_en
 """
 
 
@@ -127,7 +129,7 @@ def _insert(db: Session, payload: BitacoraAreaEvidenciaCreate):
              :orden, :latitud, :longitud, :precision_gps, :uuid_cliente)
     """), values)
     id_evidencia = int(result.lastrowid)
-    if payload.id_tipo_evidencia == 2:
+    if payload.id_tipo_evidencia in (2, 3):
         ensure_pending_transcription(db, id_evidencia, payload.id_bitacora)
     return _get(db, id_evidencia)
 
@@ -173,8 +175,8 @@ def crear_transcripcion_pendiente(
     evidencia = _get(db, id_evidencia)
     if not evidencia:
         raise HTTPException(status_code=404, detail="Evidencia no encontrada")
-    if evidencia["id_tipo_evidencia"] != 2:
-        raise HTTPException(status_code=422, detail="La evidencia no es de audio")
+    if evidencia["id_tipo_evidencia"] not in (2, 3):
+        raise HTTPException(status_code=422, detail="La evidencia no es de audio ni video")
     existente = _get_transcripcion(db, id_evidencia)
     if existente:
         return existente
@@ -217,6 +219,49 @@ def consultar_transcripcion(id_evidencia: int, db: Session = Depends(get_db)):
 
 
 @router.patch(
+    "/{id_evidencia}/transcripcion/correccion",
+    response_model=TranscripcionResponse,
+)
+def corregir_transcripcion(
+    id_evidencia: int,
+    payload: TranscripcionCorreccion,
+    db: Session = Depends(get_db),
+):
+    transcripcion = _get_transcripcion(db, id_evidencia)
+    if not transcripcion:
+        raise HTTPException(status_code=404, detail="Transcripción no encontrada")
+    if transcripcion["estado"] != EstadoTranscripcion.COMPLETADA.value:
+        raise HTTPException(
+            status_code=409,
+            detail="Solo se puede corregir una transcripción completada",
+        )
+    texto_corregido = payload.texto_corregido.strip()
+    if not texto_corregido:
+        raise HTTPException(status_code=422, detail="El texto corregido no puede estar vacío")
+    try:
+        db.execute(
+            text(
+                """
+                UPDATE evidencia_transcripcion
+                SET texto_corregido=:texto_corregido,
+                    corregido_en=CURRENT_TIMESTAMP(6)
+                WHERE id_evidencia=:id_evidencia
+                  AND estado='COMPLETADA'
+                """
+            ),
+            {"texto_corregido": texto_corregido, "id_evidencia": id_evidencia},
+        )
+        db.commit()
+        return _get_transcripcion(db, id_evidencia)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo guardar la corrección: {exc}",
+        )
+
+
+@router.patch(
     "/{id_evidencia}/transcripcion",
     response_model=TranscripcionResponse,
 )
@@ -245,6 +290,10 @@ def actualizar_transcripcion(
                     idioma=COALESCE(:idioma, idioma),
                     confianza=:confianza,
                     texto_transcrito=:texto_transcrito,
+                    texto_automatico=CASE
+                        WHEN :estado='COMPLETADA' THEN :texto_transcrito
+                        ELSE texto_automatico
+                    END,
                     ultimo_error=:ultimo_error,
                     numero_reintentos=numero_reintentos+:incrementar_reintento,
                     completado_en=CASE
@@ -357,8 +406,8 @@ def crear_con_archivo(
             detected_size,
             row["id_evidencia"],
         )
-        if id_tipo_evidencia == 2:
-            background_tasks.add_task(transcribe_audio_evidence, int(row["id_evidencia"]))
+        if id_tipo_evidencia in (2, 3):
+            background_tasks.add_task(transcribe_media_evidence, int(row["id_evidencia"]))
         return row
     except HTTPException:
         db.rollback()
@@ -395,8 +444,8 @@ def reintentar_transcripcion(
     audio = _get(db, id_evidencia)
     if not audio:
         raise HTTPException(status_code=404, detail="Evidencia no encontrada")
-    if audio["id_tipo_evidencia"] != 2:
-        raise HTTPException(status_code=422, detail="La evidencia no es un audio")
+    if audio["id_tipo_evidencia"] not in (2, 3):
+        raise HTTPException(status_code=422, detail="La evidencia no es un audio ni video")
     db.execute(
         text(
             """
@@ -416,7 +465,7 @@ def reintentar_transcripcion(
     db.commit()
     if not _get_transcripcion(db, id_evidencia):
         raise HTTPException(status_code=404, detail="Transcripción no encontrada")
-    background_tasks.add_task(transcribe_audio_evidence, id_evidencia)
+    background_tasks.add_task(transcribe_media_evidence, id_evidencia)
     return {"id_evidencia": id_evidencia, "estado": TRANSCRIPTION_PENDING}
 
 

@@ -49,8 +49,15 @@ class TranscripcionResponse(BaseModel):
     idioma: str | None = None
     confianza: float | None = None
     texto_transcrito: str | None = None
+    texto_automatico: str | None = None
+    texto_corregido: str | None = None
     numero_reintentos: int
     ultimo_error: str | None = None
     creado_en: datetime
     actualizado_en: datetime
     completado_en: datetime | None = None
+    corregido_en: datetime | None = None
+
+
+class TranscripcionCorreccion(BaseModel):
+    texto_corregido: str = Field(min_length=1)

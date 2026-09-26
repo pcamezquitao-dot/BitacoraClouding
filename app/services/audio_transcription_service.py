@@ -44,7 +44,7 @@ def ensure_pending_transcription(
     )
 
 
-def transcribe_file(source: Path) -> str:
+def transcribe_file(source: Path, evidence_type: int = 2) -> str:
     ffmpeg = Path(settings.FFMPEG_PATH)
     whisper = Path(settings.WHISPER_CLI_PATH)
     model = Path(settings.WHISPER_MODEL_PATH)
@@ -56,17 +56,22 @@ def transcribe_file(source: Path) -> str:
         workdir = Path(directory)
         wav = workdir / "audio.wav"
         output = workdir / "transcripcion"
-        subprocess.run(
-            [
-                str(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error",
-                "-y", "-i", str(source), "-ar", "16000", "-ac", "1",
-                "-c:a", "pcm_s16le", str(wav),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
+        try:
+            subprocess.run(
+                [
+                    str(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error",
+                    "-y", "-i", str(source), "-map", "0:a:0", "-vn",
+                    "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(wav),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+        except subprocess.CalledProcessError as error:
+            if evidence_type == 3:
+                raise RuntimeError("El video no contiene una pista de audio utilizable") from error
+            raise
         subprocess.run(
             [
                 str(whisper), "-m", str(model), "-f", str(wav), "-l",
@@ -103,18 +108,19 @@ def _mark_error(id_evidencia: int, error: Exception) -> None:
     logger.exception("audio transcription failed evidence_id=%s", id_evidencia)
 
 
-def transcribe_audio_evidence(id_evidencia: int) -> None:
+def transcribe_media_evidence(id_evidencia: int) -> None:
     try:
         with SessionLocal() as db:
             audio = db.execute(
                 text(
                     f"""
-                    SELECT e.id_evidencia, e.id_bitacora, e.archivo_url
+                    SELECT e.id_evidencia, e.id_bitacora, e.archivo_url,
+                           e.id_tipo_evidencia
                     FROM {settings.BAE_TABLE} AS e
                     JOIN evidencia_transcripcion AS t
                       ON t.id_evidencia=e.id_evidencia
                     WHERE e.id_evidencia=:id_evidencia
-                      AND e.id_tipo_evidencia=2
+                      AND e.id_tipo_evidencia IN (2, 3)
                     LIMIT 1
                     """
                 ),
@@ -147,7 +153,7 @@ def transcribe_audio_evidence(id_evidencia: int) -> None:
         )
         if source is None:
             raise RuntimeError("Archivo de audio no encontrado")
-        transcript = transcribe_file(source)
+        transcript = transcribe_file(source, int(audio["id_tipo_evidencia"]))
 
         with SessionLocal() as db:
             db.execute(
@@ -156,6 +162,7 @@ def transcribe_audio_evidence(id_evidencia: int) -> None:
                     UPDATE evidencia_transcripcion
                     SET estado='COMPLETADA',
                         texto_transcrito=:texto,
+                        texto_automatico=:texto,
                         ultimo_error=NULL,
                         completado_en=CURRENT_TIMESTAMP(6)
                     WHERE id_evidencia=:id_evidencia
@@ -167,6 +174,11 @@ def transcribe_audio_evidence(id_evidencia: int) -> None:
         logger.info("audio transcription completed evidence_id=%s", id_evidencia)
     except Exception as error:
         _mark_error(id_evidencia, error)
+
+
+def transcribe_audio_evidence(id_evidencia: int) -> None:
+    """Alias compatible para consumidores anteriores del flujo de audio."""
+    transcribe_media_evidence(id_evidencia)
 
 
 def recover_pending_transcriptions(limit: int = 20) -> None:
@@ -184,4 +196,4 @@ def recover_pending_transcriptions(limit: int = 20) -> None:
             {"limit": limit},
         ).scalars().all()
     for id_evidencia in pending:
-        transcribe_audio_evidence(int(id_evidencia))
+        transcribe_media_evidence(int(id_evidencia))

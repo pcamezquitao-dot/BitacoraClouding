@@ -29,6 +29,7 @@ import com.cactus.bitacora.data.models.AreaByQrIn
 import com.cactus.bitacora.data.models.BitacoraDiariaCreate
 import com.cactus.bitacora.data.models.BitacoraDiariaOut
 import com.cactus.bitacora.model.EvidenciaTextoCreate
+import com.cactus.bitacora.model.EvidenceTranscriptionOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.model.EmployeeAreaAdminIn
@@ -53,9 +54,18 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 internal fun remoteDeleteAlreadySatisfied(statusCode: Int): Boolean = statusCode == 404
+sealed interface AudioTranscriptionState {
+    data object Loading : AudioTranscriptionState
+    data object PendingSync : AudioTranscriptionState
+    data object NotFound : AudioTranscriptionState
+    data class Available(val value: EvidenceTranscriptionOut) : AudioTranscriptionState
+    data class Unavailable(val message: String) : AudioTranscriptionState
+}
+
 
 class BitacoraRepository(
     context: Context,
@@ -1116,6 +1126,56 @@ class BitacoraRepository(
     suspend fun getEvidences(localId: Long): List<BitacoraEvidenceEntity> {
         val bitacora = bitacoraDao.getById(localId)
         return remoteEvidenceRepository.refreshAndGet(localId, bitacora?.backendId)
+    }
+
+    suspend fun getAudioTranscription(
+        evidence: BitacoraEvidenceEntity
+    ): AudioTranscriptionState = getMediaTranscription(evidence)
+
+    suspend fun getMediaTranscription(
+        evidence: BitacoraEvidenceEntity
+    ): AudioTranscriptionState {
+        if (evidence.evidenceType !in setOf(EvidenceType.AUDIO, EvidenceType.VIDEO)) {
+            return AudioTranscriptionState.NotFound
+        }
+        val remoteId = evidence.remoteId ?: return AudioTranscriptionState.PendingSync
+        return try {
+            val response = api.getEvidenceTranscription(remoteId)
+            when {
+                response.isSuccessful && response.body() != null ->
+                    AudioTranscriptionState.Available(requireNotNull(response.body()))
+                response.code() == 404 -> AudioTranscriptionState.NotFound
+                else -> AudioTranscriptionState.Unavailable(
+                    "No fue posible consultar la transcripción (HTTP ${response.code()})"
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AudioTranscriptionState.Unavailable(
+                error.message ?: "No fue posible consultar la transcripción"
+            )
+        }
+    }
+
+    suspend fun correctAudioTranscription(
+        evidence: BitacoraEvidenceEntity,
+        correctedText: String
+    ): AudioTranscriptionState.Available {
+        require(evidence.evidenceType in setOf(EvidenceType.AUDIO, EvidenceType.VIDEO)) {
+            "La evidencia no es un audio ni video"
+        }
+        val remoteId = requireNotNull(evidence.remoteId) {
+            "La evidencia aún no está sincronizada"
+        }
+        val normalized = correctedText.trim()
+        require(normalized.isNotEmpty()) { "El texto corregido no puede estar vacío" }
+        return AudioTranscriptionState.Available(
+            api.correctEvidenceTranscription(
+                remoteId,
+                com.cactus.bitacora.model.EvidenceTranscriptionCorrectionIn(normalized)
+            )
+        )
     }
 
     suspend fun deleteEvidence(localId: Long) {

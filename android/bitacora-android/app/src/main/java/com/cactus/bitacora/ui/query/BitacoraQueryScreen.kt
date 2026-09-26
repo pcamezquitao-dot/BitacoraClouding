@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -59,6 +60,7 @@ import androidx.media3.ui.PlayerView
 import com.cactus.bitacora.R
 import com.cactus.bitacora.api.NetworkClient
 import com.cactus.bitacora.data.BitacoraRepository
+import com.cactus.bitacora.data.AudioTranscriptionState
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
 import com.cactus.bitacora.data.local.BitacoraLocalEntity
 import com.cactus.bitacora.data.local.BitacoraQueryHeader
@@ -100,6 +102,38 @@ internal fun canOpenEvidenceLocally(localFilePath: String?, fileExists: Boolean)
 
 internal fun canShowDeletionActions(allowDelete: Boolean): Boolean = allowDelete
 
+internal fun transcriptionStatusLabel(state: AudioTranscriptionState): String = when (state) {
+    AudioTranscriptionState.Loading -> "Transcripción: consultando"
+    AudioTranscriptionState.PendingSync -> "Transcripción: pendiente de sincronizar el audio"
+    AudioTranscriptionState.NotFound -> "Transcripción: no iniciada"
+    is AudioTranscriptionState.Unavailable -> "Transcripción: ${state.message}"
+    is AudioTranscriptionState.Available -> when (state.value.estado.uppercase()) {
+        "PENDIENTE" -> "Transcripción: pendiente"
+        "PROCESANDO" -> "Transcripción: procesando"
+        "COMPLETADA" -> "Transcripción: completada"
+        "ERROR" -> "Transcripción: error${state.value.ultimo_error?.let { " · $it" }.orEmpty()}"
+        else -> "Transcripción: ${state.value.estado}"
+    }
+}
+
+internal fun transcriptionText(state: AudioTranscriptionState?): String? =
+    (state as? AudioTranscriptionState.Available)
+        ?.value
+        ?.takeIf { it.estado.equals("COMPLETADA", ignoreCase = true) }
+        ?.let { it.texto_corregido ?: it.texto_automatico ?: it.texto_transcrito }
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+internal fun transcriptionTextLabel(state: AudioTranscriptionState?): String? {
+    val value = (state as? AudioTranscriptionState.Available)?.value ?: return null
+    if (!value.estado.equals("COMPLETADA", ignoreCase = true)) return null
+    return if (!value.texto_corregido.isNullOrBlank()) {
+        "Texto corregido"
+    } else {
+        "Texto automático"
+    }
+}
+
 internal fun evidenceRemoteUrl(remoteId: Int): String =
     "${AppConfig.BASE_URL}bitacora-area-evidencias/$remoteId/archivo"
 
@@ -132,6 +166,9 @@ private sealed interface QueryLoadState {
     data class Ready(val items: List<BitacoraQueryHeader>) : QueryLoadState
     data class Error(val message: String) : QueryLoadState
 }
+internal fun viewerUsesBoundedMedia(kind: EvidenceViewerKind): Boolean =
+    kind == EvidenceViewerKind.PHOTO || kind == EvidenceViewerKind.VIDEO
+
 
 @Composable
 fun BitacoraQueryScreen(
@@ -145,6 +182,9 @@ fun BitacoraQueryScreen(
     var queryMessage by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<BitacoraLocalEntity?>(null) }
     var evidences by remember { mutableStateOf(emptyList<BitacoraEvidenceEntity>()) }
+    var transcriptions by remember {
+        mutableStateOf<Map<Long, AudioTranscriptionState>>(emptyMap())
+    }
     var selectedEvidence by remember { mutableStateOf<BitacoraEvidenceEntity?>(null) }
     var level by remember { mutableStateOf(QueryLevel.LIST) }
     var detailLoading by remember { mutableStateOf(false) }
@@ -198,16 +238,35 @@ fun BitacoraQueryScreen(
     fun openDetail(bitacora: BitacoraLocalEntity) {
         selected = bitacora
         evidences = emptyList()
+        transcriptions = emptyMap()
         detailError = null
         detailLoading = true
         level = QueryLevel.DETAIL
         scope.launch {
             try {
-                evidences = associatedEvidences(
+                val loaded = associatedEvidences(
                     bitacora.localId,
                     bitacora.backendId,
                     repository.getEvidences(bitacora.localId)
                 )
+                evidences = loaded
+                if (allowDelete) {
+                    val transcribable = loaded.filter {
+                        it.evidenceType in setOf(EvidenceType.AUDIO, EvidenceType.VIDEO)
+                    }
+                    transcriptions = transcribable.associate { evidence ->
+                        evidence.localId to if (evidence.remoteId == null) {
+                            AudioTranscriptionState.PendingSync
+                        } else {
+                            AudioTranscriptionState.Loading
+                        }
+                    }
+                    transcribable.forEach { evidence ->
+                        transcriptions = transcriptions + (
+                            evidence.localId to repository.getMediaTranscription(evidence)
+                        )
+                    }
+                }
             } catch (error: Exception) {
                 detailError = error.message ?: "No fue posible cargar las evidencias"
             } finally {
@@ -226,6 +285,7 @@ fun BitacoraQueryScreen(
             QueryLevel.DETAIL -> {
                 selected = null
                 evidences = emptyList()
+                transcriptions = emptyMap()
                 level = QueryLevel.LIST
                 true
             }
@@ -252,6 +312,7 @@ fun BitacoraQueryScreen(
             BitacoraQueryDetail(
                 bitacora = it,
                 evidences = evidences,
+                transcriptions = transcriptions,
                 loading = detailLoading,
                 error = detailError,
                 onRetry = { openDetail(it) },
@@ -268,7 +329,16 @@ fun BitacoraQueryScreen(
             )
         }
         QueryLevel.VIEWER -> selectedEvidence?.let {
-            EvidenceViewer(evidence = it, onBack = { goBack() })
+            EvidenceViewer(
+                evidence = it,
+                transcription = transcriptions[it.localId],
+                allowTranscriptionEdit = allowDelete,
+                onSaveTranscription = { text ->
+                    val updated = repository.correctAudioTranscription(it, text)
+                    transcriptions = transcriptions + (it.localId to updated)
+                },
+                onBack = { goBack() }
+            )
         }
     }
 
@@ -483,6 +553,7 @@ private fun BitacoraHeader(
 private fun BitacoraQueryDetail(
     bitacora: BitacoraLocalEntity,
     evidences: List<BitacoraEvidenceEntity>,
+    transcriptions: Map<Long, AudioTranscriptionState>,
     loading: Boolean,
     error: String?,
     onRetry: () -> Unit,
@@ -548,6 +619,7 @@ private fun BitacoraQueryDetail(
                 evidences.forEach { evidence ->
                     EvidenceRow(
                         evidence = evidence,
+                        transcription = transcriptions[evidence.localId],
                         onOpen = onOpen,
                         allowDelete = allowDelete,
                         deletionInProgress = deletionInProgress,
@@ -562,6 +634,7 @@ private fun BitacoraQueryDetail(
 @Composable
 private fun EvidenceRow(
     evidence: BitacoraEvidenceEntity,
+    transcription: AudioTranscriptionState?,
     onOpen: (BitacoraEvidenceEntity) -> Unit,
     allowDelete: Boolean,
     deletionInProgress: Boolean,
@@ -575,6 +648,14 @@ private fun EvidenceRow(
             evidence.fileSize?.let { Text("Tamaño: ${formatBytes(it)}") }
             Text("Estado: ${evidenceStatusLabel(evidence, fileExists)}")
             Text(evidence.textContent ?: evidence.originalName ?: "Sin descripción")
+            if (
+                evidence.evidenceType in setOf(EvidenceType.AUDIO, EvidenceType.VIDEO) &&
+                transcription != null
+            ) {
+                Text(transcriptionStatusLabel(transcription))
+                transcriptionTextLabel(transcription)?.let { Text(it) }
+                transcriptionText(transcription)?.let { Text(it) }
+            }
             Button(onClick = { onOpen(evidence) }) { Text("Abrir") }
             if (canShowDeletionActions(allowDelete)) {
                 OutlinedButton(
@@ -587,11 +668,23 @@ private fun EvidenceRow(
 }
 
 @Composable
-private fun EvidenceViewer(evidence: BitacoraEvidenceEntity, onBack: () -> Unit) {
+private fun EvidenceViewer(
+    evidence: BitacoraEvidenceEntity,
+    transcription: AudioTranscriptionState?,
+    allowTranscriptionEdit: Boolean,
+    onSaveTranscription: suspend (String) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val file = evidence.localFilePath?.let(::File)
     val fileExists = file?.isFile == true
     var error by remember(evidence.localId) { mutableStateOf<String?>(null) }
+    var editing by remember(evidence.localId) { mutableStateOf(false) }
+    var correction by remember(evidence.localId, transcription) {
+        mutableStateOf(transcriptionText(transcription).orEmpty())
+    }
+    var saving by remember(evidence.localId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val localUri = remember(evidence.localId, fileExists) {
         if (fileExists) {
             runCatching {
@@ -620,7 +713,7 @@ private fun EvidenceViewer(evidence: BitacoraEvidenceEntity, onBack: () -> Unit)
         if (viewerKind(evidence.evidenceType) == EvidenceViewerKind.TEXT) {
             Text(
                 evidence.textContent ?: "Sin contenido",
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                modifier = Modifier.fillMaxWidth()
             )
             return@Column
         }
@@ -631,18 +724,87 @@ private fun EvidenceViewer(evidence: BitacoraEvidenceEntity, onBack: () -> Unit)
             )
             return@Column
         }
-        when (viewerKind(evidence.evidenceType)) {
-            EvidenceViewerKind.PHOTO -> if (fileExists) {
-                PhotoViewer(file = requireNotNull(file), onError = { error = it })
-            } else {
-                RemotePhotoViewer(url = requireNotNull(remoteUrl), onError = { error = it })
+        val kind = viewerKind(evidence.evidenceType)
+        if (viewerUsesBoundedMedia(kind)) {
+            Box(Modifier.fillMaxWidth().height(170.dp)) {
+                when (kind) {
+                    EvidenceViewerKind.PHOTO -> if (fileExists) {
+                        PhotoViewer(file = requireNotNull(file), onError = { error = it })
+                    } else {
+                        RemotePhotoViewer(url = requireNotNull(remoteUrl), onError = { error = it })
+                    }
+                    EvidenceViewerKind.VIDEO ->
+                        VideoViewer(uri = playbackUri, onError = { error = it })
+                    else -> Unit
+                }
             }
-            EvidenceViewerKind.VIDEO ->
-                VideoViewer(uri = playbackUri, onError = { error = it })
-            EvidenceViewerKind.AUDIO -> AudioViewer(playbackUri, evidence.durationSeconds) {
+        } else if (kind == EvidenceViewerKind.AUDIO) {
+            AudioViewer(playbackUri, evidence.durationSeconds) {
                 error = it
             }
-            EvidenceViewerKind.TEXT -> Unit
+        }
+        if (
+            evidence.evidenceType in setOf(EvidenceType.AUDIO, EvidenceType.VIDEO) &&
+            transcription != null
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(transcriptionStatusLabel(transcription))
+                transcriptionTextLabel(transcription)?.let { Text(it) }
+                if (editing) {
+                    OutlinedTextField(
+                        value = correction,
+                        onValueChange = { correction = it },
+                        label = { Text("Texto corregido") },
+                        enabled = !saving,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            enabled = correction.isNotBlank() && !saving,
+                            onClick = {
+                                saving = true
+                                error = null
+                                scope.launch {
+                                    try {
+                                        onSaveTranscription(correction)
+                                        editing = false
+                                    } catch (failure: Exception) {
+                                        error = failure.message
+                                            ?: "No fue posible guardar la corrección"
+                                    } finally {
+                                        saving = false
+                                    }
+                                }
+                            }
+                        ) { Text(if (saving) "Guardando" else "Guardar corrección") }
+                        OutlinedButton(
+                            enabled = !saving,
+                            onClick = {
+                                correction = transcriptionText(transcription).orEmpty()
+                                editing = false
+                            }
+                        ) { Text("Cancelar") }
+                    }
+                } else {
+                    transcriptionText(transcription)?.let { Text(it) }
+                    if (
+                        allowTranscriptionEdit &&
+                        transcription is AudioTranscriptionState.Available &&
+                        transcription.value.estado.equals("COMPLETADA", ignoreCase = true)
+                    ) {
+                        OutlinedButton(onClick = {
+                            correction = transcriptionText(transcription).orEmpty()
+                            editing = true
+                        }) { Text("Editar transcripción") }
+                    }
+                }
+            }
         }
     }
 }

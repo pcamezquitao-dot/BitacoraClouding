@@ -1,10 +1,12 @@
 package com.cactus.bitacora.ui.query
 
+import com.cactus.bitacora.data.AudioTranscriptionState
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
 import com.cactus.bitacora.data.local.BitacoraLocalEntity
 import com.cactus.bitacora.data.local.BitacoraQueryHeader
 import com.cactus.bitacora.data.local.EvidenceType
 import com.cactus.bitacora.data.local.SyncStatus
+import com.cactus.bitacora.model.EvidenceTranscriptionOut
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,6 +14,68 @@ import org.junit.Test
 
 class BitacoraQueryPolicyTest {
     @Test
+    private fun transcription(
+        state: String,
+        text: String? = null,
+        error: String? = null,
+        automatic: String? = null,
+        corrected: String? = null
+    ) = AudioTranscriptionState.Available(
+        EvidenceTranscriptionOut(
+            id_transcripcion = 1,
+            id_evidencia = 50,
+            id_bitacora = 68,
+            estado = state,
+            texto_transcrito = text,
+            texto_automatico = automatic,
+            texto_corregido = corrected,
+            numero_reintentos = if (error == null) 0 else 1,
+            ultimo_error = error,
+            creado_en = "2026-09-25T12:00:00",
+            actualizado_en = "2026-09-25T12:00:01"
+        )
+    )
+
+    @Test
+    fun audioTranscriptionStatesRemainVisibleWithoutReplacingAudio() {
+        assertEquals(
+            "Transcripci?n: pendiente de sincronizar el audio",
+            transcriptionStatusLabel(AudioTranscriptionState.PendingSync)
+        )
+        assertEquals("Transcripci?n: pendiente", transcriptionStatusLabel(transcription("PENDIENTE")))
+        assertEquals("Transcripci?n: procesando", transcriptionStatusLabel(transcription("PROCESANDO")))
+        assertEquals(
+            "Transcripci?n: error ? audio ilegible",
+            transcriptionStatusLabel(transcription("ERROR", error = "audio ilegible"))
+        )
+    }
+
+    @Test
+    fun completedTranscriptionShowsTextOnlyForCompletedState() {
+        assertEquals("Texto reconocido", transcriptionText(transcription("COMPLETADA", " Texto reconocido ")))
+        assertEquals(null, transcriptionText(transcription("PROCESANDO", "Texto parcial")))
+        assertEquals(null, transcriptionText(AudioTranscriptionState.NotFound))
+    }
+
+    @Test
+    fun correctedTranscriptionTakesPriorityAndIdentifiesItsSource() {
+        val corrected = transcription(
+            state = "COMPLETADA",
+            text = "Texto compatible",
+            automatic = "Texto autom?tico",
+            corrected = "Texto corregido"
+        )
+        assertEquals("Texto corregido", transcriptionText(corrected))
+        assertEquals("Texto corregido", transcriptionTextLabel(corrected))
+
+        val automatic = transcription(
+            state = "COMPLETADA",
+            text = "Texto compatible",
+            automatic = "Texto autom?tico"
+        )
+        assertEquals("Texto autom?tico", transcriptionText(automatic))
+        assertEquals("Texto autom?tico", transcriptionTextLabel(automatic))
+    }
     fun deletionActionsAreOnlyVisibleForAdministratorPermission() {
         assertTrue(canShowDeletionActions(allowDelete = true))
         assertFalse(canShowDeletionActions(allowDelete = false))
@@ -72,6 +136,26 @@ class BitacoraQueryPolicyTest {
         assertEquals(EvidenceViewerKind.PHOTO, viewerKind(EvidenceType.PHOTO))
         assertEquals(EvidenceViewerKind.VIDEO, viewerKind(EvidenceType.VIDEO))
         assertEquals(EvidenceViewerKind.AUDIO, viewerKind(EvidenceType.AUDIO))
+        assertTrue(viewerUsesBoundedMedia(EvidenceViewerKind.PHOTO))
+        assertTrue(viewerUsesBoundedMedia(EvidenceViewerKind.VIDEO))
+        assertFalse(viewerUsesBoundedMedia(EvidenceViewerKind.AUDIO))
+        assertFalse(viewerUsesBoundedMedia(EvidenceViewerKind.TEXT))
+    }
+
+    @Test
+    fun videoTranscriptionUsesSameVisibleStatesAsAudio() {
+        val video = evidence(9, type = EvidenceType.VIDEO, remoteId = 99)
+        assertEquals(EvidenceViewerKind.VIDEO, viewerKind(video.evidenceType))
+        assertEquals(
+            "Texto corregido",
+            transcriptionTextLabel(
+                transcription(
+                    state = "COMPLETADA",
+                    automatic = "Texto automático",
+                    corrected = "Texto corregido"
+                )
+            )
+        )
     }
 
     @Test
@@ -80,7 +164,7 @@ class BitacoraQueryPolicyTest {
         assertEquals("Disponible en servidor", evidenceStatusLabel(item, localFileExists = false))
         assertFalse(canOpenEvidenceLocally(item.localFilePath, fileExists = false))
         assertEquals(
-            "http://161.22.47.89/bitacora/bitacora-area-evidencias/44/archivo",
+            "https://161-22-47-89.sslip.io/bitacora/bitacora-area-evidencias/44/archivo",
             evidenceRemoteUrl(requireNotNull(item.remoteId))
         )
     }

@@ -300,6 +300,30 @@ data class EvidenciaTextoCreate(
     val uuid_cliente: String
 )
 
+data class EvidenceTranscriptionOut(
+    val id_transcripcion: Long,
+    val id_evidencia: Int,
+    val id_bitacora: Int,
+    val estado: String,
+    val proveedor: String? = null,
+    val modelo: String? = null,
+    val idioma: String? = null,
+    val confianza: Double? = null,
+    val texto_transcrito: String? = null,
+    val texto_automatico: String? = null,
+    val texto_corregido: String? = null,
+    val numero_reintentos: Int,
+    val ultimo_error: String? = null,
+    val creado_en: String,
+    val actualizado_en: String,
+    val completado_en: String? = null,
+    val corregido_en: String? = null
+)
+
+data class EvidenceTranscriptionCorrectionIn(
+    val texto_corregido: String
+)
+
 data class CatalogParticipantOut(
     val id_participante: Int,
     val identificacion_participante: String,

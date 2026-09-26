@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -7,12 +8,14 @@ from app.core.config import settings
 from app.main import app
 from app.routers.bitacora_area_evidencia import (
     actualizar_transcripcion,
+    corregir_transcripcion,
     consultar_transcripcion,
     crear_transcripcion_pendiente,
 )
 from app.schemas.evidencia_transcripcion import (
     EstadoTranscripcion,
     TranscripcionCreate,
+    TranscripcionCorreccion,
     TranscripcionUpdate,
 )
 from app.services.audio_transcription_service import transcribe_file
@@ -26,6 +29,37 @@ class AudioTranscriptionTest(unittest.TestCase):
         self.assertIn("get", paths[endpoint])
         self.assertIn("post", paths[endpoint])
         self.assertIn("patch", paths[endpoint])
+        self.assertIn(f"{endpoint}/correccion", paths)
+        self.assertIn("patch", paths[f"{endpoint}/correccion"])
+
+    def test_correccion_conserva_texto_automatico(self):
+        db = MagicMock()
+        automatic = "Texto automático original."
+        corrected = "Texto corregido."
+        expected = {
+            "id_evidencia": 583,
+            "estado": "COMPLETADA",
+            "texto_automatico": automatic,
+            "texto_corregido": corrected,
+        }
+        with patch(
+            "app.routers.bitacora_area_evidencia._get_transcripcion",
+            side_effect=[
+                {"id_evidencia": 583, "estado": "COMPLETADA", "texto_automatico": automatic},
+                expected,
+            ],
+        ):
+            result = corregir_transcripcion(
+                583,
+                TranscripcionCorreccion(texto_corregido=f"  {corrected}  "),
+                db,
+            )
+        self.assertEqual(expected, result)
+        sql = str(db.execute.call_args.args[0])
+        params = db.execute.call_args.args[1]
+        self.assertNotIn("texto_automatico=", sql)
+        self.assertEqual(corrected, params["texto_corregido"])
+        db.commit.assert_called_once()
 
     def test_motor_convierte_y_transcribe_en_espanol(self):
         previous = (
@@ -73,6 +107,64 @@ class AudioTranscriptionTest(unittest.TestCase):
         self.assertEqual(2, len(commands))
         self.assertIn("-l", commands[1])
         self.assertEqual("es", commands[1][commands[1].index("-l") + 1])
+        self.assertIn("-map", commands[0])
+        self.assertEqual("0:a:0", commands[0][commands[0].index("-map") + 1])
+
+    def test_video_sin_audio_devuelve_error_especifico(self):
+        previous = (
+            settings.FFMPEG_PATH,
+            settings.WHISPER_CLI_PATH,
+            settings.WHISPER_MODEL_PATH,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "video.mp4"
+            ffmpeg = root / "ffmpeg"
+            whisper = root / "whisper-cli"
+            model = root / "ggml-small.bin"
+            for path in (source, ffmpeg, whisper, model):
+                path.write_bytes(b"test")
+            settings.FFMPEG_PATH = str(ffmpeg)
+            settings.WHISPER_CLI_PATH = str(whisper)
+            settings.WHISPER_MODEL_PATH = str(model)
+            failure = subprocess.CalledProcessError(1, [str(ffmpeg)], stderr="no stream")
+            with patch(
+                "app.services.audio_transcription_service.subprocess.run",
+                side_effect=failure,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "El video no contiene una pista de audio utilizable",
+                ):
+                    transcribe_file(source, evidence_type=3)
+        (
+            settings.FFMPEG_PATH,
+            settings.WHISPER_CLI_PATH,
+            settings.WHISPER_MODEL_PATH,
+        ) = previous
+
+    def test_crea_una_sola_transcripcion_pendiente_para_video(self):
+        db = MagicMock()
+        existing = {
+            "id_transcripcion": 9,
+            "id_evidencia": 21,
+            "id_bitacora": 8,
+            "estado": "PENDIENTE",
+        }
+        with patch(
+            "app.routers.bitacora_area_evidencia._get",
+            return_value={"id_evidencia": 21, "id_bitacora": 8, "id_tipo_evidencia": 3},
+        ), patch(
+            "app.routers.bitacora_area_evidencia._get_transcripcion",
+            return_value=existing,
+        ):
+            result = crear_transcripcion_pendiente(
+                21,
+                TranscripcionCreate(proveedor="local", modelo="whisper", idioma="es"),
+                db,
+            )
+        self.assertEqual(existing, result)
+        db.execute.assert_not_called()
 
     def test_migracion_define_relacion_unica_y_estado(self):
         sql = Path("migrations/20260724_audio_transcription.sql").read_text(
