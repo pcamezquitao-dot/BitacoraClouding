@@ -1,0 +1,36 @@
+Verificación: 2026-09-30 08:58:11 -05:00 (America/Bogota)
+Ruta: C:\Bitacora\BitacoraClouding-areas-sync-fix
+Rama: fix/c03-c11-c12-c16-areas-sync
+Commit: 31124c496b81e058f5481c24fc14fa534ff00ae3
+Upstream: origin/fix/c03-c11-c12-c16-areas-sync
+Divergencia observada: +2 -0
+
+Cambios locales ya existentes antes de crear ENT-001:
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/MainActivity.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/biometric/technical/FaceTechnicalScreen.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/data/BitacoraRepository.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/data/ReferenceCatalogRepository.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/data/local/ReferenceCatalogDao.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/feature/supervisorevents/SupervisorEventRepository.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/ui/admin/AdminCatalogScreen.kt
+ M android/bitacora-android/app/src/main/java/com/cactus/bitacora/ui/query/BitacoraQueryScreen.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/FaceNavigationStructureTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/OfflineManagerValidationTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/biometric/technical/FaceEnrollmentCameraTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/data/ReferenceCatalogPolicyTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/data/ReferenceCatalogRepositoryTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/feature/supervisorevents/SupervisorEventRepositoryTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/ui/admin/AdminAreaTreePolicyTest.kt
+ M android/bitacora-android/app/src/test/java/com/cactus/bitacora/ui/query/BitacoraQueryPolicyTest.kt
+ M app/main.py
+ M app/services/jerarquia_service.py
+?? android/bitacora-android/app/src/test/java/com/cactus/bitacora/QrCameraSelectorTest.kt
+?? android/bitacora-android/device-backups/
+?? app/routers/supervisor_events.py
+?? app/schemas/supervisor_event.py
+?? deploy_c08_novedades.sh
+?? docs/uml/
+?? tests/test_supervisor_events.py
+
+Nota: esta lista registra el estado previo. ENT-001 agrega únicamente documentación y evidencias.
+

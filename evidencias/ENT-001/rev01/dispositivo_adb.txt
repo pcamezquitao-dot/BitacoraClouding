@@ -1,0 +1,9 @@
+Verificación: 2026-09-30 08:58:11 -05:00 (America/Bogota)
+ADB: C:\Users\DELL\AppData\Local\Android\Sdk\platform-tools\adb.exe
+Comando: adb devices -l
+
+Salida significativa:
+List of devices attached
+
+Resultado: no había dispositivos ni emuladores visibles. No se consultaron propiedades, paquete instalado, base SQLite ni acceso a Administración.
+

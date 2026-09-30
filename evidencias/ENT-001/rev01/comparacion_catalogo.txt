@@ -1,0 +1,15 @@
+Verificación: 2026-09-30 08:58:11 -05:00 (America/Bogota)
+
+MariaDB:
+- Tabla: areas_administrativas
+- Filas del query de referencia: 7
+- Contenido completo: areas_administrativas_mariadb.json
+
+SQLite/Room:
+- Tabla declarada: areas_administrativas_locales
+- Correspondencias declaradas por el modelo: idArea, nombreArea, idPadre, nombreCorto
+- Resultado instalado: PENDIENTE; el V2035 no apareció en ADB.
+
+Resultado de comparación: PENDIENTE.
+No se declara catálogo sincronizado usando solamente el conteo de MariaDB ni un estado READY.
+

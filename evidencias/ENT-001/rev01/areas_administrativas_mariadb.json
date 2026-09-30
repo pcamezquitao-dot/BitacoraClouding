@@ -1,0 +1,28 @@
+{
+  "verified_at_america_bogota": "2026-09-30T08:57:52-05:00",
+  "application_connection": {
+    "configured_host": "localhost",
+    "configured_port": 3306,
+    "database": "bitacora"
+  },
+  "database_server": {
+    "db": "bitacora",
+    "server_hostname": "maestro",
+    "server_port": 3306,
+    "clouding_host": "161.22.47.89",
+    "db_version": "11.8.6-MariaDB-5ubuntu0.1 from Ubuntu"
+  },
+  "query": "SELECT id_Area_Administrativa, descripcion, nodo_padre, nombre_corto FROM areas_administrativas ORDER BY id_Area_Administrativa;",
+  "row_count": 7,
+  "rows": [
+    {"id_Area_Administrativa": 10006, "descripcion": "Agricola Cactus", "nodo_padre": null, "nombre_corto": "1"},
+    {"id_Area_Administrativa": 10011, "descripcion": "Gerencia", "nodo_padre": 10006, "nombre_corto": "11"},
+    {"id_Area_Administrativa": 10024, "descripcion": "Dir Operaciones y Produccion", "nodo_padre": 10011, "nombre_corto": "1101"},
+    {"id_Area_Administrativa": 10025, "descripcion": "Dirección Desarrollo", "nodo_padre": 10011, "nombre_corto": "1102"},
+    {"id_Area_Administrativa": 10026, "descripcion": "Jefatura Produccion Rosa", "nodo_padre": 10025, "nombre_corto": "110201"},
+    {"id_Area_Administrativa": 10027, "descripcion": "Sub Jefatura Rosa Toca", "nodo_padre": 10026, "nombre_corto": "110201202"},
+    {"id_Area_Administrativa": 10028, "descripcion": "Jefe Finca 2 Rosa", "nodo_padre": 10027, "nombre_corto": "11020120202"}
+  ],
+  "secrets_included": false
+}
+

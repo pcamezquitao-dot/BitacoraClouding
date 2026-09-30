@@ -1,0 +1,13 @@
+Verificación: 2026-09-30 08:58:11 -05:00 (America/Bogota)
+
+Fuente: android/bitacora-android/app/build.gradle.kts
+applicationId declarado para production: com.cactus.bitacora
+versionName declarado: maria49-c22-bitacora-prueba-dev
+versionCode declarado: 49
+
+Fuente: android/bitacora-android/app/src/main/java/com/cactus/bitacora/data/local/BitacoraDatabase.kt
+Archivo SQLite declarado: bitacora_local.db
+Versión Room declarada: 20
+
+Estas son declaraciones del código fuente. No demuestran la versión de la APK o de la base instalada.
+
