@@ -25,16 +25,17 @@ class ReferenceCatalogPolicyTest {
     }
 
     @Test
-    fun supervisorRequiresCargoThree() {
-        assertTrue(assignmentAllowsRole(3, CatalogRole.SUPERVISOR))
-        assertFalse(assignmentAllowsRole(1, CatalogRole.SUPERVISOR))
+    fun supervisorUsesCatalogTypeCode() {
+        assertTrue(assignmentAllowsRole(2, CatalogRole.SUPERVISOR, supervisorTypeCode = 2))
+        assertFalse(assignmentAllowsRole(1, CatalogRole.SUPERVISOR, supervisorTypeCode = 2))
     }
 
     @Test
-    fun employeeRejectsSupervisorAndManagerRoles() {
-        assertTrue(assignmentAllowsRole(1, CatalogRole.EMPLOYEE))
-        assertFalse(assignmentAllowsRole(3, CatalogRole.EMPLOYEE))
-        assertFalse(assignmentAllowsRole(4, CatalogRole.EMPLOYEE))
+    fun dailyLogParticipantAcceptsAnyActiveAssignmentRole() {
+        assertTrue(assignmentAllowsRole(1, CatalogRole.EMPLOYEE, supervisorTypeCode = 2))
+        assertTrue(assignmentAllowsRole(2, CatalogRole.EMPLOYEE, supervisorTypeCode = 2))
+        assertTrue(assignmentAllowsRole(4, CatalogRole.EMPLOYEE, supervisorTypeCode = 2))
+        assertFalse(assignmentAllowsRole(null, CatalogRole.EMPLOYEE, supervisorTypeCode = 2))
     }
 
     @Test

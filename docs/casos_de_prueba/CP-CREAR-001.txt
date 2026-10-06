@@ -1,0 +1,671 @@
+CP-CREAR-001 — Crear bitácora para empleado Supervisor con superior asignado
+
+Caso de prueba: Creación administrativa de bitácora sin exclusión por cargo Supervisor
+Caso de uso asociado: CU-CREAR-001 — Crear bitácora desde Administrador
+Estado: COBERTURA TÉCNICA PARCIAL APROBADA; ejecución funcional pendiente
+Célula propietaria provisional: C07
+Confirmación de propiedad: PENDIENTE. La asignación a C07 no constituye confirmación definitiva de propiedad.
+
+1. OBJETIVO
+
+Verificar que desde Administrador → Crear (+) pueda crearse una bitácora para un empleado que tenga cargo activo de Supervisor, siempre que tenga un superior responsable vigente asignado, incluido el caso en que dicho superior sea Gerente.
+
+Verificar además la excepción expresa según la cual un Gerente puede ser participante de su propia bitácora y supervisor responsable de sí mismo, permitiendo que id_empleado e id_supervisor tengan el mismo identificador. Comprobar que esta excepción no se extienda a participantes con cargo Supervisor ni a otros cargos.
+
+También se debe verificar que la operación conserve correctamente la identidad del empleado y la del superior, que los casos inválidos se rechacen sin escrituras parciales y que las validaciones existentes no relacionadas con esta regla permanezcan activas.
+
+2. ALCANCE
+
+Incluido:
+- Selección o identificación del empleado en Administrador → Crear (+).
+- Validación del cargo Supervisor del empleado sin excluirlo por ese solo motivo.
+- Resolución o validación de su superior responsable.
+- Aceptación de un Gerente vigente como superior responsable.
+- Creación de una bitácora con un Gerente como participante y como su propio supervisor responsable.
+- Igualdad id_empleado = id_supervisor exclusivamente para el Gerente autorresponsable.
+- Rechazo de la autorresponsabilidad para Supervisor y demás cargos.
+- Creación, persistencia local/remota y sincronización mediante los mecanismos existentes.
+- Verificación de id_empleado e id_supervisor en el resultado persistido.
+- Manejo de errores sin creación parcial.
+
+Excluido:
+- Modificación de cargos, asignaciones o jerarquías.
+- Gestión general de permisos.
+- Cambios de esquema MariaDB o Room.
+- Tipos de participante y CP-TIP-001.
+- Cualquier autorresponsabilidad distinta de la excepción expresa del Gerente.
+
+3. PRECONDICIONES
+
+- Versión candidata y commit identificados antes de ejecutar.
+- Dispositivo, aplicación, backend y base exclusivamente de pruebas identificados.
+- Respaldo y reversión disponibles antes de cualquier escritura de prueba.
+- Actor administrativo autorizado para abrir Administrador → Crear (+).
+- Catálogos locales y remotos sincronizados o su estado registrado.
+- Participantes y asignaciones de prueba preparados sin modificar datos reales.
+- Acceso de solo lectura para comprobar el estado inicial y final de las filas relacionadas.
+- La ejecución de cualquier escritura en MariaDB o Room requiere autorización expresa separada conforme a INVARIANTES.md.
+
+Si cualquiera de estas condiciones falta, registrar la condición afectada como BLOQUEADA; no registrarla como aprobada ni como “No aplica”.
+
+4. DATOS DE PRUEBA REQUERIDOS
+
+DT-01 — Empleado ordinario de control:
+- Participante activo.
+- Asignación activa y vigente.
+- Cargo distinto de Supervisor y Gerente.
+- Superior vigente con cargo Supervisor.
+
+DT-02 — Empleado con cargo Supervisor:
+- Participante activo.
+- Asignación activa y vigente con cargo Supervisor.
+- Superior responsable activo y vigente distinto del propio empleado.
+
+DT-03 — Empleado con cargo Supervisor cuyo superior es Gerente:
+- Participante activo.
+- Asignación activa y vigente con cargo Supervisor.
+- Superior responsable activo y vigente con cargo Gerente.
+- Relación jerárquica o asignación comprobable según el mecanismo vigente.
+
+DT-04 — Empleado sin superior vigente:
+- Participante activo y con asignación vigente.
+- Sin superior responsable vigente resoluble.
+
+DT-05 — Superior inválido:
+- Participante inexistente, inactivo, con asignación vencida o sin rol admisible como superior.
+
+DT-06 — Gerente autorresponsable:
+- Participante activo.
+- Asignación activa y vigente con cargo Gerente.
+- El mismo identificador se utilizará como participante de la bitácora y supervisor responsable.
+- Área y demás datos obligatorios válidos.
+
+DT-07 — Supervisor que intenta ser su propio superior:
+- Participante activo.
+- Asignación activa y vigente con cargo Supervisor.
+- Se intenta utilizar el mismo identificador como participante y supervisor responsable.
+- No existe autorización para aplicar la excepción del Gerente.
+
+Para cada dato se deben registrar, sin incluir información sensible innecesaria:
+- identificador del participante;
+- cargo y vigencia;
+- área;
+- identificador esperado del superior;
+- estado inicial de bitácoras;
+- ambiente y fecha/hora de la evidencia.
+
+5. CONDICIONES DE PRUEBA
+
+5.1. Control: empleado ordinario con superior Supervisor
+
+Precondición:
+- DT-01 disponible.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar al empleado DT-01.
+3. Validar el superior Supervisor correspondiente.
+4. Completar área y demás campos obligatorios con datos válidos.
+5. Guardar.
+6. Consultar el resultado en la aplicación y en la persistencia de pruebas autorizada.
+
+Resultado esperado:
+- La operación conserva el comportamiento existente.
+- Se crea una sola bitácora.
+- id_empleado corresponde a DT-01.
+- id_supervisor corresponde al superior validado.
+- No se producen duplicados ni errores de rol.
+
+Estado de ejecución: PARCIAL. Cobertura técnica aprobada; ejecución funcional pendiente.
+
+5.2. Empleado con cargo Supervisor y superior Supervisor
+
+Precondición:
+- DT-02 disponible y su relación con el superior comprobada.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar como empleado al participante DT-02.
+3. Observar la respuesta de la validación de empleado.
+4. Determinar o validar al superior responsable vigente.
+5. Completar los demás campos obligatorios con datos válidos.
+6. Guardar.
+7. Consultar el registro creado.
+
+Resultado esperado:
+- DT-02 es aceptado como empleado aunque su cargo sea Supervisor.
+- No aparece un rechazo basado únicamente en que el empleado tiene cargo Supervisor.
+- Se crea exactamente una bitácora.
+- id_empleado corresponde a DT-02.
+- id_supervisor corresponde a su superior responsable, no a DT-02 por inferencia automática.
+
+Estado de ejecución: PARCIAL. Android acepta Supervisor como participante y backend alcanza el INSERT simulado con un superior diferente; ejecución funcional pendiente.
+
+5.3. Empleado con cargo Supervisor y superior Gerente
+
+Precondición:
+- DT-03 disponible y la vigencia del Gerente comprobada.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar como empleado al participante DT-03.
+3. Determinar o validar al Gerente como superior responsable.
+4. Completar área y demás campos obligatorios con datos válidos.
+5. Guardar.
+6. Consultar el registro creado y sus identificadores.
+
+Resultado esperado:
+- El empleado con cargo Supervisor es aceptado como empleado.
+- El Gerente vigente es aceptado como superior responsable.
+- El sistema no exige sustituir al Gerente por un Supervisor.
+- Se crea exactamente una bitácora.
+- id_empleado corresponde a DT-03 e id_supervisor al Gerente.
+
+Estado de ejecución: PARCIAL. La política acepta Gerente como responsable de otro participante; ejecución funcional pendiente.
+
+5.4. Empleado sin superior vigente
+
+Precondición:
+- DT-04 disponible.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar DT-04.
+3. Completar los demás campos posibles e intentar continuar o guardar.
+4. Consultar la persistencia de pruebas.
+
+Resultado esperado:
+- El sistema informa que no existe un superior responsable vigente.
+- No asigna un superior arbitrario.
+- No crea una bitácora ni una fila parcial.
+
+Estado de ejecución: PENDIENTE.
+
+5.5. Superior inválido o inactivo
+
+Precondición:
+- Empleado válido y DT-05 disponible como intento de superior.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Validar al empleado.
+3. Intentar validar DT-05 como superior.
+4. Intentar guardar.
+5. Consultar la persistencia de pruebas.
+
+Resultado esperado:
+- La validación del superior se rechaza con mensaje comprensible.
+- Guardar permanece impedido.
+- No se crea una bitácora ni una relación parcial.
+
+Estado de ejecución: PARCIAL. El rechazo de un cargo no autorizado está cubierto técnicamente; falta ejecutar los casos inexistente, inactivo y vencido en desarrollo.
+
+5.6. Cancelación
+
+Precondición:
+- DT-02 o DT-03 disponible.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Validar empleado, superior y demás campos.
+3. Cancelar o regresar antes de guardar.
+4. Consultar la persistencia de pruebas.
+
+Resultado esperado:
+- No se crea una bitácora.
+- No quedan escrituras parciales derivadas de la cancelación.
+
+Estado de ejecución: PENDIENTE.
+
+5.7. Fallo controlado de persistencia o sincronización
+
+Precondición:
+- Mecanismo seguro y autorizado para simular el fallo sin afectar datos reales.
+- DT-02 o DT-03 disponible.
+
+Pasos:
+1. Preparar el fallo controlado.
+2. Completar una creación válida.
+3. Solicitar guardar.
+4. Observar el mensaje y el estado local.
+5. Restablecer el servicio y ejecutar únicamente el mecanismo de reintento autorizado.
+6. Comprobar que no se creen duplicados.
+
+Resultado esperado:
+- No se informa un éxito remoto inexistente.
+- Se conserva o marca el registro local conforme al mecanismo existente.
+- El reintento crea como máximo una bitácora remota.
+- id_empleado e id_supervisor conservan los valores originalmente validados.
+
+Estado de ejecución: PARCIAL. Las pruebas de persistencia local e idempotencia aprobaron; no se ejecutó el fallo controlado funcional.
+
+5.8. Gerente como participante y supervisor de sí mismo
+
+Precondición:
+- DT-06 disponible y su cargo Gerente activo y vigente comprobado.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar a DT-06 como participante de la bitácora.
+3. Identificar o seleccionar al mismo DT-06 como supervisor responsable.
+4. Comprobar que ambos campos conservan el mismo identificador y que el sistema reconoce el cargo Gerente.
+5. Completar área y demás campos obligatorios con datos válidos.
+6. Guardar.
+7. Consultar el registro creado en la aplicación y en la persistencia de pruebas autorizada.
+
+Resultado esperado:
+- El Gerente es aceptado como participante de su propia bitácora.
+- El mismo Gerente es aceptado como supervisor responsable.
+- Se crea exactamente una bitácora.
+- id_empleado e id_supervisor contienen el mismo identificador de DT-06.
+- La igualdad de identificadores no elimina las validaciones de actividad, vigencia, área ni demás campos obligatorios.
+
+Estado de ejecución: PARCIAL. Android y backend aceptan técnicamente al Gerente autorresponsable; la ruta backend alcanzó el INSERT simulado conservando identificadores iguales. Ejecución funcional pendiente.
+
+5.9. La autorresponsabilidad no se extiende al Supervisor ni a otros cargos
+
+Precondición:
+- DT-07 disponible. Para otros cargos, disponer de un participante equivalente si el catálogo de pruebas lo permite.
+
+Pasos:
+1. Abrir Administrador → Crear (+).
+2. Identificar o seleccionar DT-07 como participante de la bitácora.
+3. Intentar identificar o seleccionar al mismo DT-07 como supervisor responsable.
+4. Intentar guardar.
+5. Consultar la persistencia de pruebas.
+6. Si existe un dato seguro de otro cargo, repetir el intento con ese participante.
+
+Resultado esperado:
+- El sistema rechaza que DT-07 sea su propio supervisor responsable.
+- La excepción del Gerente no se aplica al cargo Supervisor ni a otro cargo.
+- No se crea una bitácora ni una fila parcial con id_empleado = id_supervisor para esos cargos.
+
+Estado de ejecución: PARCIAL. Android y backend rechazan técnicamente al Supervisor autorresponsable antes del INSERT. Ejecución funcional pendiente.
+
+6. PROCEDIMIENTO GENERAL DE EJECUCIÓN
+
+1. Registrar carpeta, rama, commit, versión de APK, hash del artefacto, dispositivo, backend, base de pruebas y ejecutor.
+2. Registrar el estado inicial de los datos DT-01 a DT-07 y los conteos de bitácoras relacionados.
+3. Confirmar que el ambiente es exclusivamente de pruebas y que existe respaldo reversible.
+4. Ejecutar 5.1 como control.
+5. Ejecutar 5.2 y comprobar que el cargo Supervisor del empleado no lo excluya.
+6. Ejecutar 5.3 y comprobar la aceptación del Gerente como superior.
+7. Ejecutar 5.4 y 5.5 para verificar rechazos sin escrituras.
+8. Ejecutar 5.6 para comprobar cancelación.
+9. Ejecutar 5.8 para comprobar al Gerente como participante y supervisor de sí mismo.
+10. Ejecutar 5.9 para comprobar que la excepción no se extienda al Supervisor ni a otros cargos.
+11. Ejecutar 5.7 únicamente si existe autorización y mecanismo seguro para el fallo controlado.
+12. Comparar aplicación, Room/SQLite, respuesta de API y MariaDB según corresponda.
+13. Registrar evidencias y resultado individual de cada condición.
+14. Revertir exclusivamente los datos de prueba mediante el procedimiento previamente autorizado.
+
+7. TRAZABILIDAD CU–CP
+
+Requisito de CU-CREAR-001                         Condición de prueba
+RF-CREAR-001: Supervisor aceptado como empleado   5.2 y 5.3
+RF-CREAR-002: Gerente aceptado como superior      5.3
+RF-CREAR-003: empleado y superior diferenciados   5.2, 5.3 y comprobación de identificadores
+RF-CREAR-004: conservar validaciones existentes   5.1, 5.4, 5.5, 5.6 y 5.7
+RF-CREAR-005: Gerente autorresponsable             5.8
+Límite de RF-CREAR-005: no extender la excepción  5.9
+Flujo principal                                   5.1, 5.2 y 5.3
+Empleado sin superior                             5.4
+Superior inválido                                 5.5
+Cancelación                                       5.6
+Persistencia/sincronización                       5.1, 5.2, 5.3 y 5.7
+
+8. EVIDENCIAS REQUERIDAS
+
+- Captura del formulario con el empleado Supervisor validado.
+- Evidencia del superior responsable y su cargo vigente.
+- Respuesta visible al guardar.
+- Registro local, si aplica, con estado de sincronización.
+- Respuesta de API, sin credenciales ni secretos.
+- Consulta de solo lectura del registro persistido con id_empleado e id_supervisor.
+- Evidencia de ausencia de filas para los rechazos y la cancelación.
+- Conteos anterior y posterior para detectar duplicados.
+- Registro de cualquier diferencia entre código abierto, APK y backend ejecutado.
+
+9. REGISTRO DE EJECUCIÓN
+
+Condición  Resultado obtenido  Estado: cumple / falla / bloqueado  Evidencia o incidencia
+5.1  Políticas y contratos base aprobados; sin creación real  PARCIAL  Suites Android/backend; validación funcional pendiente
+5.2  Supervisor aceptado como participante y ruta simulada alcanza INSERT con superior distinto  PARCIAL  DailyLogRolePolicyTest y test_create_daily_log_roles.py
+5.3  Gerente aceptado técnicamente como responsable de otro participante  PARCIAL  Pruebas de política Android/backend
+5.4  No ejecutada con dato funcional sin superior  PENDIENTE  Requiere fixture y escritura controlada de desarrollo
+5.5  Cargo no autorizado rechazado; inactivo/vencido no ejecutados funcionalmente  PARCIAL  Prueba backend focalizada
+5.6  No ejecutada en interfaz  PENDIENTE  Requiere validación funcional Android
+5.7  Persistencia local e idempotencia aprobadas; fallo controlado no ejecutado  PARCIAL  OfflineSyncPolicyTest y pruebas backend de idempotencia
+5.8  Gerente autorresponsable aceptado y ruta simulada alcanza INSERT con IDs iguales  PARCIAL  DailyLogRolePolicyTest y test_create_daily_log_roles.py
+5.9  Supervisor autorresponsable rechazado antes del INSERT  PARCIAL  DailyLogRolePolicyTest y test_create_daily_log_roles.py
+
+Fecha: ____________________
+Ejecutor: ____________________
+Worktree: ____________________
+Rama y commit: ____________________
+APK, versión y SHA-256: ____________________
+Dispositivo: ____________________
+Backend y base de pruebas: ____________________
+Respaldo y reversión: ____________________
+Resultado final: PARCIAL — cobertura técnica aprobada; ejecución funcional pendiente
+Observaciones: No hubo instalación ni escrituras funcionales en MariaDB o Room.
+
+13. EJECUCIÓN FUNCIONAL DE DESARROLLO — 2026-10-05
+
+Ambiente comprobado:
+- Backend aislado: /srv/bitacora-tip-test-20261001, servicio bitacora-tip-test.service, puerto local 8010 y ruta pública /bitacora-tip-test/.
+- Configuración efectiva: DB_NAME=bitacora_test y APP_ENV=development.
+- MariaDB: bitacora_test restaurada desde respaldo verificado; no se escribió en bitacora.
+- Respaldo inmediatamente anterior a los fixtures: /srv/bitacora/db-backups/c07/20261005_175848/bitacora_test-before-cp-crear.sql.
+- SHA-256 del respaldo: 74a800bb557f9b507e6aa28f291e13f07589ee12f0c1819a2394b4365152e15f.
+- Router desplegado solo en el backend aislado. Respaldo anterior: /srv/bitacora-tip-test-20261001/backups/c07_validation_20261005_175744/bitacora_uc03.py.
+- Catálogo real: 1 operario, 2 supervisor, 3 directivo y 4 supervisor_RH. Para CU-CREAR-001, la denominación vigente directivo se reconoce como el rol Gerente; no se modificó el catálogo.
+
+Datos controlados:
+- Participantes 900101–900107, identificaciones con prefijo CPCR001.
+- Áreas 99071–99072.
+- Registros remotos con client_uuid prefijo CP-CREAR-001-.
+- Los fixtures y registros se conservan temporalmente para la validación física pendiente; existe reversión exacta documentada.
+
+Resultado por condición:
+- 5.1 PARCIAL: API y MariaDB cumplen. HTTP 200, id_bitacora 5861, id_empleado 900101, id_supervisor 900103; una fila. Falta interfaz/Room.
+- 5.2 PARCIAL: API y MariaDB cumplen. HTTP 200, id_bitacora 5862, Supervisor 900102 aceptado como empleado y responsable distinto 900103; una fila. Falta interfaz/Room.
+- 5.3 PARCIAL: API y MariaDB cumplen. HTTP 200, id_bitacora 5863, Supervisor 900102 y Gerente/directivo 900104; una fila. Falta interfaz/Room.
+- 5.4 PARCIAL: API y MariaDB cumplen el rechazo. HTTP 404, mensaje de empleado sin supervisor vigente; cero filas con CP-CREAR-001-54. Falta interfaz/Room.
+- 5.5 PARCIAL: API y MariaDB cumplen para superior vencido y cargo no admisible. HTTP 422 en ambos; cero filas con CP-CREAR-001-55V/55O. Falta interfaz/Room y variante inexistente.
+- 5.6 PENDIENTE: requiere cancelar desde la interfaz Android y verificar Room/MariaDB.
+- 5.7 PARCIAL: dos solicitudes con el mismo client_uuid devolvieron HTTP 200 y el mismo id_bitacora 5864; MariaDB contiene una sola fila. No se simuló todavía una desconexión física con Room.
+- 5.8 PARCIAL: API y MariaDB cumplen. HTTP 200, id_bitacora 5865, id_empleado=id_supervisor=900104; una fila. Falta interfaz/Room.
+- 5.9 PARCIAL: API y MariaDB cumplen el rechazo. Supervisor autorresponsable: HTTP 422, mensaje que limita la excepción al gerente. Otro cargo autorresponsable: HTTP 422 por rol no admisible. Cero filas CP-CREAR-001-59S/59O. Falta interfaz/Room.
+
+Android e instalación:
+- Se definió una variante paralela de desarrollo con applicationId com.cactus.bitacora.c07test, etiqueta Bitacora C07 Pruebas y URL exclusiva https://161-22-47-89.sslip.io/bitacora-tip-test/.
+- El dispositivo V2035 no apareció en `adb devices -l` durante los reintentos. No se instaló ningún APK y la aplicación actual y sus datos permanecen intactos.
+- Las comprobaciones que requieren interfaz, Room/SQLite o desconexión física permanecen pendientes; no se declara aprobado todo CP-CREAR-001.
+
+10. ESTADO ACTUAL
+
+- Las condiciones 5.1 a 5.9 conservan pendiente su ejecución funcional completa. Las condiciones con cobertura técnica se registran como PARCIALES, no como aprobadas funcionalmente.
+- No se declara aprobado el caso de prueba.
+- No se ejecutaron escrituras en MariaDB ni Room/SQLite.
+- Se compiló una candidata local; no se instaló ni desplegó.
+- La candidata corrige la exclusión técnica del Supervisor como participante y limita la autorresponsabilidad al Gerente.
+- La correspondencia exacta entre el código abierto, una APK instalada y un backend desplegado debe registrarse al ejecutar.
+
+11. CONTROL DOCUMENTAL
+
+- Documento creado: 2026-10-05.
+- Caso de uso asociado: CU-CREAR-001.
+- Célula provisional: C07, pendiente de confirmación.
+- Worktree observado: C:\Bitacora\BitacoraClouding-areas-sync-fix.
+- Rama observada: fix/c03-c11-c12-c16-areas-sync.
+- Commit base observado: 20e95856478481b987a934c8b07e68ea8a0df7b4.
+- Los documentos CU-TIP-001, CP-TIP-001 y todos los `.docx` permanecen fuera del alcance y sin modificación.
+
+12. REGISTRO TÉCNICO DE LA CANDIDATA — 2026-10-05
+
+Versión analizada:
+- Worktree: C:\Bitacora\BitacoraClouding-areas-sync-fix.
+- Rama: fix/c03-c11-c12-c16-areas-sync.
+- Commit base: 20e95856478481b987a934c8b07e68ea8a0df7b4.
+- Estado: commit base más cambios locales preexistentes y cambios C07 sin commit.
+
+Respaldo previo:
+- Ruta: C:\Bitacora\_codex_backups\C07_CREATE_20261005_103500.
+- Los archivos respaldados se verificaron comparando SHA-256 de origen y copia antes de editar.
+
+Pruebas ejecutadas:
+- python -m pytest tests/test_create_daily_log_roles.py tests/test_bitacora_area_evidencia_crud.py tests/test_bitacora_area_observacion.py tests/test_bitacora_idempotency.py tests/test_bitacora_list_endpoint.py tests/test_bitacora_test_origin.py tests/test_offline_catalog_endpoint.py -q
+  Resultado final: 37 aprobadas, 4 subpruebas aprobadas, 0 fallas; dos advertencias de deprecación FastAPI ajenas a esta corrección.
+- Gradle testProductionDebugUnitTest focalizado sobre DailyLogRolePolicyTest, FaceNavigationStructureTest, OfflineManagerValidationTest, ReferenceCatalogPolicyTest, ReferenceCatalogRepositoryTest, BitacoraLocalEntityTest y OfflineSyncPolicyTest.
+  Resultado final: 61 pruebas aprobadas, 0 fallas; BUILD SUCCESSFUL.
+- Gradle assembleProductionDebug.
+  Resultado: BUILD SUCCESSFUL.
+- python -m py_compile sobre router y pruebas modificadas.
+  Resultado: aprobado.
+
+Artefacto candidato:
+- Ruta: android/bitacora-android/app/build/outputs/apk/production/debug/app-production-debug.apk.
+- Tamaño: 117436779 bytes.
+- SHA-256: 70C1B8FBD4B02F8D4B0FE2FF53C4E31FAF49B6C1C64FF0A431B233387B6087F3.
+
+Persistencia y esquema:
+- No se modificaron esquemas MariaDB ni Room.
+- Los modelos existentes ya admiten id_empleado e id_supervisor con el mismo valor.
+- La verificación directa de information_schema no pudo completarse porque el cliente local carece del complemento auth_gssapi_client; la conexión falló antes de ejecutar la consulta.
+- No se realizaron INSERT, UPDATE, DELETE, migraciones ni escrituras funcionales.
+
+Pendientes:
+- Ejecutar 5.1 a 5.9 funcionalmente en una base exclusivamente de desarrollo/pruebas con fixtures identificados, respaldo y reversión autorizados.
+- Instalar la candidata en un dispositivo de pruebas solo si se autoriza una etapa posterior.
+- Confirmar la correspondencia entre APK instalada, backend ejecutado y esta candidata.
+- Solo Patricia puede declarar validado el caso.
+
+14. REANUDACIÓN DEL BLOQUEO DE CATÁLOGOS — 2026-10-05
+
+Alcance comprobado:
+- Se dejó sin efecto la solicitud accidental “View all (25)” y se retomó C07 provisional.
+- Se preservaron la aplicación principal y tiptest; no se instalaron paquetes, no se borraron datos y no se modificaron esquemas.
+- La revisión se limitó a la variante paralela `com.cactus.bitacora.c07test`, el backend aislado `/bitacora-tip-test/`, la base de pruebas expuesta por ese backend y la ruta de sincronización hacia Room.
+
+API y base de pruebas:
+- `GET https://161-22-47-89.sslip.io/bitacora-tip-test/catalogos/offline` respondió correctamente el 2026-10-05.
+- Resumen real recibido: 525 participantes, 9 áreas, 34 asignaciones y 4 tipos de participante.
+- El área 99071 está presente y activa en la respuesta: descripción `Area controlada CP-CREAR-001`, referencia `CPCR001-A`, sin nodo padre.
+- Las 34 asignaciones remotas referencian participantes y áreas incluidos en la misma instantánea; no se encontraron relaciones huérfanas.
+- Existe exactamente un tipo activo cuya descripción normalizada es `supervisor`: código 2, descripción `supervisor`, capacidad `EMPLEADO`.
+- `GET /bitacora-tip-test/admin/jornadas` respondió HTTP 200 con 7 jornadas y 63 detalles, sin colecciones nulas.
+
+Sincronización hacia Room:
+- `ReferenceCatalogRepository.syncCatalogs` consume `/catalogos/offline`, transforma 99071 en `AreaAdministrativaLocalEntity`, transforma el tipo supervisor código 2 en `TipoParticipanteLocalEntity` y aplica la instantánea mediante la transacción `ReferenceCatalogDao.applySnapshot`.
+- La carga de Administrador → Crear (+) consulta primero las áreas locales y, si están vacías, ejecuta `syncReferenceCatalogs` y vuelve a consultar Room.
+- La cobertura focalizada de repositorio aprobó la persistencia de áreas, tipos, asignaciones y estado de sincronización, además de conservar las reglas de catálogo.
+- No fue posible comprobar la fila 99071 dentro de `areas_administrativas_locales` del celular: tras reiniciar el servidor ADB, `adb devices -l` continuó sin mostrar dispositivos. Por tanto, “99071 llegó al celular” permanece BLOQUEADO y no se declara cumplido por inferencia desde la API o las pruebas unitarias.
+- El mensaje reportado `No hay áreas administrativas en el catálogo local` sigue siendo reproducible solo como estado observado previamente; sin acceso a la base instalada ni al error guardado en `catalog_sync_state`, no se atribuye una causa física no comprobada.
+
+Reglas de roles:
+- El catálogo remoto confirma que el tipo activo `supervisor` es el código 2.
+- La política Android resuelve el código por descripción activa y permite que una asignación Supervisor sea participante de la bitácora.
+- Android permite responsable Supervisor o Gerente/directivo y solo admite igualdad participante/responsable para Gerente.
+- El backend aplica la misma regla antes del INSERT: responsable activo Supervisor o Gerente/directivo; autorresponsabilidad exclusiva del Gerente.
+- Estado técnico del error “tipo activo supervisor”: RESUELTO EN CÓDIGO, CONTRATO REMOTO Y PRUEBAS; PENDIENTE DE CONFIRMACIÓN EN LA APK INSTALADA DEL V2035.
+
+Pruebas y artefacto de esta reanudación:
+- Android: `testC07testDebugUnitTest` focalizado en `DailyLogRolePolicyTest`, `ReferenceCatalogRepositoryTest` y `OfflineManagerValidationTest`: 41 pruebas, 0 fallas, 0 errores, 0 omitidas.
+- Backend: `tests/test_create_daily_log_roles.py` y `tests/test_offline_catalog_endpoint.py`: 11 pruebas aprobadas, 0 fallas; 2 advertencias de deprecación FastAPI ajenas a C07.
+- Compilación: `assembleC07testDebug`, BUILD SUCCESSFUL.
+- APK paralela: `android/bitacora-android/app/build/outputs/apk/c07test/debug/app-c07test-debug.apk`.
+- Tamaño: 116975723 bytes.
+- SHA-256: `5E2F90CA3E6CF63FBEA032C40F3C5871878047906457DBE849755ECAD05DB111`.
+- La APK no se instaló porque el V2035 no apareció por ADB. La aplicación principal y sus datos permanecieron intactos.
+
+Resultado real de la reanudación:
+- API/base de pruebas: CUMPLE para área 99071, integridad referencial del catálogo y tipo activo supervisor.
+- Transformación y transacción Room: CUMPLE en código y pruebas focalizadas.
+- APK paralela compilada: CUMPLE.
+- Presencia de 99071 en Room del V2035 y flujo completo de interfaz: BLOQUEADO por ausencia del dispositivo en ADB.
+- Validación funcional total de CP-CREAR-001: PENDIENTE; solo Patricia puede declararla aprobada.
+
+15. CORRECCIÓN Y EJECUCIÓN FÍSICA EN V2035 — 2026-10-05
+
+Dispositivo y preservación:
+- Dispositivo comprobado por ADB: modelo V2035, serial `3065397347006YM`, estado `device`.
+- Paquete intervenido exclusivamente: `com.cactus.bitacora.c07test`.
+- La aplicación principal `com.cactus.bitacora` y `com.cactus.bitacora.tiptest` permanecieron instaladas y no fueron actualizadas.
+- Respaldo previo recuperable: `C:\Bitacora\_codex_backups\C07_DEVICE_20261005_233043`.
+- El respaldo contiene la APK anterior, inventario, archivo tar de datos privados y hashes. La actualización se hizo con `adb install -r`, conservando datos.
+
+Causa real del bloqueo:
+- Antes de la corrección, Room versión 20 contenía 0 áreas activas, 0 tipos activos y 0 asignaciones; 99071 no estaba presente.
+- `catalog_sync_state` registraba `No fue posible actualizar los catálogos`, pero el mensaje genérico ocultaba la excepción.
+- La captura física mostró: `IllegalStateException: Las cabeceras de jornadas no coinciden despues de persistir` en `ReferenceCatalogDao.applySnapshot`.
+- El backend de pruebas entrega 7 jornadas, incluidas 5 inactivas. La transacción comparaba únicamente las jornadas activas leídas de Room contra todas las jornadas recibidas. La comparación siempre fallaba cuando existía alguna inactiva y Room revertía atómicamente toda la instantánea, incluidas áreas, participantes, asignaciones y tipos.
+- Corrección: comparar todas las cabeceras persistidas contra todas las cabeceras recibidas. Se agregó una prueba de regresión con una jornada inactiva. La atomicidad y las demás validaciones permanecen vigentes.
+- Se agregó registro técnico de la excepción de sincronización y conservación del mensaje específico seguro en el estado local para evitar que una falla futura quede reducida a un mensaje genérico.
+
+Resultado real de Room después de la corrección:
+- `PRAGMA user_version`: 20, sin cambio de esquema.
+- Participantes activos: 525.
+- Áreas activas: 9.
+- Asignaciones activas: 34.
+- Tipos activos: 4.
+- Área 99071: presente y activa; `Area controlada CP-CREAR-001`, referencia `CPCR001-A`, padre nulo.
+- Tipo `supervisor`: exactamente una fila activa, código 2, capacidad `EMPLEADO`.
+- `catalog_sync_state`: conteos 525/9/34/4, sincronización exitosa y `lastError` nulo.
+- Jornadas locales: 7, incluidas las 5 inactivas recibidas; ya no provocan reversión.
+
+Flujo físico Administrador → Crear (+):
+- El participante 900102, QR `CPCR001-SUP-E`, cargo Supervisor activo, fue validado localmente como empleado/participante; área asignada 99071.
+- El participante 900103, QR `CPCR001-SUP-R`, cargo Supervisor activo, fue validado localmente como responsable distinto.
+- El selector de áreas mostró las 9 áreas y permitió seleccionar 99071; desapareció el bloqueo `No hay áreas administrativas en el catálogo local`.
+- GPS obtenido en el dispositivo y formulario completado con tipo de anotación 4 y observación `CP-CREAR-001-V2035`.
+- La pantalla informó `Bitácora guardada localmente`.
+- La sincronización informó: 0 pendientes, 1 sincronizado y 0 errores.
+- Room: localId 1, backendId 5866, idEmpleado 900102, idSupervisor 900103, área 99071, estado `SINCRONIZADO`, sin mensaje de error, clientUuid `2d1bee9e-f6c6-4b67-8f99-5c9c29ca9d4a`.
+- API `GET /bitacora-tip-test/bitacora_diaria/5866`: id_empleado 900102, id_supervisor 900103, tipo_anotacion 4, observaciones `CP-CREAR-001-V2035`, origen `MANUAL`.
+- Se creó exactamente una bitácora funcional en la base de pruebas durante esta ejecución. No se escribió en producción.
+
+Límites de rol comprobados en pantalla:
+- Supervisor como participante: CUMPLE. 900102 fue aceptado como empleado y conservado como idEmpleado.
+- Supervisor autorresponsable: CUMPLE EL RECHAZO. Al usar `CPCR001-SUP-E` también como responsable, la pantalla indicó que solo el Gerente puede ser supervisor de sí mismo. No se guardó otro registro.
+- Gerente/directivo autorresponsable: CUMPLE LA ACEPTACIÓN. 900104, QR `CPCR001-GER`, fue aceptado localmente como participante y como su propio responsable. No se guardó otro registro en esta comprobación.
+- Error del tipo activo `supervisor`: RESUELTO Y COMPROBADO EN API, ROOM, INTERFAZ Y PERSISTENCIA.
+
+Pruebas, compilación e instalación finales:
+- Pruebas Android focalizadas: `DailyLogRolePolicyTest`, `ReferenceCatalogRepositoryTest` y `OfflineManagerValidationTest`: 42 pruebas aprobadas, 0 fallas.
+- La cifra incluye la nueva regresión que persiste una jornada inactiva sin revertir los catálogos centrales.
+- `assembleC07testDebug`: BUILD SUCCESSFUL.
+- APK instalada: versionCode 49, versionName `maria49-c22-bitacora-prueba-dev`.
+- Tamaño: 116975895 bytes.
+- SHA-256 de APK compilada e instalada: `744BBB4A7976A4C2B692B7CD1F0DC1330C9C9480D3794793F2CEF8F3DB9644E8`; coincidencia exacta.
+
+Estado de las condiciones afectadas:
+- 5.2: CUMPLE funcionalmente en V2035 y persistencia remota; Supervisor aceptado como participante con responsable distinto.
+- 5.3: conserva cobertura API/Room; el catálogo local contiene Supervisor y Gerente/directivo activos en 99071.
+- 5.7: CUMPLE la persistencia local y sincronización normal de esta ejecución; no se ejecutó una desconexión física controlada.
+- 5.8: CUMPLE la validación de interfaz para Gerente autorresponsable; no se creó una segunda bitácora durante esta comprobación.
+- 5.9: CUMPLE el rechazo de interfaz para Supervisor autorresponsable; no se creó una segunda bitácora.
+- CP-CREAR-001 no se declara VALIDADO automáticamente: la aprobación final corresponde exclusivamente a Patricia.
+
+16. REGRESIÓN C16 Y RECOMPROBACIÓN FÍSICA DE LA APK PARALELA — 2026-10-06
+
+Incidencia y causa:
+- La compilación paralela había incorporado una revisión regresiva de `AdminCatalogScreen.kt`: faltaban el resumen superior de solo lectura, el árbol interactivo aceptado de C16, “+ Adicionar área raíz”, el “+” por fila, la presentación compacta y el repliegue por nombre.
+- La comparación con la implementación aceptada del worktree `BitacoraClouding-c16-reproducible`, rama `fix/c16-reproducible-rev03`, commit `91dce2`, confirmó la pérdida selectiva de esos componentes.
+- Se recuperó selectivamente la presentación C16 sin reemplazar el resto del archivo, conservando la corrección de sincronización C07, la administración posterior de tipos/asignaciones y las reglas Supervisor/Gerente.
+- Evidencia detallada: `docs/evidencias/C16-REGRESION-AREAS-ADMINISTRATIVAS-20261006.txt`.
+
+Prueba automatizada y compilación:
+- `AdminAreaTreePolicyTest`, `ReferenceCatalogRepositoryTest`, `DailyLogRolePolicyTest` y `OfflineManagerValidationTest` ejecutados para la variante C07test: BUILD SUCCESSFUL, 0 fallas.
+- Se añadieron regresiones del resumen/preorden/referencias y del repliegue compartido sin alterar hojas.
+- `assembleC07testDebug`: BUILD SUCCESSFUL.
+
+APK instalada:
+- Paquete único: `com.cactus.bitacora.c07test` en V2035 serial `3065397347006YM`.
+- Tamaño: 117353796 bytes.
+- SHA-256 compilada e instalada: `4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8`; coincidencia exacta.
+- versionCode 49; versionName `maria49-c22-bitacora-prueba-dev`.
+- Al inicio de esta intervención la aplicación principal y tiptest ya no estaban instaladas. No se instalaron, actualizaron ni modificaron; después de la intervención el único paquete Bitácora presente fue C07test.
+- Se restauró el estado privado recuperable de la última ejecución positiva C07 para conservar sus datos funcionales, incluida la bitácora backendId 5866.
+
+Verificación física de Áreas administrativas:
+- CUMPLE: resumen superior de solo lectura, árbol interactivo inferior, “+ Adicionar área raíz”, “+” por fila antes de ojo/lápiz/X, tipografía compacta y área 99071 visibles.
+- CUMPLE: pulsar `▶ Agricola Cactus` ocultó sus descendientes; pulsarlo de nuevo mostró `▼ Agricola Cactus`, `Gerencia` y `Dirección Desarrollo`.
+
+Recomprobación física de Crear (+), sin guardar otro registro:
+- `CPCR001-SUP-E` fue validado como empleado/participante Supervisor y mostró área asignada 99071.
+- `CPCR001-SUP-R` fue validado como responsable Supervisor distinto.
+- El selector presentó 9 áreas e incluyó 99071.
+- Room confirmó 9 áreas y la fila activa 99071 con referencia `CPCR001-A`.
+- Room confirmó un único tipo activo `supervisor`, código 2, capacidad `EMPLEADO`.
+- Room conservó backendId 5866 como `SINCRONIZADO`, empleado 900102, supervisor 900103 y área 99071.
+- Se mantienen como positivos los controles físicos previos: Supervisor autorresponsable rechazado y Gerente autorresponsable aceptado. Las pruebas de política volvieron a aprobar.
+
+Resultado:
+- Crear (+): POSITIVO, conservado y recomprobado.
+- Sincronización y tipo activo supervisor: RESUELTOS Y RECONFIRMADOS.
+- Regresión de Áreas administrativas: CORREGIDA Y COMPROBADA FÍSICAMENTE.
+- Validación final de la APK completa: pendiente exclusivamente de la declaración de Patricia.
+- No se realizó commit, push, integración ni despliegue.
+
+17. DIAGNÓSTICO Y CORRECCIÓN DE CPCR01101 — 2026-10-06
+
+Causa comprobada antes de modificar datos:
+- El backend efectivo `bitacora-tip-test.service` ejecutaba desde `/srv/bitacora-tip-test-20261001`, con `DB_NAME=bitacora_test`; `SELECT DATABASE()` confirmó `bitacora_test`.
+- `CPCR01101` no existía en MariaDB, API ni Room. DT-01 estaba registrado como id 900101, documento `CPCR001101` e identificación QR `CPCR001-EMP`.
+- Crear (+) busca por coincidencia exacta de `identificacion_participante`/`codigoQr`; no usa `documento` como alias. Por ello la inconsistencia se propagaba correctamente y no correspondía a una falla de sincronización.
+- Las áreas 99071 y 99072 ya eran correctas: ambas activas y con `nodo_padre = NULL`. No fueron modificadas.
+
+Corrección controlada:
+- Respaldo completo previo: `/srv/bitacora/db-backups/c07/20261006_130037-cpcr01101/bitacora_test-before-cpcr01101.sql`.
+- SHA-256 del respaldo: `d826035cdbdbee0d2b4a74531793e9f67de760221ad2c5db15f56a0a2656d3e7`.
+- Se actualizó exactamente una fila: id 900101 cambió su `identificacion_participante` de `CPCR001-EMP` a `CPCR01101`.
+- Se conservaron documento `CPCR001101`, nombre, id numérico, asignación 113, área 99071 y todas las relaciones existentes.
+
+Trazabilidad posterior:
+- API por QR: HTTP 200 para `CPCR01101`, participante 900101.
+- Catálogo offline: 525 participantes, 9 áreas y 35 asignaciones activas; incluyó CPCR01101, asignación 113→99071 y ambas áreas raíz.
+- Sincronización física “Actualizar catálogos”: 525 participantes locales, 9 áreas, 35 relaciones, 0 pendientes y 0 errores.
+- Room: CPCR01101 presente y activo; código anterior ausente; asignación 113 activa hacia 99071; 99071 y 99072 con `idPadre NULL`; `lastError NULL`.
+- Crear (+): CPCR01101 fue validado localmente como Prueba Empleado y mostró área asignada 99071.
+- El selector del formulario mostró 99071 y 99072.
+- No se guardó el formulario ni se creó otra bitácora.
+
+Paquete y evidencia:
+- Paquete comprobado: `com.cactus.bitacora.c07test`, versionCode 49, versionName `maria49-c22-bitacora-prueba-dev`.
+- SHA-256 de `base.apk` calculado en el V2035: `4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8`.
+- Evidencia completa: `docs/evidencias/C07-CPCR01101-TRAZABILIDAD-V2035-20261006.txt`.
+- Capturas: `C07-CPCR01101-CREAR-V2035-20261006.png` y `C07-CPCR01101-AREAS-V2035-20261006.png`.
+
+Resultado real:
+- Inconsistencia de CPCR01101: CORREGIDA Y COMPROBADA físicamente en el V2035.
+- Áreas 99071/99072: coherentes en MariaDB, API, Room y selector; ambas raíces.
+- Registros existentes de Patricia: CONSERVADOS.
+- No hubo cambios de esquema, producción, commit, push, integración ni despliegue.
+
+18. EJECUCIÓN AMPLIADA 5.1–5.9 — 2026-10-06
+
+Se ejecutó la matriz completa hasta donde existió evidencia válida y se registraron sin ocultar dos pendientes reales. Evidencia detallada: `docs/evidencias/C07-CP-CREAR-001-EJECUCION-COMPLETA-20261006.txt`.
+
+Resultado por escenario:
+- 5.1 APROBADO: id 5895, empleado 900101, supervisor 900103; una fila después de corregir cinco duplicados provocados por pulsaciones ADB repetidas.
+- 5.2 APROBADO: id 5901, empleado Supervisor 900102 y responsable Supervisor 900103.
+- 5.3 APROBADO: id 5902, empleado Supervisor 900102 y responsable Gerente 900104; validación física de ambos roles.
+- 5.4 APROBADO: HTTP 404 por ausencia de superior vigente; cero filas.
+- 5.5 APROBADO: vencido e inexistente rechazados con HTTP 422; rechazo físico del vencido; cero filas.
+- 5.6 BLOQUEADO PARA APROBACIÓN: no quedó evidencia inequívoca de cancelación desde un formulario totalmente completado; cero filas.
+- 5.7 PARCIAL: el mismo UUID devolvió dos veces id 5904 y existe una sola fila remota; no se completó el ciclo físico pendiente Room→reintento porque el formulario preparado por ADB quedó inválido y no se provocó el corte.
+- 5.8 APROBADO: id 5903 con id_empleado=id_supervisor=900104; Gerente validado físicamente en ambos campos.
+- 5.9 APROBADO: Supervisor y otro cargo autorresponsables rechazados; cero filas; rechazo físico del Supervisor.
+
+Estado global: NO COMPLETO. Permanecen pendientes 5.6 y la parte física de 5.7. No se declara validado CP-CREAR-001.
+
+19. CIERRE DE ESCENARIOS 5.6 Y 5.7 — 2026-10-06
+
+5.6 APROBADO:
+- Formulario físicamente válido con empleado Supervisor CPCR001-SUP-E, responsable distinto CPCR001-SUP-R, área 99071 y tipo 4.
+- El árbol de interfaz no mostró requisitos faltantes y Guardar estaba habilitado.
+- Se regresó sin guardar.
+- MariaDB y Room no recibieron una fila 5.6.
+
+5.7 APROBADO:
+- Formulario físico válido con 900102/900103, área 99071 y tipo 4.
+- Se detuvo exclusivamente `bitacora-tip-test.service`; `/health` devolvió HTTP 502.
+- Una sola pulsación Guardar produjo localId 74, servidor pendiente y estado Room `PENDIENTE_CREAR` con UUID `826b63c6-d2a3-443a-9826-565e07fe86f2`.
+- Antes del reintento MariaDB contenía 0 filas para ese UUID.
+- Tras restaurar el servicio y pulsar una vez “Sincronizar ahora”, la interfaz mostró 0 pendientes y 0 errores.
+- Room quedó `SINCRONIZADO`, backendId 5905, syncAttempts 1 y error nulo.
+- MariaDB contiene exactamente una fila 5905 con empleado 900102, supervisor 900103 y el UUID original.
+
+Matriz final:
+- 5.1 APROBADO.
+- 5.2 APROBADO.
+- 5.3 APROBADO.
+- 5.4 APROBADO.
+- 5.5 APROBADO.
+- 5.6 APROBADO.
+- 5.7 APROBADO.
+- 5.8 APROBADO.
+- 5.9 APROBADO.
+
+Resultado final: PRUEBA COMPLETA. Los nueve escenarios fueron ejecutados y aprobados. Pendientes reales: NINGUNO. Solo Patricia puede declarar formalmente el estado VALIDADA.

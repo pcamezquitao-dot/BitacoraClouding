@@ -1,6 +1,7 @@
 package com.cactus.bitacora.data
 
 import android.content.Context
+import android.util.Log
 import com.cactus.bitacora.data.local.AreaAdministrativaLocalEntity
 import com.cactus.bitacora.data.local.BitacoraDatabase
 import com.cactus.bitacora.data.local.CatalogSyncStateEntity
@@ -12,6 +13,7 @@ import com.cactus.bitacora.data.local.ReferenceCatalogDao
 import com.cactus.bitacora.data.local.TipoParticipanteLocalEntity
 import com.cactus.bitacora.model.AreaOut
 import com.cactus.bitacora.model.AreaTreeNodeOut
+import com.cactus.bitacora.model.AdministrativeAreaOut
 import com.cactus.bitacora.model.CalendarTreeNodeOut
 import com.cactus.bitacora.model.EmployeeAreaAssignmentOut
 import com.cactus.bitacora.model.EmployeeAreaTreeNodeOut
@@ -22,6 +24,8 @@ import com.cactus.bitacora.model.ParticipantTypeAdminOut
 import com.cactus.bitacora.model.EmpleadoAreaActivaOut
 import com.cactus.bitacora.model.ParticipanteOut
 import java.io.IOException
+import java.text.Collator
+import java.util.Locale
 import retrofit2.HttpException
 
 enum class CatalogRole { EMPLOYEE, SUPERVISOR }
@@ -57,6 +61,7 @@ data class ParticipantUpdateResult(
 )
 
 internal const val SUPERVISOR_TYPE_NAME = "supervisor"
+internal val MANAGER_TYPE_NAMES = setOf("gerente", "directivo")
 
 class CatalogValidationException(message: String) : IllegalStateException(message)
 
@@ -74,9 +79,117 @@ internal fun parseAreaCode(raw: String): ParsedAreaCode {
     return ParsedAreaCode(id, parts.getOrNull(2)?.takeIf(String::isNotBlank))
 }
 
-internal fun assignmentAllowsRole(cargo: Int?, role: CatalogRole): Boolean = when (role) {
-    CatalogRole.SUPERVISOR -> cargo == 3
-    CatalogRole.EMPLOYEE -> cargo != 3 && cargo != 4
+internal fun assignmentAllowsRole(
+    cargo: Int?,
+    role: CatalogRole,
+    supervisorTypeCode: Int
+): Boolean = when (role) {
+    CatalogRole.SUPERVISOR -> cargo == supervisorTypeCode
+    // En Crear (+), "empleado" identifica al participante de la bitácora,
+    // no un cargo excluyente. Supervisor y Gerente también pueden serlo.
+    CatalogRole.EMPLOYEE -> cargo != null
+}
+
+// Reordena por jerarquía (padre -> hijos) vía DFS; conserva huérfanos/ciclos al final sin perderlos.
+internal data class AdminAreaSnapshotCoverage(
+    val total: Int,
+    val uniqueIds: Int,
+    val roots: Int,
+    val reachable: Int
+)
+
+private fun areaCollator(): Collator = Collator.getInstance(Locale("es", "CO")).apply {
+    strength = Collator.PRIMARY
+}
+
+internal fun validateAdminAreaSnapshot(nodes: List<AreaTreeNodeOut>): AdminAreaSnapshotCoverage {
+    if (nodes.isEmpty()) throw CatalogValidationException(
+        "El servidor devolvió cero áreas. Se conserva el catálogo anterior"
+    )
+    val ids = nodes.map { it.id_area }
+    if (ids.toSet().size != ids.size) throw CatalogValidationException(
+        "El servidor devolvió identificadores de área duplicados"
+    )
+    val byId = nodes.associateBy(AreaTreeNodeOut::id_area)
+    nodes.forEach { node ->
+        val parentId = node.id_padre?.takeUnless { it == 0 }
+        if (parentId != null && parentId !in byId) throw CatalogValidationException(
+            "El área ${node.id_area} hace referencia a un padre inexistente"
+        )
+        val reference = node.nombre_corto.orEmpty()
+        if (reference.isBlank() || reference != reference.trim() || reference.length > 25) {
+            throw CatalogValidationException(
+                "El área ${node.id_area} tiene una Referencia inválida"
+            )
+        }
+        if (node.descripcion.isBlank() || node.descripcion != node.descripcion.trim()) {
+            throw CatalogValidationException(
+                "El área ${node.id_area} tiene una descripción inválida"
+            )
+        }
+    }
+    val collator = areaCollator()
+    nodes.forEachIndexed { index, node ->
+        nodes.drop(index + 1).forEach { other ->
+            if (collator.compare(node.nombre_corto, other.nombre_corto) == 0) {
+                throw CatalogValidationException("El servidor devolvió Referencias duplicadas")
+            }
+            val nodeParent = node.id_padre?.takeUnless { it == 0 }
+            val otherParent = other.id_padre?.takeUnless { it == 0 }
+            if (nodeParent == otherParent && collator.compare(node.descripcion, other.descripcion) == 0) {
+                throw CatalogValidationException(
+                    "El servidor devolvió descripciones duplicadas bajo el mismo padre"
+                )
+            }
+        }
+    }
+    val state = mutableMapOf<Int, Int>()
+    fun detectCycle(node: AreaTreeNodeOut) {
+        when (state[node.id_area]) {
+            1 -> throw CatalogValidationException("El servidor devolvió un ciclo en el árbol de áreas")
+            2 -> return
+        }
+        state[node.id_area] = 1
+        node.id_padre?.takeUnless { it == 0 }?.let { detectCycle(byId.getValue(it)) }
+        state[node.id_area] = 2
+    }
+    nodes.forEach(::detectCycle)
+
+    val childrenByParent = nodes.groupBy { it.id_padre?.takeUnless { parent -> parent == 0 } }
+    val reachableIds = mutableSetOf<Int>()
+    fun visit(node: AreaTreeNodeOut) {
+        if (!reachableIds.add(node.id_area)) return
+        childrenByParent[node.id_area].orEmpty().forEach(::visit)
+    }
+    val roots = childrenByParent[null].orEmpty()
+    roots.forEach(::visit)
+    if (reachableIds.size != nodes.size) throw CatalogValidationException(
+        "La respuesta de áreas no cubre todos los registros recibidos"
+    )
+    return AdminAreaSnapshotCoverage(nodes.size, ids.toSet().size, roots.size, reachableIds.size)
+}
+
+internal fun orderAreaTreeHierarchically(nodes: List<AreaTreeNodeOut>): List<AreaTreeNodeOut> {
+    val collator = areaCollator()
+    val childrenByParent = nodes
+        .groupBy { it.id_padre?.takeUnless { parentId -> parentId == 0 } }
+        .mapValues { (_, children) ->
+            children.sortedWith { left, right ->
+                collator.compare(left.descripcion, right.descripcion)
+                    .takeUnless { it == 0 }
+                    ?: left.id_area.compareTo(right.id_area)
+            }
+        }
+    val visited = mutableSetOf<Int>()
+    val ordered = mutableListOf<AreaTreeNodeOut>()
+    fun visit(node: AreaTreeNodeOut) {
+        if (!visited.add(node.id_area)) return
+        ordered += node
+        childrenByParent[node.id_area].orEmpty().forEach(::visit)
+    }
+    childrenByParent[null].orEmpty().forEach(::visit)
+    nodes.forEach { if (it.id_area !in visited) visit(it) }
+    return ordered
 }
 
 class ReferenceCatalogRepository(
@@ -91,6 +204,16 @@ class ReferenceCatalogRepository(
         }
         if (matches.size != 1) throw CatalogValidationException(
             "El catálogo debe contener exactamente un tipo activo llamado supervisor"
+        )
+        return matches.single().codigo
+    }
+
+    suspend fun managerTypeCode(): Int {
+        val matches = dao.participantTypes().filter {
+            it.activo && it.descripcion.trim().lowercase() in MANAGER_TYPE_NAMES
+        }
+        if (matches.size != 1) throw CatalogValidationException(
+            "El catálogo debe contener exactamente un tipo activo gerente o directivo"
         )
         return matches.single().codigo
     }
@@ -324,6 +447,9 @@ class ReferenceCatalogRepository(
             )
             CatalogSyncResult(true, participants.size, areas.size, assignments.size)
         } catch (error: Exception) {
+            runCatching {
+                Log.e(CATALOG_SYNC_TAG, "Falló la sincronización del catálogo de referencia", error)
+            }
             val previous = dao.syncState()
             val message = safeCatalogError(error)
             dao.upsertSyncState(
@@ -424,8 +550,9 @@ class ReferenceCatalogRepository(
         participantId: Int,
         role: CatalogRole
     ): EmpleadoAreaActivaOut {
+        val supervisorType = supervisorTypeCode()
         return assignmentsForParticipant(participantId)
-            .firstOrNull { assignmentAllowsRole(it.cargo, role) }
+            .firstOrNull { assignmentAllowsRole(it.cargo, role, supervisorType) }
             ?: throw CatalogValidationException(
                 if (role == CatalogRole.SUPERVISOR) {
                     "El participante existe, pero no tiene rol activo de supervisor"
@@ -543,11 +670,40 @@ class ReferenceCatalogRepository(
             }
             return result
         }
-        return rows.map { item ->
+        val nodes = rows.map { item ->
             val parents = ancestors(item)
             AreaTreeNodeOut(item.idArea, item.nombreArea, item.nombreCorto, item.idPadre,
                 parents.size, (parents.map { it.nombreArea } + item.nombreArea).joinToString(" / "))
         }
+        return orderAreaTreeHierarchically(nodes)
+    }
+
+    suspend fun cacheAdminArea(area: AdministrativeAreaOut): List<AreaTreeNodeOut> {
+        val current = localAreaTree()
+        val candidate = current.filterNot { it.id_area == area.id_area_administrativa } +
+            AreaTreeNodeOut(
+                area.id_area_administrativa,
+                area.descripcion,
+                area.nombre_corto,
+                area.nodo_padre,
+                0,
+                area.descripcion
+            )
+        validateAdminAreaSnapshot(candidate)
+        dao.upsertArea(area.toLocal(System.currentTimeMillis()))
+        return localAreaTree()
+    }
+
+    suspend fun removeAdminArea(areaId: Int): List<AreaTreeNodeOut> {
+        dao.deleteArea(areaId)
+        return localAreaTree()
+    }
+
+    suspend fun reconcileAdminAreaTree(remote: List<AreaTreeNodeOut>): List<AreaTreeNodeOut> {
+        validateAdminAreaSnapshot(remote)
+        val now = System.currentTimeMillis()
+        dao.replaceAdminAreas(remote.map { it.toLocal(now) })
+        return localAreaTree()
     }
 
     suspend fun localParticipantTypes(): List<ParticipantTypeAdminOut> =
@@ -651,10 +807,13 @@ class ReferenceCatalogRepository(
     private fun safeCatalogError(error: Exception): String = when (error) {
         is HttpException -> "No fue posible actualizar los catálogos (HTTP ${error.code()})"
         is IOException -> "Sin conexión. Se conserva el catálogo local anterior"
+        is CatalogValidationException -> error.message ?: "El servidor devolvió un catálogo inválido"
+        is IllegalStateException -> error.message ?: "Room rechazó el catálogo recibido"
         else -> "No fue posible actualizar los catálogos"
     }
 
     companion object {
+        private const val CATALOG_SYNC_TAG = "ReferenceCatalogSync"
         private const val PARTICIPANT_PAGE_SIZE = 100
         const val MISSING_LOCAL_MESSAGE =
             "No fue posible validar este código sin conexión porque todavía no está " +
@@ -713,6 +872,28 @@ private fun AreaOut.toLocal(now: Long) = AreaAdministrativaLocalEntity(
     nombreArea = descripcion,
     nombreCorto = null,
     idPadre = null,
+    activo = true,
+    updatedAtServer = null,
+    syncedAtMillis = now
+)
+
+private fun AdministrativeAreaOut.toLocal(now: Long) = AreaAdministrativaLocalEntity(
+    idArea = id_area_administrativa,
+    codigoQr = ReferenceCatalogRepository.canonicalAreaCode(id_area_administrativa, descripcion),
+    nombreArea = descripcion,
+    nombreCorto = nombre_corto,
+    idPadre = nodo_padre,
+    activo = true,
+    updatedAtServer = null,
+    syncedAtMillis = now
+)
+
+private fun AreaTreeNodeOut.toLocal(now: Long) = AreaAdministrativaLocalEntity(
+    idArea = id_area,
+    codigoQr = ReferenceCatalogRepository.canonicalAreaCode(id_area, descripcion),
+    nombreArea = descripcion,
+    nombreCorto = nombre_corto,
+    idPadre = id_padre,
     activo = true,
     updatedAtServer = null,
     syncedAtMillis = now

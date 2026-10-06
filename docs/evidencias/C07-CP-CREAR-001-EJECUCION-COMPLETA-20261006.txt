@@ -1,0 +1,87 @@
+C07 PROVISIONAL — EJECUCIÓN CP-CREAR-001 DEL 2026-10-06
+
+Ambiente:
+- Backend efectivo: bitacora-tip-test.service.
+- Base efectiva comprobada: bitacora_test.
+- APK: com.cactus.bitacora.c07test, versionCode 49.
+- SHA-256 instalado: 4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8.
+- Dispositivo: V2035, serial 3065397347006YM / ADB TCP temporal 192.168.1.6:5555.
+
+Respaldos previos:
+- MariaDB: /srv/bitacora/db-backups/c07/20261006_131123-full-cp-crear/bitacora_test-before-full-cp.sql
+- Tamaño: 792104 bytes.
+- SHA-256: 3d1ad6f9f1b5461bbcc5e2fb1edcea3d0084eafffbdcdc4dce840517a739445f.
+- Room: C:\Users\DELL\AppData\Local\Temp\full-cp-before-20261006_131123.tar
+- SHA-256 Room: 3567AB86F14210CC7CDFAEA07EE8C48A78298165902BE70749A316E695E18DEF.
+
+Precondiciones:
+- Los participantes 900101–900107 fueron comprobados en MariaDB, API y Room.
+- CPCR01101 correspondió a 900101 y asignación 113→99071.
+- 900107 conservó únicamente una asignación vencida; correctamente no apareció en el catálogo activo.
+- 99071 y 99072 permanecieron activas y con nodo_padre/idPadre NULL.
+- Conteo inicial de bitácoras CP-CREAR-001 de esta ejecución: 0.
+
+MATRIZ
+
+5.1 — Control, empleado ordinario y superior Supervisor
+Esperado: una fila con empleado 900101 y supervisor 900103.
+Obtenido: validación física en V2035, guardado desde Crear (+), Room sincronizado y MariaDB id_bitacora 5895; tipo 4; observación CP-CREAR-001-FULL-5.1.
+Incidencia: varias pulsaciones ADB generaron seis UUID distintos porque el mensaje de éxito quedó debajo del área visible. Se conservaron 5895/localId 68 y se eliminaron selectivamente cinco duplicados de MariaDB y Room, después de SELECT y con respaldo.
+Estado: APROBADO después de corrección y reconteo 1.
+
+5.2 — Supervisor como empleado, superior Supervisor distinto
+Esperado: 900102 aceptado como empleado y 900103 como responsable.
+Obtenido: la interfaz había validado físicamente ambos cargos; POST funcional actual creó id 5901 con 900102/900103 y UUID CP-CREAR-001-FULL-52. Conteo final 1.
+Estado: APROBADO.
+
+5.3 — Supervisor como empleado, Gerente como superior
+Esperado: 900102/900104, sin exigir responsable Supervisor.
+Obtenido: V2035 validó CPCR001-SUP-E y mostró “Supervisor validado localmente” para CPCR001-GER; persistencia creó id 5902 con 900102/900104. Conteo final 1.
+Estado: APROBADO.
+
+5.4 — Empleado sin superior vigente
+Esperado: rechazo sin fila.
+Obtenido: DT-04 900105 está asignado a la raíz 99072 sin Supervisor; backend devolvió HTTP 404 “Empleado sin supervisor asignado”; UUID CP-CREAR-001-FULL-54 ausente en MariaDB.
+Estado: APROBADO.
+
+5.5 — Superior inválido, inexistente o vencido
+Esperado: rechazo sin fila parcial.
+Obtenido: el V2035 rechazó físicamente CPCR001-SUP-V; backend rechazó 900107 vencido y 999999 inexistente con HTTP 422. UUID 55V y 55I ausentes.
+Estado: APROBADO.
+
+5.6 — Cancelación
+Esperado: formulario válido cancelado antes de guardar, sin fila.
+Obtenido final: en el V2035 se validaron CPCR001-SUP-E, CPCR001-SUP-R y el área 99071; se ingresó tipo_anotacion 4. El árbol de interfaz mostró el botón Guardar habilitado, Estado: pendiente y ninguna línea “Falta”. Se regresó sin pulsar Guardar. La consulta posterior devolvió 0 filas para la marca 5.6 y no apareció un nuevo registro local.
+Estado: APROBADO.
+
+5.7 — Fallo controlado y reintento
+Esperado: pendiente local durante fallo; reintento único sin duplicado.
+Obtenido final: primero se conservó la comprobación remota idempotente: dos POST con UUID CP-CREAR-001-FULL-57 devolvieron id 5904 y una sola fila. Después se preparó físicamente un formulario válido para 900102/900103, área 99071 y tipo 4. Se detuvo únicamente bitacora-tip-test.service; /health respondió HTTP 502. Una sola pulsación en Guardar produjo “Bitácora guardada localmente”, estado PENDIENTE, localId 74 y servidor pendiente. Room registró UUID 826b63c6-d2a3-443a-9826-565e07fe86f2, backendId NULL, PENDIENTE_CREAR, syncAttempts 0 y valores 900102/900103. MariaDB confirmó 0 filas para ese UUID. Se restauró el servicio, se pulsó una sola vez “Sincronizar ahora” y la interfaz mostró 0 pendientes, 7 sincronizados y 0 errores. Room quedó SINCRONIZADO, backendId 5905, syncAttempts 1 y error NULL; MariaDB contiene exactamente una fila 5905 para el UUID original.
+Evidencia gráfica: C07-CP-CREAR-001-5.7-ANTES-FALLO-20261006.png, C07-CP-CREAR-001-5.7-PENDIENTE-20261006.png y C07-CP-CREAR-001-5.7-SINCRONIZADA-20261006.png.
+Estado: APROBADO.
+
+5.8 — Gerente autorresponsable
+Esperado: id_empleado=id_supervisor=900104.
+Obtenido: V2035 validó CPCR001-GER como participante y como responsable; persistencia creó id 5903 con 900104/900104. Conteo final 1.
+Estado: APROBADO.
+
+5.9 — Autorresponsabilidad no extensible
+Esperado: Supervisor y otro cargo rechazados sin filas.
+Obtenido: V2035 mostró rechazo para CPCR001-SUP-E autorresponsable; backend rechazó 900102/900102 y 900106/900106 con HTTP 422. UUID 59S y 59O ausentes.
+Estado: APROBADO.
+
+Persistencia final MariaDB:
+- 5895: 900101/900103, 5.1.
+- 5901: 900102/900103, 5.2.
+- 5902: 900102/900104, 5.3.
+- 5903: 900104/900104, 5.8.
+- 5904: 900102/900103, 5.7 idempotente.
+- 5905: 900102/900103, 5.7 físico pendiente→reintento, UUID 826b63c6-d2a3-443a-9826-565e07fe86f2.
+- Filas prohibidas de 5.4, 5.5 y 5.9: 0.
+
+Resultado global:
+- Aprobados: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8 y 5.9.
+- Pendientes reales: NINGUNO.
+- CP-CREAR-001: PRUEBA COMPLETA, con los nueve escenarios ejecutados y aprobados.
+- La declaración del estado formal VALIDADA sigue siendo atribución exclusiva de Patricia.
+- Producción, otras aplicaciones y esquemas permanecieron intactos.

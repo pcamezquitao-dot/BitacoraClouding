@@ -27,6 +27,39 @@ from app.schemas.evidencia import EvidenciaOut, BitacoraCompletaOut
 router = APIRouter(tags=["bitacora_uc03"])
 
 
+def _require_daily_log_responsible(
+    db: Session, id_empleado: int, id_supervisor: int
+) -> None:
+    """Aplica CU-CREAR-001 sin depender de códigos numéricos de cargo."""
+    assignments = db.execute(
+        text(
+            f"""
+            SELECT UPPER(TRIM(tp.descripcion)) AS rol
+            FROM {settings.EMPLEADO_AREA_TABLE} AS ea
+            JOIN tipos_participante AS tp ON tp.codigo = ea.cargo
+            WHERE ea.id_participante = :id_supervisor
+              AND ea.activo = TRUE
+              AND ea.fecha_inicia <= CURDATE()
+              AND (ea.fecha_final IS NULL OR ea.fecha_final >= CURDATE())
+              AND tp.activo = TRUE
+              AND UPPER(TRIM(tp.descripcion)) IN ('SUPERVISOR', 'GERENTE', 'DIRECTIVO')
+            """
+        ),
+        {"id_supervisor": id_supervisor},
+    ).mappings().all()
+    roles = {str(row["rol"]).strip().upper() for row in assignments}
+    if not roles:
+        raise HTTPException(
+            status_code=422,
+            detail="El responsable debe tener cargo activo de supervisor o gerente",
+        )
+    if id_empleado == id_supervisor and not roles.intersection({"GERENTE", "DIRECTIVO"}):
+        raise HTTPException(
+            status_code=422,
+            detail="Solo un gerente puede ser supervisor de sí mismo",
+        )
+
+
 def _resolve_bao_table(db: Session) -> str:
     """Respeta BAO_TABLE y usa el nombre histórico real si quedó desactualizado."""
     fallback = "bitacora_area_observacion"
@@ -155,10 +188,7 @@ def _crear_bitacora_diaria(
         except LookupError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-    try:
-        require_asignacion_activa(db, id_supervisor, "supervisor")
-    except LookupError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    _require_daily_log_responsible(db, id_empleado, id_supervisor)
 
     ts_in_min_calc, fecha_in, hora_in = _now_parts(ts_in_min)
     fecha_out = None

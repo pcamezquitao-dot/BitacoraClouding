@@ -58,6 +58,7 @@ import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 internal fun remoteDeleteAlreadySatisfied(statusCode: Int): Boolean = statusCode == 404
+
 sealed interface AudioTranscriptionState {
     data object Loading : AudioTranscriptionState
     data object PendingSync : AudioTranscriptionState
@@ -66,6 +67,18 @@ sealed interface AudioTranscriptionState {
     data class Unavailable(val message: String) : AudioTranscriptionState
 }
 
+private const val CATALOG_NOT_SYNCED_MESSAGE =
+    "Este catálogo todavía no ha sido sincronizado. Conéctese y pulse Actualizar."
+
+internal fun resolveAdminAreaTree(
+    localAreas: List<com.cactus.bitacora.model.AreaTreeNodeOut>,
+    status: CatalogStatus
+): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
+    if (localAreas.isNotEmpty()) return localAreas
+    throw CatalogValidationException(
+        status.lastError ?: CATALOG_NOT_SYNCED_MESSAGE
+    )
+}
 
 class BitacoraRepository(
     context: Context,
@@ -84,8 +97,6 @@ class BitacoraRepository(
 
     private companion object {
         val syncMutex = Mutex()
-        const val CATALOG_NOT_SYNCED_MESSAGE =
-            "Este catálogo todavía no ha sido sincronizado. Conéctese y pulse Actualizar."
     }
 
     suspend fun checkHealth() =
@@ -331,47 +342,73 @@ class BitacoraRepository(
         actor: String,
         description: String,
         capabilities: List<String>
-    ) = api.createAdminParticipantType(
-        adminAuthorization(),
-        actor.trim(),
-        Build.MODEL,
-        ParticipantTypeAdminIn(description, capabilities)
-    )
+    ) = participantTypeMutation {
+        api.createAdminParticipantType(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            ParticipantTypeAdminIn(description, capabilities)
+        )
+    }
 
     suspend fun updateAdminParticipantType(
         actor: String,
         code: Int,
         description: String,
         capabilities: List<String>
-    ) = api.updateAdminParticipantType(
-        adminAuthorization(),
-        actor.trim(),
-        Build.MODEL,
-        code,
-        ParticipantTypeAdminIn(description, capabilities)
-    )
+    ) = participantTypeMutation {
+        api.updateAdminParticipantType(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            code,
+            ParticipantTypeAdminIn(description, capabilities)
+        )
+    }
 
     suspend fun setAdminParticipantTypeStatus(
         actor: String,
         code: Int,
         active: Boolean
-    ) = api.setAdminParticipantTypeStatus(
-        adminAuthorization(),
-        actor.trim(),
-        Build.MODEL,
-        code,
-        ParticipantTypeStatusIn(active)
-    )
+    ) = participantTypeMutation {
+        api.setAdminParticipantTypeStatus(
+            adminAuthorization(),
+            actor.trim(),
+            Build.MODEL,
+            code,
+            ParticipantTypeStatusIn(active)
+        )
+    }
 
-    suspend fun adminAreaTree(actor: String): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
-        var localAreas = referenceCatalogRepository.localAreaTree()
-        if (localAreas.isEmpty()) {
-            referenceCatalogRepository.syncCatalogs()
-            localAreas = referenceCatalogRepository.localAreaTree()
-            if (localAreas.isEmpty()) throw CatalogValidationException(CATALOG_NOT_SYNCED_MESSAGE)
+    suspend fun deleteAdminParticipantType(actor: String, code: Int) =
+        participantTypeMutation {
+            val response = api.deleteAdminParticipantType(
+                adminAuthorization(),
+                actor.trim(),
+                Build.MODEL,
+                code
+            )
+            if (!response.isSuccessful) throw HttpException(response)
         }
-        return localAreas
-        @Suppress("UNREACHABLE_CODE")
+
+    private suspend fun <T> participantTypeMutation(block: suspend () -> T): T =
+        try {
+            block()
+        } catch (error: HttpException) {
+            val detail = runCatching {
+                JSONObject(error.response()?.errorBody()?.string().orEmpty())
+                    .optString("detail")
+            }.getOrNull().orEmpty()
+            throw IOException(detail.ifBlank { error.message() }, error)
+        }
+
+    suspend fun adminAreaTree(actor: String): List<com.cactus.bitacora.model.AreaTreeNodeOut> =
+        resolveAdminAreaTree(
+            referenceCatalogRepository.localAreaTree(),
+            referenceCatalogRepository.status()
+        )
+
+    suspend fun refreshAdminAreaTree(actor: String): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
         val url = "${AppConfig.BASE_URL}admin/areas/arbol"
         val normalizedActor = actor.trim().ifBlank { "administrador-consulta" }
         Log.i("AdminAreaTree", "URL consultada: $url")
@@ -381,30 +418,32 @@ class BitacoraRepository(
                 Build.MODEL
             )
             Log.i("AdminAreaTree", "Código HTTP: ${response.code()}")
-            if (!response.isSuccessful) throw HttpException(response)
+            if (!response.isSuccessful) throw CatalogValidationException(
+                "El servidor rechazó el catálogo de áreas (HTTP ${response.code()}). " +
+                    "Se conserva el árbol local anterior"
+            )
             val areas = response.body()
                 ?: throw IOException("El endpoint de áreas respondió sin contenido")
-            val ids = areas.mapTo(mutableSetOf()) { it.id_area }
-            val roots = areas.count { it.id_padre == null || it.id_padre == 0 }
-            val orphanIds = areas
-                .filter {
-                    it.id_padre != null &&
-                        it.id_padre != 0 &&
-                        it.id_padre !in ids
-                }
-                .map { it.id_area }
+            val coverage = validateAdminAreaSnapshot(areas)
             Log.i(
                 "AdminAreaTree",
-                "Áreas recibidas: ${areas.size}; nodos raíz: $roots"
+                "Cobertura validada antes de Room: total=${coverage.total}; " +
+                    "IDs únicos=${coverage.uniqueIds}; raíces=${coverage.roots}; " +
+                    "alcanzables=${coverage.reachable}"
             )
-            Log.i("AdminAreaTree", "IDs sin padre válido: $orphanIds")
-            areas
+            referenceCatalogRepository.reconcileAdminAreaTree(areas)
         } catch (error: Exception) {
             Log.e(
                 "AdminAreaTree",
                 "Error HTTP o de deserialización al consultar $url",
                 error
             )
+            if (error is CatalogValidationException) throw error
+            if (error is IOException) {
+                throw CatalogValidationException(
+                    "Sin conexión. Se conserva el árbol local anterior"
+                )
+            }
             throw error
         }
     }
@@ -452,7 +491,8 @@ class BitacoraRepository(
         description: String,
         shortName: String?,
         parentId: Int?
-    ) = adminMutation(
+    ): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
+        val remote = adminMutation(
         action = "ADD",
         areaId = parentId,
         endpoint = "${AppConfig.BASE_URL}admin/areas"
@@ -462,7 +502,9 @@ class BitacoraRepository(
             Build.MODEL,
             AdministrativeAreaIn(description, shortName, parentId)
         )
-    } ?: throw IOException("El servidor no devolvió el área creada")
+        } ?: throw IOException("El servidor no devolvió el área creada")
+        return referenceCatalogRepository.cacheAdminArea(remote)
+    }
 
     suspend fun updateAdminArea(
         actor: String,
@@ -470,7 +512,8 @@ class BitacoraRepository(
         description: String,
         shortName: String?,
         parentId: Int?
-    ) = adminMutation(
+    ): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
+        val remote = adminMutation(
         action = "EDIT",
         areaId = areaId,
         endpoint = "${AppConfig.BASE_URL}admin/areas/$areaId"
@@ -481,9 +524,11 @@ class BitacoraRepository(
             areaId,
             AdministrativeAreaIn(description, shortName, parentId)
         )
-    } ?: throw IOException("El servidor no devolvió el área actualizada")
+        } ?: throw IOException("El servidor no devolvió el área actualizada")
+        return referenceCatalogRepository.cacheAdminArea(remote)
+    }
 
-    suspend fun deleteAdminArea(actor: String, areaId: Int) =
+    suspend fun deleteAdminArea(actor: String, areaId: Int): List<com.cactus.bitacora.model.AreaTreeNodeOut> {
         adminMutation<Unit>(
             action = "DEL",
             areaId = areaId,
@@ -496,6 +541,8 @@ class BitacoraRepository(
                 areaId
             )
         }
+        return referenceCatalogRepository.removeAdminArea(areaId)
+    }
 
     suspend fun createAdminEmployeeArea(
         actor: String,
@@ -683,11 +730,28 @@ class BitacoraRepository(
     suspend fun getAsignacionesActivas(idParticipante: Int) =
         referenceCatalogRepository.assignmentsForParticipant(idParticipante)
 
+    suspend fun getSupervisorTypeCode(): Int = resolveDailyLogRoleCode {
+        referenceCatalogRepository.supervisorTypeCode()
+    }
+
+    suspend fun getManagerTypeCode(): Int = resolveDailyLogRoleCode {
+        referenceCatalogRepository.managerTypeCode()
+    }
+
+    private suspend fun resolveDailyLogRoleCode(resolve: suspend () -> Int): Int =
+        try {
+            resolve()
+        } catch (firstError: CatalogValidationException) {
+            val sync = referenceCatalogRepository.syncCatalogs()
+            if (!sync.success) throw firstError
+            resolve()
+        }
+
     suspend fun getSupervisorForEmployee(idEmpleado: Int): Pair<ParticipanteOut, EmpleadoAreaActivaOut> {
         val response = api.getSupervisorForEmployee(idEmpleado)
         val participant = referenceCatalogRepository.participantById(response.id_supervisor)
         val assignment = referenceCatalogRepository.assignmentsForParticipant(response.id_supervisor)
-            .firstOrNull { it.cargo == 3 }
+            .firstOrNull { it.cargo == 2 }
             ?: throw CatalogValidationException(
                 "El supervisor asignado no tiene un cargo activo de supervisor"
             )

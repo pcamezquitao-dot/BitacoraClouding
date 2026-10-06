@@ -11,6 +11,7 @@ from app.schemas.admin_catalog import (
 )
 from app.services.admin_catalog_service import (
     create_participant_type,
+    delete_participant_type,
     list_participant_types,
     set_participant_type_status,
     update_participant_type,
@@ -88,5 +89,20 @@ def cambiar_estado_tipo_participante(
             payload.activo,
             identity,
         )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.delete(
+    "/tipos-participante/{codigo}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_tipo_participante(
+    codigo: int,
+    db: Session = Depends(get_db),
+    identity: AdminIdentity = Depends(require_admin_access),
+):
+    try:
+        delete_participant_type(db, codigo, identity)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

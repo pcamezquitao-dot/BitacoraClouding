@@ -1,0 +1,202 @@
+CU-CREAR-001 — Crear bitácora desde Administrador
+
+Caso de uso: Crear bitácora desde Administrador → Crear (+)
+Caso de prueba asociado: CP-CREAR-001
+Estado: CANDIDATA TÉCNICA IMPLEMENTADA Y COMPILADA; validación funcional pendiente
+Célula propietaria provisional: C07
+Confirmación de propiedad: PENDIENTE. La asignación a C07 fue autorizada únicamente para mantener la trazabilidad provisional de esta funcionalidad y no constituye confirmación definitiva de propiedad.
+
+1. OBJETIVO
+
+Permitir que un actor administrativo cree desde Administrador → Crear (+) una bitácora para un empleado que tenga un superior vigente asignado.
+
+La condición de que el empleado seleccionado tenga un cargo activo de Supervisor no debe, por sí sola, impedir la creación. El superior responsable asignado puede ser un Supervisor o un Gerente, según la relación vigente que corresponda.
+
+Excepción expresa: un Gerente también puede ser participante de su propia bitácora y supervisor responsable de sí mismo. Únicamente en este caso se permite que id_empleado e id_supervisor tengan el mismo identificador.
+
+2. ACTORES Y ROLES
+
+Actor principal:
+- Actor administrativo que accede al flujo existente Administrador → Crear (+).
+
+Participantes del registro:
+- Empleado o participante de la bitácora: participante para quien se crea el registro. Puede tener cargo activo de Supervisor y seguir actuando como empleado dentro de esta operación. También puede ser Gerente exclusivamente bajo la excepción de autorresponsabilidad definida en este documento.
+- Superior responsable: participante vigente asignado como superior del empleado. Puede ser Supervisor o Gerente.
+
+Esta distinción es funcional: el cargo Supervisor del empleado no lo convierte automáticamente en el superior responsable de su propia bitácora ni debe excluirlo como empleado del registro.
+
+Excepción limitada del Gerente:
+- Cuando el participante de la bitácora es Gerente, puede actuar como su propio supervisor responsable.
+- En ese caso, el participante y el supervisor responsable pueden ser la misma persona y compartir el mismo identificador.
+- Esta autorresponsabilidad no se permite para participantes con cargo Supervisor ni para ningún otro cargo.
+
+3. PRECONDICIONES
+
+- El actor administrativo ingresó al flujo existente Administrador → Crear (+).
+- El empleado existe y tiene una asignación activa y vigente.
+- Existe una relación vigente que permite determinar o validar su superior responsable, salvo la excepción expresa del Gerente como supervisor de sí mismo.
+- El superior responsable existe, está activo y cumple el rol vigente aceptado por el sistema: Supervisor o Gerente.
+- El área y los demás datos obligatorios del flujo de creación pueden validarse conforme a las reglas ya existentes.
+- La API, Room/SQLite y MariaDB se encuentran disponibles según el modo de operación que corresponda.
+
+4. REGLA FUNCIONAL AUTORIZADA
+
+RF-CREAR-001:
+
+Ser Supervisor no debe impedir que un participante sea seleccionado como empleado de una bitácora creada desde Administrador → Crear (+), siempre que tenga un superior responsable vigente asignado.
+
+RF-CREAR-002:
+
+El superior responsable puede ser un Gerente. La existencia de un Gerente válido como superior no debe provocar el rechazo de la creación por exigir exclusivamente el cargo Supervisor.
+
+RF-CREAR-003:
+
+La validación debe distinguir entre:
+- el cargo del empleado para quien se crea la bitácora; y
+- el rol del superior responsable asociado a la bitácora.
+
+RF-CREAR-004:
+
+La creación debe conservar las validaciones existentes de participante activo, asignación vigente, área, datos obligatorios, persistencia, sincronización y manejo de errores que no contradigan RF-CREAR-001 a RF-CREAR-003.
+
+RF-CREAR-005 — Excepción de autorresponsabilidad del Gerente:
+
+Un participante con cargo activo y vigente de Gerente puede crear o tener creada su propia bitácora desde Administrador → Crear (+), actuando simultáneamente como participante de la bitácora y supervisor responsable. En esta situación se permite expresamente que id_empleado = id_supervisor.
+
+La igualdad id_empleado = id_supervisor debe rechazarse para participantes con cargo Supervisor y para cualquier otro cargo. Esta excepción no modifica ni elimina las demás validaciones aplicables al Gerente, su asignación, área o datos obligatorios.
+
+5. FLUJO PRINCIPAL
+
+1. El actor abre Administrador → Crear (+).
+2. El sistema presenta el formulario existente de creación de bitácora.
+3. El actor identifica o selecciona al empleado.
+4. El sistema valida que el empleado exista y tenga una asignación activa y vigente.
+5. Si el empleado tiene cargo Supervisor, el sistema no lo rechaza únicamente por ese cargo.
+6. El sistema determina o permite validar al superior responsable vigente del empleado.
+7. Si el superior responsable es Gerente, el sistema lo acepta cuando cumple las condiciones vigentes del rol.
+8. Si el participante seleccionado es Gerente y se identifica a sí mismo como supervisor responsable, el sistema acepta la igualdad de identificadores por la excepción RF-CREAR-005.
+9. El actor completa área y demás datos obligatorios.
+10. El sistema valida el formulario sin confundir el cargo del empleado con el rol del superior y sin extender la autorresponsabilidad a otros cargos.
+11. El actor solicita guardar.
+12. El sistema crea la bitácora mediante el mecanismo de persistencia y sincronización existente.
+13. El sistema informa el resultado real de la operación.
+
+6. FLUJOS ALTERNATIVOS Y ERRORES
+
+6.1. Empleado sin asignación vigente
+
+- El sistema rechaza la creación e informa que no existe una asignación activa y vigente.
+- No se crea ni sincroniza una bitácora.
+
+6.2. Empleado sin superior vigente
+
+- El sistema informa que no se encontró un superior responsable vigente.
+- No utiliza un participante arbitrario ni crea una relación inexistente.
+- No se crea ni sincroniza una bitácora hasta que se suministre o determine un superior válido conforme al flujo autorizado.
+
+6.3. Superior inválido o inactivo
+
+- El sistema rechaza la validación del superior.
+- No crea una bitácora con un responsable inválido.
+
+6.4. Empleado con cargo Supervisor y superior válido
+
+- El sistema continúa el flujo normal.
+- No muestra un error que excluya al empleado por tener cargo Supervisor.
+
+6.5. Superior responsable con cargo Gerente
+
+- El sistema continúa el flujo normal cuando el Gerente es el superior vigente correspondiente.
+- No exige sustituirlo por un participante con cargo Supervisor.
+
+6.6. Gerente como participante y supervisor de sí mismo
+
+- El sistema permite seleccionar o identificar al Gerente como participante de la bitácora.
+- El sistema permite identificar al mismo Gerente como supervisor responsable.
+- La igualdad entre id_empleado e id_supervisor es válida exclusivamente porque ambos identifican al mismo Gerente activo y vigente.
+- La bitácora puede crearse si cumple las demás validaciones.
+
+6.7. Intento de autorresponsabilidad con otro cargo
+
+- Si un participante con cargo Supervisor o cualquier cargo distinto de Gerente intenta figurar también como su propio supervisor responsable, el sistema rechaza la operación.
+- No se crea una bitácora ni una relación parcial.
+
+6.8. Fallo de persistencia o sincronización
+
+- El sistema aplica el comportamiento existente de persistencia local, sincronización y presentación de errores.
+- No anuncia éxito si la operación no fue aceptada o conservada según ese mecanismo.
+
+7. DATOS Y CONTRATOS OBSERVADOS
+
+Los siguientes elementos se registran como trazabilidad del código abierto inspeccionado, no como autorización para modificarlos:
+
+- Pantalla Android: CrearBitacoraDiariaScreen, en MainActivity.kt.
+- Validación de roles Android: assignmentAllowsTarget y validación de empleado/superior.
+- Resolución Android: BitacoraRepository.getSupervisorForEmployee y crearBitacoraDiaria.
+- Persistencia local: bitacoras_locales, mediante el repositorio existente.
+- API: POST /bitacora_diaria.
+- Backend: crear_bitacora_diaria y _crear_bitacora_diaria, en app/routers/bitacora_uc03.py.
+- Resolución jerárquica: get_supervisor_for_empleado, en app/services/jerarquia_service.py.
+- Persistencia remota: bitacora_diaria.id_empleado e id_supervisor.
+
+8. POSTCONDICIONES ESPERADAS
+
+- Una creación aceptada conserva al empleado seleccionado en id_empleado y al superior responsable en id_supervisor.
+- El cargo Supervisor del empleado no causa por sí solo el rechazo.
+- Un Gerente vigente puede quedar registrado como superior responsable cuando corresponda.
+- Cuando el participante es Gerente y actúa como supervisor de sí mismo, id_empleado e id_supervisor conservan el mismo identificador.
+- Para participantes con cargo Supervisor u otros cargos, id_empleado e id_supervisor no pueden coincidir por esta excepción.
+- No se altera la identidad de otros participantes ni sus asignaciones.
+- Los rechazos no crean registros parciales ni relaciones inventadas.
+- Las capacidades existentes de creación, persistencia local y sincronización se conservan.
+
+9. EXCLUSIONES
+
+- No redefine la jerarquía organizacional general.
+- No crea cargos, asignaciones ni relaciones de superioridad.
+- No cambia el sistema general de permisos administrativos.
+- No modifica esquemas MariaDB ni Room.
+- No permite que un participante con cargo Supervisor u otro cargo distinto de Gerente sea supervisor de sí mismo.
+- No extiende la igualdad id_empleado = id_supervisor fuera de la excepción expresa del Gerente.
+- No modifica Tipos de participante ni CU-TIP-001/CP-TIP-001.
+
+10. CRITERIOS DE ACEPTACIÓN
+
+- CP-CREAR-001 demuestra que un empleado con cargo Supervisor y superior vigente puede tener una bitácora creada desde Administrador → Crear (+).
+- CP-CREAR-001 demuestra el caso en que el superior responsable vigente es Gerente.
+- CP-CREAR-001 demuestra que un Gerente puede ser participante y supervisor responsable de sí mismo, persistiendo id_empleado = id_supervisor.
+- CP-CREAR-001 comprueba que la autorresponsabilidad se rechaza para un participante con cargo Supervisor y no se extiende a otros cargos.
+- Los casos sin asignación o sin superior válido se rechazan sin escritura parcial.
+- La bitácora persistida conserva correctamente empleado y superior.
+- Las validaciones existentes no relacionadas con esta regla continúan vigentes.
+
+11. ESTADO DE IMPLEMENTACIÓN Y VALIDACIÓN
+
+- La candidata local permite que una asignación activa de Supervisor o Gerente sea utilizada como participante de la bitácora en Administrador → Crear (+).
+- Android valida al responsable como Supervisor o Gerente y permite que coincida con el participante únicamente cuando su cargo es Gerente.
+- La API aplica la misma regla antes del INSERT: responsable activo de tipo Supervisor o Gerente; autorresponsabilidad exclusiva del Gerente.
+- No fue necesario cambiar modelos, tablas, columnas, claves ni restricciones de MariaDB o Room.
+- Las pruebas focalizadas Android y backend fueron aprobadas y la candidata compiló correctamente el 2026-10-05.
+- No se instalaron artefactos ni se ejecutaron escrituras funcionales en MariaDB o Room.
+- La validación funcional de CP-CREAR-001 permanece PENDIENTE; la cobertura técnica no equivale a aprobación física.
+
+11.1. Evidencia técnica — 2026-10-05
+
+- Backend focalizado final: 37 pruebas aprobadas, 4 subpruebas aprobadas, 0 fallas.
+- Android focalizado ampliado: 61 pruebas aprobadas, 0 fallas; BUILD SUCCESSFUL.
+- Compilación: assembleProductionDebug, BUILD SUCCESSFUL.
+- Artefacto: android/bitacora-android/app/build/outputs/apk/production/debug/app-production-debug.apk.
+- Tamaño: 117436779 bytes.
+- SHA-256: 70C1B8FBD4B02F8D4B0FE2FF53C4E31FAF49B6C1C64FF0A431B233387B6087F3.
+- Respaldo previo verificable: C:\Bitacora\_codex_backups\C07_CREATE_20261005_103500.
+- Verificación directa de information_schema: no ejecutada; la conexión local falló antes de consultar por falta del complemento auth_gssapi_client. No hubo escritura.
+
+12. TRAZABILIDAD DOCUMENTAL
+
+- Solicitud funcional de Patricia: documentar que ser Supervisor no debe impedir crear desde Administrador → Crear (+) la bitácora de un empleado con superior asignado, incluido el caso de superior Gerente.
+- Caso de prueba vinculado: CP-CREAR-001.
+- Célula provisional: C07, pendiente de confirmación.
+- Documento creado: 2026-10-05.
+- Worktree analizado: C:\Bitacora\BitacoraClouding-areas-sync-fix.
+- Rama observada: fix/c03-c11-c12-c16-areas-sync.
+- Commit base observado: 20e95856478481b987a934c8b07e68ea8a0df7b4.

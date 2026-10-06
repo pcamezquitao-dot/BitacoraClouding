@@ -40,7 +40,7 @@ def get_supervisor_for_empleado(db: Session, id_empleado: int) -> int:
             FROM ascenso a
             JOIN {ea} ea_sup
              ON ea_sup.id_area = a.id_area_actual
-             AND ea_sup.cargo = 3
+             AND ea_sup.cargo = 2
              AND ea_sup.activo = TRUE
              AND ea_sup.fecha_inicia <= CURDATE()
              AND (

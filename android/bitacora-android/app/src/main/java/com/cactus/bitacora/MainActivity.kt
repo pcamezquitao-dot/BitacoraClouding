@@ -1114,10 +1114,27 @@ internal fun roleLabel(cargo: Int?): String = when (cargo) {
     else -> "Empleado/otro (cargo $cargo)"
 }
 
-internal fun assignmentAllowsTarget(cargo: Int?, target: DailyLogQrTarget): Boolean = when (target) {
-    DailyLogQrTarget.SUPERVISOR -> cargo == 3
-    DailyLogQrTarget.EMPLEADO -> cargo != 3 && cargo != 4
+internal fun assignmentAllowsTarget(
+    cargo: Int?,
+    target: DailyLogQrTarget,
+    supervisorTypeCode: Int
+): Boolean = when (target) {
+    DailyLogQrTarget.SUPERVISOR -> cargo == supervisorTypeCode
+    DailyLogQrTarget.EMPLEADO -> cargo != null
     DailyLogQrTarget.AREA -> false
+}
+
+internal fun assignmentAllowsDailyLogResponsible(
+    cargo: Int?,
+    employeeId: Int?,
+    responsibleId: Int,
+    supervisorTypeCode: Int,
+    managerTypeCode: Int
+): Boolean {
+    val isManager = cargo == managerTypeCode
+    val hasResponsibleRole = cargo == supervisorTypeCode || isManager
+    if (!hasResponsibleRole) return false
+    return employeeId == null || employeeId != responsibleId || isManager
 }
 
 internal fun allowsOfflineManager(
@@ -1284,7 +1301,9 @@ internal fun CrearBitacoraDiariaScreen(
     fun validateEmpleado(rawQr: String) {
         val qr = rawQr.trim()
         empleado = null
+        supervisor = null
         empleadoError = null
+        supervisorError = null
         area = null
         areaError = null
         if (qr.isBlank()) {
@@ -1325,31 +1344,26 @@ internal fun CrearBitacoraDiariaScreen(
         scope.launch {
             try {
                 val participante = repository.getParticipanteByQr(qr)
-                val asignacion = if (managerFallback) {
-                    repository.getAsignacionesActivas(participante.id_participante)
-                        .firstOrNull {
-                            allowsOfflineManager(
-                                normalizedQr = qr,
-                                participantId = participante.id_participante,
-                                cargo = it.cargo,
-                                active = true,
-                                startDate = null,
-                                endDate = it.fecha_final,
-                                today = SimpleDateFormat(
-                                    "yyyy-MM-dd",
-                                    Locale.ROOT
-                                ).format(Date())
-                            )
-                        }
-                        ?: throw IllegalStateException(
-                            "El participante no tiene un cargo activo de gerente"
+                val supervisorTypeCode = repository.getSupervisorTypeCode()
+                val managerTypeCode = repository.getManagerTypeCode()
+                val asignacion = repository.getAsignacionesActivas(participante.id_participante)
+                    .firstOrNull {
+                        assignmentAllowsDailyLogResponsible(
+                            cargo = it.cargo,
+                            employeeId = empleado?.participante?.id_participante,
+                            responsibleId = participante.id_participante,
+                            supervisorTypeCode = supervisorTypeCode,
+                            managerTypeCode = managerTypeCode
                         )
-                } else {
-                    repository.getAsignacionParaRol(
-                        participante.id_participante,
-                        supervisor = true
+                    }
+                    ?: throw IllegalStateException(
+                        if (managerFallback) {
+                            "El participante no tiene un cargo activo de gerente"
+                        } else {
+                            "El responsable debe tener cargo activo de supervisor o gerente; " +
+                                "solo el gerente puede ser supervisor de sí mismo"
+                        }
                     )
-                }
                 supervisor = ParticipanteValidado(participante, asignacion)
                 supervisorFallbackRequired = false
             } catch (e: Exception) {
@@ -1578,15 +1592,29 @@ internal fun CrearBitacoraDiariaScreen(
             try {
                 val participant = repository.getParticipanteByQr(candidate.participantCode)
                 val assignments = repository.getAsignacionesActivas(candidate.participantId)
+                val supervisorTypeCode = repository.getSupervisorTypeCode()
+                val managerTypeCode = repository.getManagerTypeCode()
                 val assignment = assignments.firstOrNull {
-                    assignmentAllowsTarget(it.cargo, target)
+                    if (target == DailyLogQrTarget.SUPERVISOR) {
+                        assignmentAllowsDailyLogResponsible(
+                            cargo = it.cargo,
+                            employeeId = empleado?.participante?.id_participante,
+                            responsibleId = participant.id_participante,
+                            supervisorTypeCode = supervisorTypeCode,
+                            managerTypeCode = managerTypeCode
+                        )
+                    } else {
+                        assignmentAllowsTarget(it.cargo, target, supervisorTypeCode)
+                    }
                 } ?: throw IllegalStateException(missingRoleMessage(target))
                 val validated = ParticipanteValidado(participant, assignment)
                 when (target) {
                     DailyLogQrTarget.EMPLEADO -> {
                         qrEmpleado = candidate.participantCode
                         empleado = validated
+                        supervisor = null
                         empleadoError = null
+                        supervisorError = null
                         area = null
                         areaError = null
                         if (citizenEventType != null) {
@@ -1696,7 +1724,14 @@ internal fun CrearBitacoraDiariaScreen(
             title = "Empleado",
             scanText = "Escanear empleado",
             qr = qrEmpleado,
-            onQrChange = { qrEmpleado = it; empleado = null; empleadoError = null; area = null },
+            onQrChange = {
+                qrEmpleado = it
+                empleado = null
+                supervisor = null
+                empleadoError = null
+                supervisorError = null
+                area = null
+            },
             onScan = { startScan(DailyLogQrTarget.EMPLEADO) },
             onValidate = { validateEmpleado(qrEmpleado) },
             loading = validatingTarget == DailyLogQrTarget.EMPLEADO,
@@ -2223,6 +2258,15 @@ private fun Throwable.httpDetail(): String? {
         .getOrNull()
 }
 
+internal fun initialQrCameraLens(): Int = CameraSelector.LENS_FACING_BACK
+
+internal fun nextQrCameraLens(currentLens: Int): Int =
+    if (currentLens == CameraSelector.LENS_FACING_FRONT) {
+        CameraSelector.LENS_FACING_BACK
+    } else {
+        CameraSelector.LENS_FACING_FRONT
+    }
+
 @Composable
 private fun QrScanner(
     onQrScanned: (String) -> Unit,
@@ -2234,6 +2278,7 @@ private fun QrScanner(
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val hasScanned = remember { AtomicBoolean(false) }
     val isProcessing = remember { AtomicBoolean(false) }
+    var cameraLens by remember { mutableStateOf(initialQrCameraLens()) }
     val barcodeScanner = remember {
         val options = BarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
@@ -2250,12 +2295,25 @@ private fun QrScanner(
 
     Text(prompt)
     Text("Buscando código QR…", color = MaterialTheme.colorScheme.primary)
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { cameraLens = nextQrCameraLens(cameraLens) }
+    ) {
+        Text(
+            if (cameraLens == CameraSelector.LENS_FACING_BACK) {
+                "Cambiar a cámara frontal"
+            } else {
+                "Cambiar a cámara trasera"
+            }
+        )
+    }
 
-    AndroidView(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(320.dp),
-        factory = { viewContext ->
+    key(cameraLens) {
+        AndroidView(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(320.dp),
+            factory = { viewContext ->
             val previewView = PreviewView(viewContext).apply {
                 scaleType = PreviewView.ScaleType.FILL_CENTER
                 implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -2290,7 +2348,7 @@ private fun QrScanner(
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        CameraSelector.Builder().requireLensFacing(cameraLens).build(),
                         preview,
                         analyzer
                     )
@@ -2300,10 +2358,11 @@ private fun QrScanner(
                 }
             }, ContextCompat.getMainExecutor(viewContext))
 
-            previewView
-        },
-        update = {}
-    )
+                previewView
+            },
+            update = {}
+        )
+    }
 }
 
 @OptIn(ExperimentalGetImage::class)

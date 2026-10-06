@@ -1,0 +1,106 @@
+C07 / CP-CREAR-001 — TRAZABILIDAD CPCR01101 HASTA V2035
+Fecha: 2026-10-06
+Ambiente autorizado: bitacora_test exclusivamente
+Dispositivo: V2035, serial USB 3065397347006YM
+Paquete: com.cactus.bitacora.c07test
+
+1. Diagnóstico previo a la escritura
+
+- El servicio efectivo fue bitacora-tip-test.service, activo, con WorkingDirectory /srv/bitacora-tip-test-20261001.
+- Los archivos de ambiente efectivos declararon DB_NAME=bitacora_test y APP_ENV=tip_test.
+- SELECT DATABASE() ejecutado por MariaDB devolvió bitacora_test.
+- CPCR01101 no existía en participante, no aparecía en GET /catalogos/offline, GET /participante/by_qr/CPCR01101 devolvía HTTP 404 y Room tampoco contenía el código.
+- El participante DT-01 sí existía con id_participante 900101, documento CPCR001101 e identificacion_participante CPCR001-EMP.
+- Crear (+) consulta el QR por igualdad exacta contra identificacion_participante/codigoQr. El campo documento no funciona como alias de QR.
+- Causa: el fixture DT-01 se creó con una identificación descriptiva distinta del código CPCR01101 solicitado para la prueba. La ausencia se propagaba correctamente desde MariaDB hacia API y Room; no era una falla nueva de sincronización.
+
+2. Estado de las áreas
+
+MariaDB, API y Room coincidieron:
+
+- 99071, Area controlada CP-CREAR-001, referencia CPCR001-A, nodo_padre/idPadre NULL, activa.
+- 99072, Area sin superior CP-CREAR-001, referencia CPCR001-B, nodo_padre/idPadre NULL, activa.
+
+Ambas son áreas raíz por definición del fixture. No se modificó ninguna de las dos.
+
+3. Respaldo y corrección
+
+Respaldo completo previo:
+/srv/bitacora/db-backups/c07/20261006_130037-cpcr01101/bitacora_test-before-cpcr01101.sql
+SHA-256: d826035cdbdbee0d2b4a74531793e9f67de760221ad2c5db15f56a0a2656d3e7
+
+SELECT previo:
+- id_participante=900101
+- documento=CPCR001101
+- identificacion_participante=CPCR001-EMP
+- asignación 113, área 99071, cargo 1, activa
+
+Corrección ejecutada dentro de una transacción:
+
+  UPDATE participante
+     SET identificacion_participante='CPCR01101'
+   WHERE id_participante=900101
+     AND identificacion_participante='CPCR001-EMP';
+
+Conteos comprobados: origen=1, destino previo=0, filas cambiadas=1.
+No se cambió el id_participante, documento, nombre, asignación, área ni ninguna bitácora.
+
+Reversión exacta disponible:
+
+  UPDATE participante
+     SET identificacion_participante='CPCR001-EMP'
+   WHERE id_participante=900101
+     AND identificacion_participante='CPCR01101';
+
+4. Comprobación de API
+
+- GET /bitacora-tip-test/participante/by_qr/CPCR01101: HTTP 200.
+- Resultado: id_participante 900101, Prueba Empleado, identificación CPCR01101, documento CPCR001101.
+- GET /bitacora-tip-test/catalogos/offline: 525 participantes, 9 áreas y 35 asignaciones activas.
+- La instantánea incluyó CPCR01101 y la asignación 113 hacia 99071.
+- La instantánea conservó 99071 y 99072 con nodo_padre NULL.
+
+5. Comprobación de Room posterior a sincronización física
+
+Desde la pantalla Sincronizar se ejecutó “Actualizar catálogos”. La interfaz mostró:
+
+- participantes locales: 525;
+- áreas locales: 9;
+- relaciones empleado-área: 35;
+- pendientes: 0;
+- errores: 0.
+
+Lectura directa de bitacora_local.db:
+
+- participantes_locales: CPCR01101 presente y activo con idParticipante 900101; código anterior ausente.
+- empleado_area_locales: asignación 113 activa, participante 900101, área 99071.
+- areas_administrativas_locales: 99071 y 99072 activas con idPadre NULL.
+- catalog_sync_state: 525/9/35/4, lastError NULL.
+
+6. Comprobación física en Crear (+)
+
+- Se ingresó CPCR01101 en QR Empleado y se pulsó “Validar QR manual”.
+- Resultado visible: “Empleado validado localmente”, “Nombre: Prueba Empleado”, “Identificación: CPCR01101” y “Área asignada: 99071”.
+- Se validó CPCR001-SUP-R como responsable distinto para habilitar el selector.
+- El selector mostró simultáneamente 99071 y 99072.
+- Se canceló/salió sin guardar; MariaDB quedó con 0 bitácoras relacionadas con los participantes 900101–900107 y 0 filas con client_uuid CP-CREAR-001-%. No se creó un registro adicional.
+
+Evidencia gráfica:
+
+- C07-CPCR01101-CREAR-V2035-20261006.png
+  SHA-256: 93410F544B24D11881041470F08569C972414EEDB0B69D48ABE92200F5A1D330
+- C07-CPCR01101-AREAS-V2035-20261006.png
+  SHA-256: BF2AACAC15ABD5A717A06E33A01BB6F4E83BFF4CA5C12ECAFB0F9B551DE83D70
+
+7. Paquete instalado
+
+- applicationId: com.cactus.bitacora.c07test
+- versionCode: 49
+- versionName: maria49-c22-bitacora-prueba-dev
+- tamaño de base.apk: 117353796 bytes
+- SHA-256 calculado en el V2035: 4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8
+- Único paquete Bitácora enumerado: com.cactus.bitacora.c07test.
+
+8. Resultado
+
+La inconsistencia de CPCR01101 quedó diagnosticada como dato de fixture incorrecto, corregida en bitacora_test y comprobada de extremo a extremo en MariaDB, API, Room y Crear (+) del V2035. Los registros existentes se conservaron y no se modificaron las áreas 99071/99072 ni los esquemas.

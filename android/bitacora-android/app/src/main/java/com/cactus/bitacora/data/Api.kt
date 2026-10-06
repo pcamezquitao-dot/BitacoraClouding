@@ -234,6 +234,14 @@ interface BitacoraApi {
         @Body payload: ParticipantTypeStatusIn
     ): ParticipantTypeAdminOut
 
+    @DELETE("admin/tipos-participante/{codigo}")
+    suspend fun deleteAdminParticipantType(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("codigo") code: Int
+    ): Response<Unit>
+
     @GET("admin/areas/arbol")
     suspend fun getAdminAreaTree(
         @Header("X-Admin-Actor") actor: String,

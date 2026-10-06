@@ -1,0 +1,91 @@
+C16 — INCIDENCIA Y PRUEBA DE REGRESIÓN DE ÁREAS ADMINISTRATIVAS
+Fecha de ejecución: 2026-10-06
+Worktree: C:\Bitacora\BitacoraClouding-areas-sync-fix
+Rama observada: fix/c03-c11-c12-c16-areas-sync
+Commit base observado: 20e95856478481b987a934c8b07e68ea8a0df7b4
+Paquete intervenido: com.cactus.bitacora.c07test exclusivamente
+
+1. Incidencia
+
+La APK paralela compilada para C07 no conservaba la presentación aceptada de C16 en Administrador → Administrar maestros → Áreas administrativas. La revisión comparativa contra la última implementación aceptada disponible en el worktree C:\Bitacora\BitacoraClouding-c16-reproducible, rama fix/c16-reproducible-rev03, commit 91dce2, confirmó que AdminCatalogScreen.kt procedía de una revisión diferente que había perdido selectivamente:
+
+- el resumen superior de solo lectura;
+- la separación entre resumen y árbol interactivo;
+- la acción “+ Adicionar área raíz”;
+- la acción “+” por área antes de ojo, lápiz y X;
+- la tipografía compacta;
+- el repliegue y expansión al pulsar el nombre.
+
+La causa fue una regresión de integración local de AdminCatalogScreen.kt, no la corrección de sincronización de catálogos. No se reemplazó el archivo completo: se recuperaron selectivamente los elementos aceptados de C16 para conservar la sincronización C07 y las funciones posteriores de tipos y asignaciones.
+
+2. Corrección aplicada
+
+- Se restituyó el resumen superior de solo lectura con árbol y Referencia.
+- Se restituyó el árbol interactivo inferior y “+ Adicionar área raíz”.
+- Se restituyó “+” por fila antes de consultar, editar y eliminar.
+- Se restituyeron tipografía y controles compactos.
+- Se restituyó el cambio de estado expandido/replegado al pulsar el nombre.
+- La construcción del árbol continúa usando id_area/id_padre y conserva los nodos huérfanos controlados.
+- Se mantuvo intacta la corrección de ReferenceCatalogDao.applySnapshot para jornadas inactivas.
+- Se mantuvieron las reglas: Supervisor puede ser participante; únicamente Gerente puede ser supervisor de sí mismo.
+
+3. Prueba automatizada de regresión
+
+Comando focalizado ejecutado junto con la compilación:
+
+  gradlew testC07testDebugUnitTest
+    --tests com.cactus.bitacora.ui.admin.AdminAreaTreePolicyTest
+    --tests com.cactus.bitacora.data.ReferenceCatalogRepositoryTest
+    --tests com.cactus.bitacora.DailyLogRolePolicyTest
+    --tests com.cactus.bitacora.OfflineManagerValidationTest
+  gradlew assembleC07testDebug
+
+Resultado: BUILD SUCCESSFUL, 0 fallas.
+
+Casos nuevos de regresión:
+
+- resumen_solo_lectura_reproduce_preorden_simbolos_sangria_y_referencia;
+- resumen_y_arbol_comparten_repliegue_sin_cambiar_hojas.
+
+4. Instalación controlada
+
+Dispositivo: V2035, serial 3065397347006YM.
+APK: android/bitacora-android/app/build/outputs/apk/c07test/debug/app-c07test-debug.apk.
+Tamaño: 117353796 bytes.
+SHA-256 compilada: 4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8.
+SHA-256 leída desde el paquete instalado: 4B603BCEB40152EE7D70C22F366047BE773EDCDEC384ECB21AB1639856F80FE8.
+Versión: versionCode 49, versionName maria49-c22-bitacora-prueba-dev.
+
+Al iniciar esta instalación no había ningún paquete Bitácora instalado en el dispositivo. Se instaló únicamente com.cactus.bitacora.c07test. La aplicación principal y tiptest no se instalaron, actualizaron ni modificaron. Para conservar el estado funcional previamente comprobado de C07 se restauró el archivo privado recuperable c07_final_234326.tar, correspondiente a la ejecución positiva anterior; después se confirmó la presencia de la bitácora sincronizada con backendId 5866.
+
+5. Verificación física de Áreas administrativas
+
+Resultado: CUMPLE.
+
+- Visible “Resumen de áreas (solo lectura)” con árbol, Referencia y área 99071.
+- Visible “Árbol interactivo”.
+- Visible “+ Adicionar área raíz”.
+- Cada fila visible presentó “+” antes de las acciones Consultar detalles, Editar y Eliminar.
+- La presentación fue compacta y conservó los símbolos de jerarquía.
+- Al pulsar el nombre, “▶ Agricola Cactus” quedó sin descendientes visibles; al pulsarlo nuevamente cambió a “▼ Agricola Cactus” y reaparecieron Gerencia y Dirección Desarrollo.
+
+6. Verificación física de Crear (+) y Room
+
+Resultado: CUMPLE; no se guardó una bitácora adicional.
+
+- CPCR001-SUP-E fue validado localmente como empleado y mostró el área asignada 99071.
+- CPCR001-SUP-R fue validado localmente como Supervisor responsable distinto.
+- El selector mostró 9 áreas e incluyó “Area controlada CP-CREAR-001”, id 99071.
+- Inspección directa de Room: 9 áreas; 99071 activa, referencia CPCR001-A, padre nulo.
+- Tipo supervisor: una fila activa, código 2, capacidad EMPLEADO.
+- La bitácora previa backendId 5866 permaneció en Room como SINCRONIZADO, con empleado 900102, supervisor 900103 y área 99071.
+- La ejecución física positiva anterior del rechazo de Supervisor autorresponsable y de la aceptación de Gerente autorresponsable se conserva; las pruebas focalizadas de política volvieron a aprobar.
+
+7. Estado final
+
+- Regresión visual/funcional de C16: CORREGIDA Y COMPROBADA EN V2035.
+- Corrección de sincronización C07: CONSERVADA.
+- Error del tipo activo supervisor: RESUELTO Y RECONFIRMADO en Room e interfaz.
+- Crear (+): conserva resultado positivo.
+- No hubo commit, push, integración ni despliegue.
+- La declaración de aceptación final de la APK completa corresponde exclusivamente a Patricia.

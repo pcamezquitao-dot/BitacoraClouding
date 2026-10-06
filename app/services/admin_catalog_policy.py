@@ -1,5 +1,4 @@
 from datetime import date
-import re
 from typing import Iterable
 
 
@@ -19,11 +18,11 @@ def legacy_capabilities(type_code: int) -> set[str]:
 
 
 def normalize_type_description(value: str) -> str:
-    normalized = re.sub(r"\s+", " ", value or "").strip()
+    normalized = (value or "").strip()
     if not normalized:
-        raise ValueError("La descripción del tipo es obligatoria")
+        raise ValueError("La descripción es obligatoria")
     if len(normalized) > 100:
-        raise ValueError("La descripción del tipo no puede superar 100 caracteres")
+        raise ValueError("La descripción no puede superar 100 caracteres")
     return normalized
 
 

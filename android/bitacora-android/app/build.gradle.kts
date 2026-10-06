@@ -44,11 +44,19 @@ android {
             dimension = "edition"
             applicationId = "com.cactus.bitacora"
             manifestPlaceholders["appLabel"] = "Bitacora"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora/\"")
+        }
+        create("c07test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c07test"
+            manifestPlaceholders["appLabel"] = "Bitacora C07 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-tip-test/\"")
         }
         create("facial1") {
             dimension = "edition"
             applicationId = "com.cactus.bitacora.facial1"
             manifestPlaceholders["appLabel"] = "Bitacora Facial 1"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora/\"")
         }
     }
 

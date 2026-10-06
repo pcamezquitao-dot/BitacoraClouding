@@ -43,9 +43,9 @@ class OfflineManagerValidationTest {
     }
 
     @Test
-    fun normalSupervisorSelectionRemainsCargoThreeOnly() {
-        assertTrue(assignmentAllowsTarget(3, DailyLogQrTarget.SUPERVISOR))
-        assertFalse(assignmentAllowsTarget(4, DailyLogQrTarget.SUPERVISOR))
+    fun normalSupervisorSelectionUsesCatalogCode() {
+        assertTrue(assignmentAllowsTarget(2, DailyLogQrTarget.SUPERVISOR, supervisorTypeCode = 2))
+        assertFalse(assignmentAllowsTarget(1, DailyLogQrTarget.SUPERVISOR, supervisorTypeCode = 2))
     }
 
     private fun manager(

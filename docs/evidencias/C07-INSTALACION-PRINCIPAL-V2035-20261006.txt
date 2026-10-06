@@ -1,0 +1,45 @@
+INSTALACIÓN PRINCIPAL C07/C16 — V2035 — 2026-10-06
+
+Dispositivo y aplicación
+- V2035 serial USB 3065397347006YM.
+- Antes de instalar: com.cactus.bitacora no estaba instalado; no existía contenedor privado principal que respaldar.
+- Se conservó com.cactus.bitacora.c07test y no se modificó tiptest.
+- Instalación: adb install -r, resultado Success.
+- Paquete: com.cactus.bitacora.
+- versionCode 49; versionName maria49-c22-bitacora-prueba-dev.
+- APK local: app-production-debug.apk, 117126926 bytes.
+- SHA-256 local: 135516BD112D79BA23D04643D8EB4E4801A3CF11485301471F720379E106571F.
+- URL mostrada físicamente: https://161-22-47-89.sslip.io/bitacora/.
+
+Respaldo y base efectiva
+- Dump previo: /srv/bitacora/db-backups/c07/20261006_204306-pre-main-install/bitacora-before-main-install.sql.
+- Tamaño: 806398 bytes.
+- SHA-256: 820e55d9223790e8947ac87fa45e1db197a6f9ce5788bb098c4107d87f1facdd.
+- SELECT DATABASE(): bitacora.
+- bitacora.service activo; /bitacora/health devolvió {"status":"ok"}.
+- No se copió bitacora_test sobre bitacora.
+
+Fixtures CP-CREAR-001 en producción
+- SELECT previo encontró 0 participantes 900101–900107/CPCR%, 0 áreas 99071–99072/CPCR% y 0 bitácoras con IDs, UUID u observaciones de CP-CREAR-001.
+- También se comprobaron las relaciones por claves foráneas y no hubo bitácoras asociadas a esos participantes.
+- Registros eliminados: 0. No se ejecutó DELETE. No hubo registros dudosos que clasificar.
+
+Backend
+- Producción aún tenía el validador anterior de responsable. Se instaló el router probado que admite Supervisor como participante y exige Gerente/Directivo para autorresponsabilidad.
+- SHA-256 activo de /srv/bitacora/app/routers/bitacora_uc03.py: 855ccd93968da755e84619f4a84d50b142da388a666a6947f0c339ecbb8fb051.
+- El respaldo previo del router falló por un error de comillas antes de la copia. El archivo anterior tenía SHA-256 474106c81b808fac337cbcc97fbd3195cff05f1247e0185b96705db4bcde452a y no coincidía con HEAD, por lo que no se inventó una copia de reversión. El dump de datos sí quedó verificado.
+
+Room y Crear (+)
+- catalog_sync_state: 518 participantes, 7 áreas, 29 asignaciones, 4 tipos, lastError NULL.
+- Tipo 2 supervisor: activo, capacidadesCsv EMPLEADO.
+- P0306: participante 306 activo; asignación activa 93, área 10028, cargo 2.
+- Verificación física: Crear (+) validó P0306 y mostró “Empleado validado localmente” y área 10028. No se pulsó Guardar y no se creó información productiva.
+- El indicador general “total con error: 2” corresponde exclusivamente a dos face_templates con Token de sincronización facial no configurado; no corresponde a catálogo, Crear ni C07. Se conservó.
+
+Áreas administrativas
+- Verificación física positiva: resumen superior solo lectura; árbol interactivo inferior; “+ Adicionar área raíz”; + por área antes de consultar/editar/eliminar; tipografía compacta.
+- Se comprobó repliegue por nombre: “▼ Agricola Cactus” cambió a “▶ Agricola Cactus”. La vista expandida ya había mostrado sus descendientes.
+
+Pruebas
+- gradlew testProductionDebugUnitTest assembleProductionDebug: BUILD SUCCESSFUL, 50 tareas.
+- Evidencias PNG: C07-INSTALACION-PRINCIPAL-SYNC-V2035-20261006.png; C07-INSTALACION-PRINCIPAL-CREAR-V2035-20261006.png; C07-INSTALACION-PRINCIPAL-CREAR-SUPERVISOR-V2035-20261006.png; C16-INSTALACION-PRINCIPAL-AREAS-V2035-20261006.png; C16-INSTALACION-PRINCIPAL-AREAS-ARBOL-V2035-20261006.png; C16-INSTALACION-PRINCIPAL-AREAS-REPLEGADO-V2035-20261006.png.

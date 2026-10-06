@@ -1,6 +1,7 @@
 import json
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.admin_auth import AdminIdentity
@@ -76,7 +77,9 @@ def create_participant_type(
             {"descripcion": normalized_description},
         ).scalar_one_or_none()
         if duplicate is not None:
-            raise ValueError("Ya existe un tipo con esa descripción")
+            raise ValueError(
+                "Ya existe un tipo de participante con esta descripción"
+            )
 
         inserted = db.execute(
             text(
@@ -116,6 +119,11 @@ def create_participant_type(
         )
         db.commit()
         return result
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError(
+            "Ya existe un tipo de participante con esta descripción"
+        ) from error
     except Exception:
         db.rollback()
         raise
@@ -155,7 +163,9 @@ def update_participant_type(
             {"descripcion": normalized_description, "codigo": type_code},
         ).scalar_one_or_none()
         if duplicate is not None:
-            raise ValueError("Ya existe un tipo con esa descripción")
+            raise ValueError(
+                "Ya existe un tipo de participante con esta descripción"
+            )
         db.execute(
             text(
                 "UPDATE tipos_participante SET descripcion=:descripcion "
@@ -198,6 +208,11 @@ def update_participant_type(
         )
         db.commit()
         return result
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError(
+            "Ya existe un tipo de participante con esta descripción"
+        ) from error
     except Exception:
         db.rollback()
         raise
@@ -237,8 +252,65 @@ def set_participant_type_status(
         raise
 
 
+def delete_participant_type(
+    db: Session,
+    type_code: int,
+    identity: AdminIdentity,
+) -> None:
+    try:
+        before = _participant_type_for_update(db, type_code)
+        if before is None:
+            raise ValueError("El tipo no existe")
+        assignment = db.execute(
+            text(
+                "SELECT 1 FROM empleado_area "
+                "WHERE cargo=:codigo LIMIT 1"
+            ),
+            {"codigo": type_code},
+        ).scalar_one_or_none()
+        if assignment is not None:
+            raise ValueError(
+                "No se puede eliminar este tipo porque tiene "
+                "asignaciones asociadas"
+            )
+        db.execute(
+            text(
+                "DELETE FROM tipo_participante_capacidad "
+                "WHERE codigo_tipo=:codigo"
+            ),
+            {"codigo": type_code},
+        )
+        deleted = db.execute(
+            text(
+                "DELETE FROM tipos_participante "
+                "WHERE codigo=:codigo"
+            ),
+            {"codigo": type_code},
+        )
+        if deleted.rowcount != 1:
+            raise ValueError("El tipo no existe")
+        _audit(
+            db,
+            "tipos_participante",
+            str(type_code),
+            "ELIMINAR",
+            before,
+            None,
+            identity,
+        )
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError(
+            "No se puede eliminar este tipo porque está utilizado"
+        ) from error
+    except Exception:
+        db.rollback()
+        raise
+
+
 def list_area_tree(db: Session) -> list[dict]:
-    return [
+    rows = [
         dict(row)
         for row in db.execute(
             text(
@@ -249,8 +321,11 @@ def list_area_tree(db: Session) -> list[dict]:
                            0 AS nivel,
                            CAST(descripcion AS CHAR(2000)) AS ruta,
                            CAST(
-                               LPAD(id_Area_Administrativa, 10, '0')
-                               AS CHAR(2000)
+                               CONCAT(
+                                   descripcion,
+                                   CHAR(31),
+                                   LPAD(id_Area_Administrativa, 10, '0')
+                               ) AS CHAR(2000)
                            ) AS orden
                     FROM areas_administrativas
                     WHERE nodo_padre IS NULL
@@ -267,7 +342,9 @@ def list_area_tree(db: Session) -> list[dict]:
                            CONCAT(arbol.ruta, ' > ', a.descripcion),
                            CONCAT(
                                arbol.orden,
-                               '.',
+                               CHAR(30),
+                               a.descripcion,
+                               CHAR(31),
                                LPAD(a.id_Area_Administrativa, 10, '0')
                            )
                     FROM areas_administrativas AS a
@@ -275,11 +352,19 @@ def list_area_tree(db: Session) -> list[dict]:
                 )
                 SELECT id_area, descripcion, nombre_corto, id_padre, nivel, ruta
                 FROM arbol
-                ORDER BY orden
+                ORDER BY orden COLLATE utf8mb4_uca1400_ai_ci
                 """
             )
         ).mappings().all()
     ]
+    source_total = db.execute(
+        text("SELECT COUNT(*) FROM areas_administrativas")
+    ).scalar_one()
+    if len(rows) != source_total:
+        raise ValueError(
+            "El árbol no cubre todas las áreas administrativas almacenadas"
+        )
+    return rows
 
 
 def create_administrative_area(
@@ -288,12 +373,13 @@ def create_administrative_area(
     identity: AdminIdentity,
 ) -> dict:
     description = payload.descripcion.strip()
-    short_name = (payload.nombre_corto or "").strip() or None
+    short_name = payload.nombre_corto.strip()
     parent_id = payload.nodo_padre or None
     try:
         if parent_id is not None and not _area_exists(db, parent_id):
             raise ValueError("El área padre no existe")
         _ensure_area_not_duplicate(db, description, parent_id)
+        _ensure_area_reference_not_duplicate(db, short_name)
         inserted = db.execute(
             text(
                 """
@@ -325,6 +411,9 @@ def create_administrative_area(
         )
         db.commit()
         return result
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError("Ya existe un área con esa Referencia") from error
     except Exception:
         db.rollback()
         raise
@@ -337,7 +426,7 @@ def update_administrative_area(
     identity: AdminIdentity,
 ) -> dict:
     description = payload.descripcion.strip()
-    short_name = (payload.nombre_corto or "").strip() or None
+    short_name = payload.nombre_corto.strip()
     parent_id = payload.nodo_padre or None
     try:
         before = _get_area(db, area_id)
@@ -381,6 +470,11 @@ def update_administrative_area(
             parent_id,
             exclude_area_id=area_id,
         )
+        _ensure_area_reference_not_duplicate(
+            db,
+            short_name,
+            exclude_area_id=area_id,
+        )
         db.execute(
             text(
                 """
@@ -415,6 +509,9 @@ def update_administrative_area(
         )
         db.commit()
         return result
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError("Ya existe un área con esa Referencia") from error
     except Exception:
         db.rollback()
         raise
@@ -545,6 +642,27 @@ def _ensure_area_not_duplicate(
         raise ValueError(
             "Ya existe un área con esa descripción bajo el mismo padre"
         )
+
+
+def _ensure_area_reference_not_duplicate(
+    db: Session,
+    short_name: str,
+    exclude_area_id: int | None = None,
+) -> None:
+    duplicate = db.execute(
+        text(
+            """
+            SELECT 1
+            FROM areas_administrativas
+            WHERE nombre_corto = :nombre_corto
+              AND (:excluir IS NULL OR id_Area_Administrativa <> :excluir)
+            LIMIT 1
+            """
+        ),
+        {"nombre_corto": short_name, "excluir": exclude_area_id},
+    ).scalar_one_or_none()
+    if duplicate is not None:
+        raise ValueError("Ya existe un área con esa Referencia")
 
 
 ACTIVE_ASSIGNMENT_CONFLICT_MESSAGE = (
@@ -774,9 +892,13 @@ def update_employee_area(
         type_exists = db.execute(
             text(
                 "SELECT 1 FROM tipos_participante "
-                "WHERE codigo=:codigo AND activo=TRUE LIMIT 1"
+                "WHERE codigo=:codigo "
+                "AND (activo=TRUE OR codigo=:codigo_actual) LIMIT 1"
             ),
-            {"codigo": payload.codigo_tipo},
+            {
+                "codigo": payload.codigo_tipo,
+                "codigo_actual": before["codigo_tipo"],
+            },
         ).scalar_one_or_none()
         if type_exists is None:
             raise ValueError("El tipo no existe o está inactivo")

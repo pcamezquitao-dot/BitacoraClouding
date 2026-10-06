@@ -1,6 +1,8 @@
 package com.cactus.bitacora.ui.admin
 
 import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +21,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,8 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cactus.bitacora.R
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.model.AreaTreeNodeOut
 import com.cactus.bitacora.model.CalendarHolidayUpdateIn
@@ -45,8 +55,43 @@ import com.cactus.bitacora.model.ParticipantOptionOut
 import com.cactus.bitacora.model.ParticipantTypeAdminOut
 import com.cactus.bitacora.model.ParticipanteOut
 import kotlinx.coroutines.launch
+import java.text.Normalizer
+import java.util.Locale
 
 private val availableCapabilities = listOf("EMPLEADO", "SUPERVISOR", "GERENTE")
+
+private fun areaComparisonKey(value: String): String = Normalizer
+    .normalize(value.trim(), Normalizer.Form.NFD)
+    .replace(Regex("\\p{M}+"), "")
+    .lowercase(Locale.ROOT)
+
+internal fun adminAreaFormError(
+    areas: List<AreaTreeNodeOut>,
+    currentAreaId: Int?,
+    description: String,
+    reference: String,
+    parentId: Int?
+): String? {
+    val normalizedDescription = description.trim()
+    val normalizedReference = reference.trim()
+    if (normalizedDescription.isEmpty()) return "La descripción es obligatoria"
+    if (normalizedReference.isEmpty()) return "La Referencia es obligatoria"
+    if (normalizedReference.length > 25) return "La Referencia admite máximo 25 caracteres"
+    val others = areas.filterNot { it.id_area == currentAreaId }
+    if (others.any {
+            it.id_padre?.takeUnless { id -> id == 0 } == parentId &&
+                areaComparisonKey(it.descripcion) == areaComparisonKey(normalizedDescription)
+        }) {
+        return "Ya existe un área con esa descripción bajo el mismo padre"
+    }
+    if (others.any {
+            areaComparisonKey(it.nombre_corto.orEmpty()) ==
+                areaComparisonKey(normalizedReference)
+        }) {
+        return "Ya existe un área con esa Referencia"
+    }
+    return null
+}
 
 private enum class AdminMasterSection {
     PARTICIPANTS,
@@ -55,6 +100,19 @@ private enum class AdminMasterSection {
     ADMINISTRATIVE_AREAS,
     GENERAL_CALENDAR,
     WORK_SCHEDULES
+}
+
+internal enum class ParticipantTypeFilter { ALL, ACTIVE, INACTIVE }
+
+internal const val PROVISIONAL_MASTER_ACTOR = "Administrador_Maestro"
+
+internal fun filterParticipantTypes(
+    types: List<ParticipantTypeAdminOut>,
+    filter: ParticipantTypeFilter
+): List<ParticipantTypeAdminOut> = when (filter) {
+    ParticipantTypeFilter.ALL -> types
+    ParticipantTypeFilter.ACTIVE -> types.filter(ParticipantTypeAdminOut::activo)
+    ParticipantTypeFilter.INACTIVE -> types.filterNot(ParticipantTypeAdminOut::activo)
 }
 
 internal fun validateAssignmentForm(
@@ -229,56 +287,185 @@ internal fun descendantAreaIds(
     return descendants
 }
 
+internal data class AreaTreeRow(
+    val area: AreaTreeNodeOut,
+    val depth: Int,
+    val hasChildren: Boolean,
+    val expanded: Boolean
+)
+
+internal fun toggleExpandedArea(
+    expandedAreaIds: Set<Int>,
+    row: AreaTreeRow
+): Set<Int> = when {
+    !row.hasChildren -> expandedAreaIds
+    row.expanded -> expandedAreaIds - row.area.id_area
+    else -> expandedAreaIds + row.area.id_area
+}
+
+internal fun areaTreeLabel(row: AreaTreeRow): String = when {
+    row.hasChildren && row.expanded -> "▼ ${row.area.descripcion}"
+    row.hasChildren -> "▶ ${row.area.descripcion}"
+    else -> "└─ ${row.area.descripcion}"
+}
+
+internal fun areaSummaryLabel(row: AreaTreeRow): String =
+    "   ".repeat(row.depth) +
+        if (row.depth == 0) "● ${row.area.descripcion}" else "└─ ${row.area.descripcion}"
+
+@Composable
+private fun AreaReadOnlySummary(
+    rows: List<AreaTreeRow>,
+    onToggle: (AreaTreeRow) -> Unit
+) {
+    val summaryTextStyle = MaterialTheme.typography.bodySmall.copy(
+        fontFamily = FontFamily.Monospace,
+        fontSize = 11.sp,
+        lineHeight = 14.sp
+    )
+    Text("Resumen de áreas (solo lectura)", style = MaterialTheme.typography.titleMedium)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF202124))
+            .padding(vertical = 4.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "arbol_de_areas",
+                color = Color.White,
+                style = summaryTextStyle,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+            )
+            Text("│", color = Color.White, style = summaryTextStyle)
+            Text(
+                "Referencia",
+                color = Color.White,
+                style = summaryTextStyle,
+                modifier = Modifier.width(100.dp).padding(horizontal = 6.dp)
+            )
+            Text("│", color = Color.White, style = summaryTextStyle)
+        }
+        Text(
+            "────────────────────────────────────────┼────────────┤",
+            color = Color.White,
+            style = summaryTextStyle,
+            maxLines = 1
+        )
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = row.hasChildren) { onToggle(row) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    areaSummaryLabel(row),
+                    color = Color.White,
+                    style = summaryTextStyle,
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                Text("│", color = Color.White, style = summaryTextStyle)
+                Text(
+                    row.area.nombre_corto.orEmpty(),
+                    color = Color.White,
+                    style = summaryTextStyle,
+                    modifier = Modifier.width(100.dp).padding(horizontal = 6.dp)
+                )
+                Text("│", color = Color.White, style = summaryTextStyle)
+            }
+        }
+    }
+}
+
+// Construye las filas visibles únicamente desde id_area/id_padre; la profundidad es la de la recursión, no area.nivel.
+internal fun buildAreaTreeRows(
+    areas: List<AreaTreeNodeOut>,
+    expandedAreaIds: Set<Int>
+): List<AreaTreeRow> {
+    val childrenByParent = areas
+        .groupBy { it.id_padre?.takeUnless { parentId -> parentId == 0 } }
+        .mapValues { (_, children) ->
+            children.sortedWith(
+                compareBy<AreaTreeNodeOut> { areaComparisonKey(it.descripcion) }
+                    .thenBy { it.id_area }
+            )
+        }
+    val rows = mutableListOf<AreaTreeRow>()
+    val visited = mutableSetOf<Int>()
+    val structurallyReachable = mutableSetOf<Int>()
+    fun markReachable(node: AreaTreeNodeOut) {
+        if (!structurallyReachable.add(node.id_area)) return
+        childrenByParent[node.id_area].orEmpty().forEach(::markReachable)
+    }
+    childrenByParent[null].orEmpty().forEach(::markReachable)
+    fun visit(node: AreaTreeNodeOut, depth: Int) {
+        if (!visited.add(node.id_area)) return
+        val children = childrenByParent[node.id_area].orEmpty()
+        val expanded = children.isNotEmpty() && node.id_area in expandedAreaIds
+        rows += AreaTreeRow(node, depth, children.isNotEmpty(), expanded)
+        if (expanded) children.forEach { visit(it, depth + 1) }
+    }
+    childrenByParent[null].orEmpty().forEach { visit(it, 0) }
+    // Reserva: nodos no alcanzables desde una raíz válida (dato roto) se listan sin anidar, sin perderlos.
+    areas.forEach { if (it.id_area !in structurallyReachable) visit(it, 0) }
+    return rows
+}
+
 @Composable
 private fun AreaTreeRows(
-    areas: List<AreaTreeNodeOut>,
-    parentIds: Set<Int>,
-    expandedAreaIds: Set<Int>,
-    onToggle: (AreaTreeNodeOut) -> Unit,
+    rows: List<AreaTreeRow>,
+    onToggle: (AreaTreeRow) -> Unit,
+    onAddChild: (AreaTreeNodeOut) -> Unit,
+    onView: (AreaTreeNodeOut) -> Unit,
     onDelete: (AreaTreeNodeOut) -> Unit,
-    onEdit: (AreaTreeNodeOut) -> Unit,
-    onAdd: (AreaTreeNodeOut) -> Unit
+    onEdit: (AreaTreeNodeOut) -> Unit
 ) {
-    visibleAreaTreeNodes(areas, expandedAreaIds).forEach { area ->
-        val hasChildren = area.id_area in parentIds
-        val expanded = area.id_area in expandedAreaIds
+    val treeTextStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+    rows.forEach { row ->
+        val area = row.area
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = (area.nivel * 10).dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                .padding(start = (row.depth * 10).dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedButton(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp),
-                onClick = { onToggle(area) }
+                onClick = { onToggle(row) }
             ) {
-                Text(
-                    when {
-                        hasChildren && expanded -> "▼ ${area.descripcion}"
-                        hasChildren -> "▶ ${area.descripcion}"
-                        else -> "└─ ${area.descripcion}"
-                    }
+                Text(areaTreeLabel(row), style = treeTextStyle)
+            }
+            Text(area.nombre_corto.orEmpty(), style = treeTextStyle, modifier = Modifier.width(90.dp))
+            IconButton(onClick = { onAddChild(area) }, modifier = Modifier.size(32.dp)) {
+                Text("+", color = Color(0xFF2E7D32), style = MaterialTheme.typography.titleMedium)
+            }
+            IconButton(onClick = { onView(area) }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_participant_view),
+                    "Consultar detalles del área",
+                    tint = Color(0xFF1976D2),
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Button(
-                modifier = Modifier.width(48.dp),
-                contentPadding = PaddingValues(2.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
-                onClick = { onDelete(area) }
-            ) { Text("Del") }
-            Button(
-                modifier = Modifier.width(52.dp),
-                contentPadding = PaddingValues(2.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
-                onClick = { onEdit(area) }
-            ) { Text("Edit") }
-            Button(
-                modifier = Modifier.width(44.dp),
-                contentPadding = PaddingValues(2.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                onClick = { onAdd(area) }
-            ) { Text("+") }
+            IconButton(onClick = { onEdit(area) }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_participant_edit),
+                    "Editar área",
+                    tint = Color(0xFFF9A825),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            IconButton(onClick = { onDelete(area) }, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_participant_retire),
+                    "Eliminar área",
+                    tint = Color(0xFFD32F2F),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -386,6 +573,13 @@ fun AdminCatalogScreen(
     var loading by remember { mutableStateOf(false) }
     var participantRefreshToken by remember { mutableStateOf(0) }
     var types by remember { mutableStateOf<List<ParticipantTypeAdminOut>>(emptyList()) }
+    var typeFilter by remember { mutableStateOf(ParticipantTypeFilter.ALL) }
+    var typeLoading by remember { mutableStateOf(false) }
+    var typeError by remember { mutableStateOf<String?>(null) }
+    var typeActionMessage by remember { mutableStateOf<String?>(null) }
+    var typeActionError by remember { mutableStateOf<String?>(null) }
+    var typeFormOpen by remember { mutableStateOf(false) }
+    var deletingType by remember { mutableStateOf<ParticipantTypeAdminOut?>(null) }
     var areas by remember { mutableStateOf<List<AreaTreeNodeOut>>(emptyList()) }
     var typeDescription by remember { mutableStateOf("") }
     var selectedCapabilities by remember { mutableStateOf(setOf("EMPLEADO")) }
@@ -402,13 +596,16 @@ fun AdminCatalogScreen(
     var workSchedules by remember { mutableStateOf<List<com.cactus.bitacora.model.WorkScheduleOut>>(emptyList()) }
     var section by remember { mutableStateOf<AdminMasterSection?>(null) }
     var expandedAreaIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var expandedSummaryAreaIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var loadingAreas by remember { mutableStateOf(false) }
     var areaError by remember { mutableStateOf<String?>(null) }
     var areaActionMessage by remember { mutableStateOf<String?>(null) }
     var areaActionError by remember { mutableStateOf<String?>(null) }
     var editingArea by remember { mutableStateOf<AreaTreeNodeOut?>(null) }
     var addingChildTo by remember { mutableStateOf<AreaTreeNodeOut?>(null) }
+    var addingRootArea by remember { mutableStateOf(false) }
     var deletingArea by remember { mutableStateOf<AreaTreeNodeOut?>(null) }
+    var viewingArea by remember { mutableStateOf<AreaTreeNodeOut?>(null) }
     var areaDescription by remember { mutableStateOf("") }
     var areaShortName by remember { mutableStateOf("") }
     var areaParentId by remember { mutableStateOf("") }
@@ -460,14 +657,24 @@ fun AdminCatalogScreen(
         } else {
             expandedAreaIds.intersect(validIds)
         }
+        expandedSummaryAreaIds = if (firstLoad) {
+            loadedAreas
+                .filter { it.id_area in parentIds }
+                .mapTo(mutableSetOf(), AreaTreeNodeOut::id_area)
+        } else {
+            expandedSummaryAreaIds.intersect(validIds)
+        }
     }
 
-    fun loadAreas() {
+    fun loadAreas(refreshRemote: Boolean = false) {
         loadingAreas = true
         areaError = null
         scope.launch {
             try {
-                acceptAreas(repository.adminAreaTree(actor))
+                acceptAreas(
+                    if (refreshRemote) repository.refreshAdminAreaTree(actor)
+                    else repository.adminAreaTree(actor)
+                )
             } catch (error: Exception) {
                 areaError = error.message
                     ?: "No fue posible transformar la respuesta de áreas"
@@ -705,6 +912,7 @@ fun AdminCatalogScreen(
     fun beginEdit(area: AreaTreeNodeOut) {
         Log.i("AdminAreaAction", "Botón EDIT pulsado; id=${area.id_area}")
         addingChildTo = null
+        addingRootArea = false
         editingArea = area
         areaDescription = area.descripcion
         areaShortName = area.nombre_corto.orEmpty()
@@ -713,14 +921,26 @@ fun AdminCatalogScreen(
         areaActionMessage = null
     }
 
-    fun beginAdd(area: AreaTreeNodeOut) {
-        Log.i("AdminAreaAction", "Botón ADD pulsado; id=${area.id_area}")
+    fun beginAddArea() {
+        Log.i("AdminAreaAction", "Botón ADD pulsado")
         editingArea = null
+        addingChildTo = null
+        addingRootArea = true
+        areaDescription = ""
+        areaShortName = ""
+        areaParentId = ""
+        areaActionError = null
+        areaActionMessage = null
+    }
+
+    fun beginAddChild(area: AreaTreeNodeOut) {
+        Log.i("AdminAreaAction", "Botón ADD CHILD pulsado; padre=${area.id_area}")
+        editingArea = null
+        addingRootArea = false
         addingChildTo = area
         areaDescription = ""
         areaShortName = ""
         areaParentId = area.id_area.toString()
-        expandedAreaIds = expandedAreaIds + area.id_area
         areaActionError = null
         areaActionMessage = null
     }
@@ -728,6 +948,7 @@ fun AdminCatalogScreen(
     fun closeAreaForm() {
         editingArea = null
         addingChildTo = null
+        addingRootArea = false
         areaDescription = ""
         areaShortName = ""
         areaParentId = ""
@@ -746,6 +967,16 @@ fun AdminCatalogScreen(
             areaActionError = "El ID del área padre debe ser numérico"
             return
         }
+        adminAreaFormError(
+            areas,
+            editingArea?.id_area,
+            description,
+            areaShortName,
+            parentId
+        )?.let {
+            areaActionError = it
+            return
+        }
         areaActionLoading = true
         areaActionError = null
         scope.launch {
@@ -753,28 +984,29 @@ fun AdminCatalogScreen(
                 val normalizedActor = requireActor()
                 val current = editingArea
                 if (current != null) {
-                    repository.updateAdminArea(
+                    val updatedAreas = repository.updateAdminArea(
                         normalizedActor,
                         current.id_area,
                         description,
-                        areaShortName.trim().ifBlank { null },
+                        areaShortName.trim(),
                         parentId
                     )
                     parentId?.let {
                         expandedAreaIds = expandedAreaIds + it
                     }
                     areaActionMessage = "Área administrativa actualizada"
+                    acceptAreas(updatedAreas)
                 } else {
-                    repository.createAdminArea(
+                    val updatedAreas = repository.createAdminArea(
                         normalizedActor,
                         description,
-                        areaShortName.trim().ifBlank { null },
-                        addingChildTo?.id_area
+                        areaShortName.trim(),
+                        parentId
                     )
                     areaActionMessage = "Nueva rama creada"
+                    acceptAreas(updatedAreas)
                 }
                 closeAreaForm()
-                loadAreas()
             } catch (error: Exception) {
                 areaActionError = error.message ?: "No fue posible guardar el área"
             } finally {
@@ -800,6 +1032,21 @@ fun AdminCatalogScreen(
         }
     }
 
+    fun loadParticipantTypes() {
+        typeLoading = true
+        typeError = null
+        scope.launch {
+            try {
+                types = repository.adminParticipantTypes(PROVISIONAL_MASTER_ACTOR)
+            } catch (error: Exception) {
+                typeError = error.message
+                    ?: "No fue posible cargar los tipos de participante"
+            } finally {
+                typeLoading = false
+            }
+        }
+    }
+
     fun refreshParticipants() {
         loading = true
         message = null
@@ -816,6 +1063,9 @@ fun AdminCatalogScreen(
     }
 
     LaunchedEffect(section) {
+        if (section == AdminMasterSection.PARTICIPANT_TYPES) {
+            loadParticipantTypes()
+        }
         if (section == AdminMasterSection.ADMINISTRATIVE_AREAS) {
             loadAreas()
         }
@@ -885,8 +1135,9 @@ fun AdminCatalogScreen(
                     when (section) {
                         AdminMasterSection.PARTICIPANTS -> refreshParticipants()
                         AdminMasterSection.GENERAL_CALENDAR -> loadCalendarTree()
-                        AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas()
+                        AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas(refreshRemote = true)
                         AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
+                        AdminMasterSection.PARTICIPANT_TYPES -> loadParticipantTypes()
                         else -> refresh()
                     }
                 },
@@ -905,112 +1156,234 @@ fun AdminCatalogScreen(
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {
             Text("Tipos de participante", style = MaterialTheme.typography.titleMedium)
-            types.forEach { type ->
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    editingType = type
-                    typeDescription = type.descripcion
-                    selectedCapabilities = type.capacidades.toSet()
-                    selectedType = type.takeIf { it.activo }
-                }
-            ) {
-                Text(
-                    "${type.codigo} · ${type.descripcion} · " +
-                        type.capacidades.joinToString() +
-                        if (type.activo) "" else " · INACTIVO"
-                )
-            }
-            }
-            OutlinedTextField(
-            value = typeDescription,
-            onValueChange = { typeDescription = it },
-            label = { Text("Descripción del tipo") },
-            modifier = Modifier.fillMaxWidth()
+            Text(
+                "Actor provisional: $PROVISIONAL_MASTER_ACTOR. " +
+                    "No constituye autenticación personal verificada."
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            availableCapabilities.forEach { capability ->
                 FilterChip(
-                    selected = capability in selectedCapabilities,
-                    onClick = {
-                        selectedCapabilities =
-                            if (capability in selectedCapabilities) {
-                                selectedCapabilities - capability
-                            } else {
-                                selectedCapabilities + capability
-                            }
-                    },
-                    label = { Text(capability) }
+                    selected = typeFilter == ParticipantTypeFilter.ALL,
+                    onClick = { typeFilter = ParticipantTypeFilter.ALL },
+                    label = { Text("Todos") }
+                )
+                FilterChip(
+                    selected = typeFilter == ParticipantTypeFilter.ACTIVE,
+                    onClick = { typeFilter = ParticipantTypeFilter.ACTIVE },
+                    label = { Text("Activos") }
+                )
+                FilterChip(
+                    selected = typeFilter == ParticipantTypeFilter.INACTIVE,
+                    onClick = { typeFilter = ParticipantTypeFilter.INACTIVE },
+                    label = { Text("Inactivos") }
                 )
             }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = !loading,
+                enabled = !typeLoading,
+                modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    loading = true
-                    scope.launch {
-                        try {
-                            val normalizedActor = requireActor()
-                            val current = editingType
-                            if (current == null) {
-                                repository.createAdminParticipantType(
-                                    normalizedActor,
-                                    typeDescription,
-                                    selectedCapabilities.toList()
-                                )
-                            } else {
-                                repository.updateAdminParticipantType(
-                                    normalizedActor,
-                                    current.codigo,
-                                    typeDescription,
-                                    selectedCapabilities.toList()
-                                )
+                    editingType = null
+                    typeDescription = ""
+                    selectedCapabilities = setOf("EMPLEADO")
+                    typeActionError = null
+                    typeFormOpen = true
+                }
+            ) { Text("Crear") }
+            if (typeLoading) Text("Cargando tipos de participante…")
+            typeError?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error)
+                Button(onClick = ::loadParticipantTypes) { Text("Reintentar") }
+            }
+            typeActionMessage?.let { Text(it, color = Color(0xFF2E7D32)) }
+            if (!typeLoading && typeError == null) {
+                filterParticipantTypes(types, typeFilter).forEach { type ->
+                    Text("${type.descripcion} · ${if (type.activo) "Activo" else "Inactivo"}")
+                    Text("Capacidades: ${type.capacidades.joinToString()}")
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = {
+                            editingType = type
+                            typeDescription = type.descripcion
+                            selectedCapabilities = type.capacidades.toSet()
+                            typeActionError = null
+                            typeFormOpen = true
+                        }) { Text("Editar") }
+                        OutlinedButton(onClick = {
+                            typeLoading = true
+                            scope.launch {
+                                try {
+                                    repository.setAdminParticipantTypeStatus(
+                                        PROVISIONAL_MASTER_ACTOR,
+                                        type.codigo,
+                                        !type.activo
+                                    )
+                                    typeActionMessage = if (type.activo) {
+                                        "Tipo desactivado"
+                                    } else {
+                                        "Tipo activado"
+                                    }
+                                    types = repository.adminParticipantTypes(
+                                        PROVISIONAL_MASTER_ACTOR
+                                    )
+                                } catch (error: Exception) {
+                                    typeActionError = error.message
+                                        ?: "No fue posible cambiar el estado"
+                                } finally {
+                                    typeLoading = false
+                                }
                             }
-                            editingType = null
-                            typeDescription = ""
-                            selectedCapabilities = setOf("EMPLEADO")
-                            message = "Tipo guardado"
-                            types = repository.adminParticipantTypes(normalizedActor)
-                        } catch (error: Exception) {
-                            message = error.message ?: "No fue posible guardar el tipo"
-                        } finally {
-                            loading = false
+                        }) { Text(if (type.activo) "Desactivar" else "Activar") }
+                        OutlinedButton(onClick = { deletingType = type }) {
+                            Text("Eliminar")
                         }
                     }
                 }
-            ) { Text(if (editingType == null) "Crear tipo" else "Guardar cambios") }
-            editingType?.let { type ->
-                OutlinedButton(
-                    enabled = !loading,
-                    onClick = {
-                        loading = true
-                        scope.launch {
-                            try {
-                                val normalizedActor = requireActor()
-                                repository.setAdminParticipantTypeStatus(
-                                    normalizedActor,
-                                    type.codigo,
-                                    !type.activo
-                                )
-                                types = repository.adminParticipantTypes(normalizedActor)
-                                editingType = null
-                                message = if (type.activo) {
-                                    "Tipo desactivado"
-                                } else {
-                                    "Tipo activado"
-                                }
-                            } catch (error: Exception) {
-                                message = error.message
-                                    ?: "No fue posible cambiar el estado"
-                            } finally {
-                                loading = false
-                            }
+            }
+            typeActionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+
+        if (typeFormOpen) {
+            AlertDialog(
+                onDismissRequest = { if (!typeLoading) typeFormOpen = false },
+                title = {
+                    Text(if (editingType == null) "Crear tipo" else "Modificar tipo")
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = typeDescription,
+                            onValueChange = { if (it.length <= 101) typeDescription = it },
+                            label = { Text("Descripción") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !typeLoading
+                        )
+                        availableCapabilities.forEach { capability ->
+                            FilterChip(
+                                selected = capability in selectedCapabilities,
+                                enabled = !typeLoading,
+                                onClick = {
+                                    selectedCapabilities =
+                                        if (capability in selectedCapabilities) {
+                                            selectedCapabilities - capability
+                                        } else {
+                                            selectedCapabilities + capability
+                                        }
+                                },
+                                label = { Text(capability) }
+                            )
+                        }
+                        typeActionError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error)
                         }
                     }
-                ) { Text(if (type.activo) "Desactivar" else "Activar") }
-            }
-            }
+                },
+                confirmButton = {
+                    Button(
+                        enabled = !typeLoading,
+                        onClick = {
+                            val normalized = typeDescription.trim()
+                            when {
+                                normalized.isEmpty() -> {
+                                    typeActionError = "La descripción es obligatoria"
+                                    return@Button
+                                }
+                                normalized.length > 100 -> {
+                                    typeActionError =
+                                        "La descripción no puede superar 100 caracteres"
+                                    return@Button
+                                }
+                                selectedCapabilities.isEmpty() -> {
+                                    typeActionError = "El tipo requiere al menos una capacidad"
+                                    return@Button
+                                }
+                            }
+                            typeLoading = true
+                            typeActionError = null
+                            val current = editingType
+                            scope.launch {
+                                try {
+                                    if (current == null) {
+                                        repository.createAdminParticipantType(
+                                            PROVISIONAL_MASTER_ACTOR,
+                                            normalized,
+                                            selectedCapabilities.toList()
+                                        )
+                                    } else {
+                                        repository.updateAdminParticipantType(
+                                            PROVISIONAL_MASTER_ACTOR,
+                                            current.codigo,
+                                            normalized,
+                                            selectedCapabilities.toList()
+                                        )
+                                    }
+                                    typeActionMessage = "Tipo guardado"
+                                    types = repository.adminParticipantTypes(
+                                        PROVISIONAL_MASTER_ACTOR
+                                    )
+                                    typeFormOpen = false
+                                    editingType = null
+                                } catch (error: Exception) {
+                                    typeActionError = error.message
+                                        ?: "No fue posible guardar el tipo"
+                                } finally {
+                                    typeLoading = false
+                                }
+                            }
+                        }
+                    ) { Text("Guardar") }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        enabled = !typeLoading,
+                        onClick = {
+                            typeFormOpen = false
+                            editingType = null
+                            typeActionError = null
+                        }
+                    ) { Text("Cancelar") }
+                }
+            )
+        }
+
+        deletingType?.let { type ->
+            AlertDialog(
+                onDismissRequest = { if (!typeLoading) deletingType = null },
+                title = { Text("Eliminar tipo de participante") },
+                text = {
+                    Text("¿Desea eliminar el tipo de participante “${type.descripcion}”?")
+                },
+                confirmButton = {
+                    Button(
+                        enabled = !typeLoading,
+                        onClick = {
+                            typeLoading = true
+                            typeActionError = null
+                            scope.launch {
+                                try {
+                                    repository.deleteAdminParticipantType(
+                                        PROVISIONAL_MASTER_ACTOR,
+                                        type.codigo
+                                    )
+                                    deletingType = null
+                                    typeActionMessage = "Tipo eliminado"
+                                    types = repository.adminParticipantTypes(
+                                        PROVISIONAL_MASTER_ACTOR
+                                    )
+                                } catch (error: Exception) {
+                                    typeActionError = error.message
+                                        ?: "No fue posible eliminar el tipo"
+                                } finally {
+                                    typeLoading = false
+                                }
+                            }
+                        }
+                    ) { Text("Eliminar") }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        enabled = !typeLoading,
+                        onClick = { deletingType = null }
+                    ) { Text("Cancelar") }
+                }
+            )
         }
 
         if (section == AdminMasterSection.ADMINISTRATIVE_AREAS) {
@@ -1028,28 +1401,41 @@ fun AdminCatalogScreen(
             if (!loadingAreas && areaError == null && areas.isEmpty()) {
                 Text("El servidor no devolvió áreas administrativas.")
             }
+            if (areas.isNotEmpty()) {
+                AreaReadOnlySummary(
+                    buildAreaTreeRows(areas, expandedSummaryAreaIds),
+                    onToggle = { row ->
+                        expandedSummaryAreaIds = toggleExpandedArea(expandedSummaryAreaIds, row)
+                    }
+                )
+                Text("Árbol interactivo", style = MaterialTheme.typography.titleMedium)
+                Button(
+                    onClick = ::beginAddArea,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("+ Adicionar área raíz") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("arbol_de_areas", modifier = Modifier.weight(1f))
+                    Text("Referencia", modifier = Modifier.width(90.dp))
+                    Text("Acciones", modifier = Modifier.width(108.dp))
+                }
+            }
             val orphanAreas = orphanAreaTreeNodes(areas)
             val orphanIds = orphanAreas.mapTo(mutableSetOf(), AreaTreeNodeOut::id_area)
             val regularAreas = areas.filterNot { it.id_area in orphanIds }
-            val parentIds = areas.mapNotNull(AreaTreeNodeOut::id_padre).toSet()
-            val toggleArea: (AreaTreeNodeOut) -> Unit = { area ->
-                selectedArea = area
-                if (area.id_area in parentIds) {
-                    expandedAreaIds = if (area.id_area in expandedAreaIds) {
-                        expandedAreaIds - area.id_area
-                    } else {
-                        expandedAreaIds + area.id_area
-                    }
-                }
+            val toggleArea: (AreaTreeRow) -> Unit = { row ->
+                selectedArea = row.area
+                expandedAreaIds = toggleExpandedArea(expandedAreaIds, row)
             }
             AreaTreeRows(
-                regularAreas,
-                parentIds,
-                expandedAreaIds,
+                buildAreaTreeRows(regularAreas, expandedAreaIds),
                 toggleArea,
+                onAddChild = ::beginAddChild,
+                onView = { viewingArea = it },
                 onDelete = { deletingArea = it },
-                onEdit = ::beginEdit,
-                onAdd = ::beginAdd
+                onEdit = ::beginEdit
             )
             if (orphanAreas.isNotEmpty()) {
                 Text(
@@ -1058,20 +1444,19 @@ fun AdminCatalogScreen(
                     color = MaterialTheme.colorScheme.error
                 )
                 AreaTreeRows(
-                    orphanAreas,
-                    parentIds,
-                    expandedAreaIds,
+                    buildAreaTreeRows(orphanAreas, expandedAreaIds),
                     toggleArea,
+                    onAddChild = ::beginAddChild,
+                    onView = { viewingArea = it },
                     onDelete = { deletingArea = it },
-                    onEdit = ::beginEdit,
-                    onAdd = ::beginAdd
+                    onEdit = ::beginEdit
                 )
             }
             selectedArea?.let { Text("Área seleccionada: ${it.ruta}") }
             areaActionMessage?.let {
                 Text(it, color = Color(0xFF2E7D32))
             }
-            if (editingArea == null && addingChildTo == null) {
+            if (editingArea == null && addingChildTo == null && !addingRootArea) {
                 areaActionError?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }
@@ -1280,7 +1665,9 @@ fun AdminCatalogScreen(
                         }
                     }
                     Text("Cargo")
-                    types.filter { it.activo }.forEach { type ->
+                    types.filter {
+                        it.activo || it.codigo == current?.codigo_tipo
+                    }.forEach { type ->
                         FilterChip(
                             selected = selectedType?.codigo == type.codigo,
                             enabled = !assignmentActionLoading,
@@ -1376,11 +1763,12 @@ fun AdminCatalogScreen(
         )
     }
 
-    val formArea = editingArea ?: addingChildTo
-    formArea?.let { area ->
+    if (editingArea != null || addingChildTo != null || addingRootArea) {
+        val area = editingArea ?: addingChildTo
         val isEditing = editingArea != null
+        val isAddingRoot = addingRootArea
         val excludedParentIds = if (isEditing) {
-            descendantAreaIds(areas, area.id_area) + area.id_area
+            descendantAreaIds(areas, area!!.id_area) + area.id_area
         } else {
             emptySet()
         }
@@ -1396,7 +1784,7 @@ fun AdminCatalogScreen(
                     if (isEditing) {
                         "Editar área administrativa"
                     } else {
-                        "Añadir nueva rama"
+                        "Adicionar área administrativa"
                     }
                 )
             },
@@ -1406,10 +1794,7 @@ fun AdminCatalogScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (isEditing) {
-                        Text("Área actual: ${area.descripcion}")
-                        Text("ID del área: ${area.id_area}")
-                    } else {
-                        Text("Área padre: ${area.ruta}")
+                        Text("Área actual: ${area!!.descripcion}")
                     }
                     OutlinedTextField(
                         value = areaDescription,
@@ -1428,10 +1813,10 @@ fun AdminCatalogScreen(
                         value = areaShortName,
                         onValueChange = { areaShortName = it },
                         enabled = !areaActionLoading,
-                        label = { Text("Nombre corto") },
+                        label = { Text("Referencia") },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (isEditing) {
+                    if (isEditing || addingRootArea) {
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedButton(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1485,6 +1870,7 @@ fun AdminCatalogScreen(
                         when {
                             areaActionLoading -> "Guardando…"
                             isEditing -> "Guardar cambios"
+                            isAddingRoot -> "Adicionar área"
                             else -> "Crear rama"
                         }
                     )
@@ -1495,6 +1881,24 @@ fun AdminCatalogScreen(
                     enabled = !areaActionLoading,
                     onClick = ::closeAreaForm
                 ) { Text("Cancelar") }
+            }
+        )
+    }
+
+    viewingArea?.let { area ->
+        AlertDialog(
+            onDismissRequest = { viewingArea = null },
+            title = { Text("Detalles del área administrativa") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Descripción: ${area.descripcion}")
+                    Text("Referencia: ${area.nombre_corto.orEmpty()}")
+                    Text("Área padre: ${area.id_padre?.let { id -> areas.firstOrNull { it.id_area == id }?.descripcion } ?: "Sin padre"}")
+                    Text("Ruta: ${area.ruta}")
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewingArea = null }) { Text("Cerrar") }
             }
         )
     }
@@ -1573,10 +1977,12 @@ fun AdminCatalogScreen(
                         areaActionError = null
                         scope.launch {
                             try {
-                                repository.deleteAdminArea(requireActor(), area.id_area)
+                                val updatedAreas = repository.deleteAdminArea(
+                                    requireActor(), area.id_area
+                                )
                                 areaActionMessage = "Área administrativa eliminada"
                                 deletingArea = null
-                                loadAreas()
+                                acceptAreas(updatedAreas)
                             } catch (error: Exception) {
                                 areaActionError = error.message
                                     ?: "No fue posible eliminar el área"

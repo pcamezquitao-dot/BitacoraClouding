@@ -1,0 +1,43 @@
+C07 / CP-CREAR-001 — REVERSIÓN CONTROLADA DE DATOS DE DESARROLLO
+Fecha de preparación: 2026-10-05
+Base autorizada: bitacora_test exclusivamente
+
+Respaldo completo previo:
+/srv/bitacora/db-backups/c07/20261005_175848/bitacora_test-before-cp-crear.sql
+SHA-256: 74a800bb557f9b507e6aa28f291e13f07589ee12f0c1819a2394b4365152e15f
+
+Script exacto de limpieza selectiva (ejecutar en el servidor como usuario con acceso local a MariaDB):
+
+#!/usr/bin/env bash
+set -euo pipefail
+mysql bitacora_test <<'SQL'
+START TRANSACTION;
+DELETE FROM bitacora_diaria
+ WHERE client_uuid LIKE 'CP-CREAR-001-%';
+DELETE FROM empleado_area
+ WHERE id_participante BETWEEN 900101 AND 900107;
+DELETE FROM participante
+ WHERE id_participante BETWEEN 900101 AND 900107;
+DELETE FROM areas_administrativas
+ WHERE id_Area_Administrativa IN (99071, 99072);
+COMMIT;
+SQL
+
+mysql -NBe "SELECT
+  (SELECT COUNT(*) FROM bitacora_test.bitacora_diaria WHERE client_uuid LIKE 'CP-CREAR-001-%') AS bitacoras,
+  (SELECT COUNT(*) FROM bitacora_test.empleado_area WHERE id_participante BETWEEN 900101 AND 900107) AS asignaciones,
+  (SELECT COUNT(*) FROM bitacora_test.participante WHERE id_participante BETWEEN 900101 AND 900107) AS participantes,
+  (SELECT COUNT(*) FROM bitacora_test.areas_administrativas WHERE id_Area_Administrativa IN (99071,99072)) AS areas;"
+
+Resultado esperado de la verificación: 0  0  0  0.
+
+Reversión total alternativa, solo si Patricia ordena descartar todo el estado posterior al respaldo:
+
+#!/usr/bin/env bash
+set -euo pipefail
+test -f /srv/bitacora/db-backups/c07/20261005_175848/bitacora_test-before-cp-crear.sql
+echo '74a800bb557f9b507e6aa28f291e13f07589ee12f0c1819a2394b4365152e15f  /srv/bitacora/db-backups/c07/20261005_175848/bitacora_test-before-cp-crear.sql' | sha256sum -c -
+mysql -e "DROP DATABASE IF EXISTS bitacora_test; CREATE DATABASE bitacora_test CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci;"
+mysql bitacora_test < /srv/bitacora/db-backups/c07/20261005_175848/bitacora_test-before-cp-crear.sql
+
+No ejecutar la limpieza mientras continú la validación física. El backend de pruebas debe permanecer activo hasta orden expresa.

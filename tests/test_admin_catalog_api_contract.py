@@ -16,6 +16,7 @@ class AdminCatalogApiContractTest(unittest.TestCase):
         self.assertIn("post", paths["/admin/tipos-participante"])
         self.assertIn("/admin/tipos-participante/{codigo}", paths)
         self.assertIn("put", paths["/admin/tipos-participante/{codigo}"])
+        self.assertIn("delete", paths["/admin/tipos-participante/{codigo}"])
         self.assertIn("/admin/tipos-participante/{codigo}/estado", paths)
         self.assertIn(
             "put",

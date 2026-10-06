@@ -9,6 +9,7 @@ import com.cactus.bitacora.data.local.ReferenceCatalogDao
 import com.cactus.bitacora.data.local.WorkScheduleDetailLocalEntity
 import com.cactus.bitacora.data.local.WorkScheduleLocalEntity
 import com.cactus.bitacora.model.AreaOut
+import com.cactus.bitacora.model.AdministrativeAreaOut
 import com.cactus.bitacora.model.CatalogAreaOut
 import com.cactus.bitacora.model.CatalogAssignmentOut
 import com.cactus.bitacora.model.CatalogParticipantOut
@@ -72,17 +73,23 @@ class ReferenceCatalogRepositoryTest {
     @Test
     fun employeeAndSupervisorValidateLocallyWithoutNetwork() = runBlocking {
         val dao = FakeCatalogDao().apply {
+            participantTypes[2] = participantType(2, "supervisor")
             participants[2] = participant(2, "P0002")
             participants[3] = participant(3, "P0003")
+            participants[306] = participant(306, "P0306")
             assignments[2 to 7] = assignment(2, 7, 1)
-            assignments[3 to 7] = assignment(3, 7, 3)
+            assignments[3 to 7] = assignment(3, 7, 1)
+            assignments[306 to 7] = assignment(306, 7, 2)
         }
         val api = FakeCatalogApi()
         val repository = repository(dao, api)
 
         assertEquals(2, repository.participantByCode(" p0002 ").id_participante)
         assertEquals(1, repository.assignmentForRole(2, CatalogRole.EMPLOYEE).cargo)
-        assertEquals(3, repository.assignmentForRole(3, CatalogRole.SUPERVISOR).cargo)
+        assertEquals(2, repository.assignmentForRole(306, CatalogRole.SUPERVISOR).cargo)
+        assertThrows(CatalogValidationException::class.java) {
+            runBlocking { repository.assignmentForRole(3, CatalogRole.SUPERVISOR) }
+        }
         assertEquals(0, api.calls)
     }
 
@@ -188,6 +195,184 @@ class ReferenceCatalogRepositoryTest {
     }
 
     @Test
+    fun adminAreaTreeThrowsWhenCatalogWasNeverSynced() = runBlocking {
+        val failure = runCatching {
+            resolveAdminAreaTree(
+                emptyList(),
+                CatalogStatus(
+                    participants = 0,
+                    areas = 0,
+                    assignments = 0,
+                    lastSuccessfulSyncMillis = null,
+                    lastError = null
+                )
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is CatalogValidationException)
+        assertTrue((failure as? CatalogValidationException)?.message.orEmpty().isNotBlank())
+    }
+
+    @Test
+    fun adminAreaTreeRejectsZeroAreasEvenWhenPreviousSyncWorked() = runBlocking {
+        val failure = runCatching {
+            resolveAdminAreaTree(
+                emptyList(),
+                CatalogStatus(
+                    participants = 0,
+                    areas = 0,
+                    assignments = 0,
+                    lastSuccessfulSyncMillis = 123456L,
+                    lastError = null
+                )
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is CatalogValidationException)
+    }
+
+    @Test
+    fun adminAreaTreeReturnsTreeWhenCatalogSyncHasAreas() = runBlocking {
+        val result = resolveAdminAreaTree(
+            listOf(com.cactus.bitacora.model.AreaTreeNodeOut(7, "Administración", "ADM", 0, 0, "Administración")),
+            CatalogStatus(
+                participants = 1,
+                areas = 1,
+                assignments = 1,
+                lastSuccessfulSyncMillis = 123456L,
+                lastError = null
+            )
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(7, result.first().id_area)
+    }
+
+    @Test
+    fun adminAreaMutationsOnlyChangeTheReturnedArea() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            assignments[2 to 7] = assignment(2, 7, 1)
+            areas[7] = area(7)
+        }
+        val repository = repository(dao, FakeCatalogApi())
+
+        val created = repository.cacheAdminArea(
+            AdministrativeAreaOut(8, "Nueva", "NVA", 7)
+        )
+
+        assertEquals(listOf(7, 8), created.map { it.id_area })
+        assertEquals("NVA", dao.areas[8]?.nombreCorto)
+        assertEquals(1, dao.participantCount())
+        assertEquals(1, dao.assignmentCount())
+
+        repository.removeAdminArea(8)
+
+        assertEquals(setOf(7), dao.areas.keys)
+        assertEquals(1, dao.participantCount())
+        assertEquals(1, dao.assignmentCount())
+    }
+
+    @Test
+    fun adminAreaRefreshReconcilesOnlyAdministrativeAreas() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participants[2] = participant(2, "P0002")
+            assignments[2 to 7] = assignment(2, 7, 1)
+            areas[7] = area(7)
+            areas[9] = area(9)
+        }
+
+        val tree = repository(dao, FakeCatalogApi()).reconcileAdminAreaTree(
+            listOf(
+                com.cactus.bitacora.model.AreaTreeNodeOut(8, "Raíz", "RZ", null, 0, "Raíz"),
+                com.cactus.bitacora.model.AreaTreeNodeOut(10, "Hija", "HJ", 8, 1, "Raíz / Hija")
+            )
+        )
+
+        assertEquals(listOf(8, 10), tree.map { it.id_area })
+        assertEquals(setOf(8, 10), dao.areas.keys)
+        assertEquals(1, dao.participantCount())
+        assertEquals(1, dao.assignmentCount())
+    }
+
+    @Test
+    fun invalidRemoteAreaSnapshotsAreRejectedBeforeChangingLocalCatalog() = runBlocking {
+        val invalidSnapshots = listOf(
+            emptyList(),
+            listOf(
+                com.cactus.bitacora.model.AreaTreeNodeOut(8, "Raíz", "RZ", null, 0, "Raíz"),
+                com.cactus.bitacora.model.AreaTreeNodeOut(8, "Duplicada", "DP", null, 0, "Duplicada")
+            ),
+            listOf(
+                com.cactus.bitacora.model.AreaTreeNodeOut(8, "Huérfana", "HF", 999, 0, "Huérfana")
+            ),
+            listOf(
+                com.cactus.bitacora.model.AreaTreeNodeOut(8, "Ciclo A", "CA", 9, 0, "Ciclo A"),
+                com.cactus.bitacora.model.AreaTreeNodeOut(9, "Ciclo B", "CB", 8, 0, "Ciclo B")
+            )
+        )
+
+        invalidSnapshots.forEach { snapshot ->
+            val dao = FakeCatalogDao().apply { areas[7] = area(7) }
+            val failure = runCatching {
+                repository(dao, FakeCatalogApi()).reconcileAdminAreaTree(snapshot)
+            }.exceptionOrNull()
+
+            assertTrue(failure is CatalogValidationException)
+            assertEquals(setOf(7), dao.areas.keys)
+        }
+    }
+
+    @Test
+    fun validRemoteAreaSnapshotReportsFullCoverage() {
+        val snapshot = listOf(
+            com.cactus.bitacora.model.AreaTreeNodeOut(8, "Raíz", "RZ", null, 0, "Raíz"),
+            com.cactus.bitacora.model.AreaTreeNodeOut(9, "Hija", "HJ", 8, 1, "Raíz / Hija")
+        )
+
+        val coverage = validateAdminAreaSnapshot(snapshot)
+
+        assertEquals(2, coverage.total)
+        assertEquals(2, coverage.uniqueIds)
+        assertEquals(1, coverage.roots)
+        assertEquals(2, coverage.reachable)
+    }
+
+    @Test
+    fun remoteAreaSnapshotRejectsDuplicateReferencesUsingCaseAndAccentInsensitiveRule() {
+        val failure = runCatching {
+            validateAdminAreaSnapshot(
+                listOf(
+                    com.cactus.bitacora.model.AreaTreeNodeOut(8, "Raíz", "ÁREA", null, 0, "Raíz"),
+                    com.cactus.bitacora.model.AreaTreeNodeOut(9, "Otra", "area", null, 0, "Otra")
+                )
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is CatalogValidationException)
+    }
+
+    @Test
+    fun localAreaTreeOrdersByHierarchyRegardlessOfArrivalOrOrAlphabeticalOrder() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            areas[10018] = area(10018).copy(nombreArea = "Finca 2", idPadre = 10011)
+            areas[10006] = area(10006).copy(nombreArea = "Agrícola Cactus", idPadre = null)
+            areas[10014] = area(10014).copy(nombreArea = "Finca 3", idPadre = 10011)
+            areas[10011] = area(10011).copy(nombreArea = "Gerencia", idPadre = 10006)
+            areas[10016] = area(10016).copy(nombreArea = "Finca 4", idPadre = 10011)
+            areas[10017] = area(10017).copy(nombreArea = "Finca 1", idPadre = 10011)
+        }
+        val repository = repository(dao, FakeCatalogApi())
+
+        val tree = repository.localAreaTree()
+
+        assertEquals(
+            listOf(10006, 10011, 10017, 10018, 10014, 10016),
+            tree.map { it.id_area }
+        )
+    }
+
+    @Test
     fun catalogSnapshotMarksMissingRemoteRowsInactiveAndKeepsPendingLocals() = runBlocking {
         val dao = FakeCatalogDao().apply {
             participants[2] = participant(2, "P0002")
@@ -230,6 +415,25 @@ class ReferenceCatalogRepositoryTest {
         assertEquals(0, dao.assignmentCount())
         assertEquals(6, dao.workSchedules().size)
         assertEquals(56, dao.workScheduleDetails().size)
+    }
+
+    @Test
+    fun catalogSnapshotPersistsInactiveWorkScheduleWithoutRollingBackCoreCatalogs() = runBlocking {
+        val dao = FakeCatalogDao()
+        val schedules = workScheduleSnapshot().mapIndexed { index, schedule ->
+            if (index == 0) schedule.copy(activo = false) else schedule
+        }
+
+        val result = repository(
+            dao,
+            FakeCatalogApi(snapshot = snapshot(), workSchedules = schedules)
+        ).syncCatalogs()
+
+        assertTrue(result.success)
+        assertEquals(1, dao.areaCount())
+        assertEquals(1, dao.participantCount())
+        assertEquals(false, dao.workSchedules.getValue(1L).activo)
+        assertEquals(6, dao.workSchedules().size)
     }
 
     @Test
@@ -380,7 +584,7 @@ private class FakeCatalogDao : ReferenceCatalogDao {
         participants.values.filter { it.activo }.sortedBy { it.idParticipante }
 
     override suspend fun workSchedules(): List<WorkScheduleLocalEntity> =
-        workSchedules.values.filter { it.activo }.sortedBy { it.idJornada }
+        workSchedules.values.sortedBy { it.idJornada }
 
     override suspend fun workScheduleDetails(): List<WorkScheduleDetailLocalEntity> =
         scheduleDetails.values.sortedBy { it.idDetalle }
@@ -425,6 +629,16 @@ private class FakeCatalogDao : ReferenceCatalogDao {
     override suspend fun pendingAdminParticipants() = participants.values.filter { it.pendingAdminUpdate }
     override suspend fun upsertArea(item: AreaAdministrativaLocalEntity) {
         areas[item.idArea] = item
+    }
+    override suspend fun deleteArea(id: Int) {
+        areas.remove(id)
+    }
+    override suspend fun deleteAreasNotIn(ids: List<Int>) {
+        val allowed = ids.toHashSet()
+        areas.entries.removeIf { it.key !in allowed }
+    }
+    override suspend fun deleteAllAreas() {
+        areas.clear()
     }
     override suspend fun upsertAssignment(item: EmpleadoAreaLocalEntity) {
         assignments[item.idParticipante to item.idArea] = item
@@ -536,7 +750,9 @@ private fun area(id: Int) =
         "Administración",
         true,
         null,
-        1
+        1,
+        nombreCorto = "A$id",
+        idPadre = null
     )
 
 private fun assignment(participantId: Int, areaId: Int, cargo: Int) =

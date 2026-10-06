@@ -38,7 +38,10 @@ def area_admin_identity(
 
 @router.get("/arbol", response_model=list[AreaTreeNodeOut])
 def obtener_arbol_areas(db: Session = Depends(get_db)):
-    return list_area_tree(db)
+    try:
+        return list_area_tree(db)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.post("", response_model=AdministrativeAreaOut, status_code=status.HTTP_201_CREATED)

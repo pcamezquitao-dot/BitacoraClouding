@@ -87,6 +87,22 @@ interface ReferenceCatalogDao {
     @Upsert
     suspend fun upsertArea(item: AreaAdministrativaLocalEntity)
 
+    @Query("DELETE FROM areas_administrativas_locales WHERE idArea = :id")
+    suspend fun deleteArea(id: Int)
+
+    @Query("DELETE FROM areas_administrativas_locales WHERE idArea NOT IN (:ids)")
+    suspend fun deleteAreasNotIn(ids: List<Int>)
+
+    @Query("DELETE FROM areas_administrativas_locales")
+    suspend fun deleteAllAreas()
+
+    @Transaction
+    suspend fun replaceAdminAreas(items: List<AreaAdministrativaLocalEntity>) {
+        require(items.isNotEmpty()) { "No se puede reemplazar áreas con un catálogo vacío" }
+        upsertAreas(items)
+        deleteAreasNotIn(items.map(AreaAdministrativaLocalEntity::idArea))
+    }
+
     @Upsert
     suspend fun upsertAssignment(item: EmpleadoAreaLocalEntity)
 
@@ -196,7 +212,7 @@ interface ReferenceCatalogDao {
         else deleteStaleWorkScheduleDetails(workScheduleDetails.map { it.idDetalle })
         upsertCalendar(calendar)
         upsertSyncState(state)
-        val storedSchedules = this.workSchedules().filter { it.activo }.associateBy { it.idJornada }
+        val storedSchedules = this.workSchedules().associateBy { it.idJornada }
         val expectedSchedules = workSchedules.associateBy { it.idJornada }
         check(storedSchedules == expectedSchedules) {
             "Las cabeceras de jornadas no coinciden despues de persistir"

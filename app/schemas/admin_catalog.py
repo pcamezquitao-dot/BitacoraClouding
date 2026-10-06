@@ -1,11 +1,23 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ParticipantTypeCreate(BaseModel):
     descripcion: str = Field(min_length=1, max_length=100)
     capacidades: list[str] = Field(min_length=1)
+
+    @field_validator("descripcion", mode="before")
+    @classmethod
+    def trim_participant_type_description(cls, value):
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("La descripción es obligatoria")
+        if len(normalized) > 100:
+            raise ValueError("La descripción no puede superar 100 caracteres")
+        return normalized
 
 
 class ParticipantTypeUpdate(ParticipantTypeCreate):
@@ -26,7 +38,7 @@ class ParticipantTypeOut(BaseModel):
 class AreaTreeNodeOut(BaseModel):
     id_area: int
     descripcion: str
-    nombre_corto: str | None = None
+    nombre_corto: str
     id_padre: int | None = None
     nivel: int
     ruta: str
@@ -34,8 +46,15 @@ class AreaTreeNodeOut(BaseModel):
 
 class AdministrativeAreaWrite(BaseModel):
     descripcion: str = Field(min_length=1, max_length=100)
-    nombre_corto: str | None = Field(default=None, max_length=25)
+    nombre_corto: str = Field(min_length=1, max_length=25)
     nodo_padre: int | None = None
+
+    @field_validator("descripcion", "nombre_corto", mode="before")
+    @classmethod
+    def trim_required_text(cls, value):
+        if not isinstance(value, str):
+            return value
+        return value.strip()
 
 
 class AdministrativeAreaOut(AdministrativeAreaWrite):

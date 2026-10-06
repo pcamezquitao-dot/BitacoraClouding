@@ -32,6 +32,7 @@ from app.routers.participants_admin import router as participants_admin_router
 from app.routers.work_schedules_admin import router as work_schedules_admin_router
 from app.routers.satelital import router as satelital_router
 from app.routers.supervisor import router as supervisor_router
+from app.routers.supervisor_events import router as supervisor_events_router
 from app.routers.worker import router as worker_router
 from app.routers.management import router as management_router
 from app.routers.hours_report import router as hours_report_router
@@ -42,7 +43,7 @@ from app.services.audio_transcription_service import recover_pending_transcripti
 # =========================
 # 3) Crear app
 # =========================
-app = FastAPI(title="BACKEND_FASTAPI_BITACORA3")
+app = FastAPI(title="BACKEND_FASTAPI_BITACORA3", root_path="/bitacora")
 
 # Servir archivos subidos por los endpoints de evidencia
 upload_dir = os.getenv("UPLOAD_DIR", "uploads")
@@ -77,6 +78,7 @@ app.include_router(participants_admin_router)
 app.include_router(work_schedules_admin_router)
 app.include_router(satelital_router)
 app.include_router(supervisor_router)
+app.include_router(supervisor_events_router)
 app.include_router(worker_router)
 app.include_router(management_router)
 app.include_router(hours_report_router)
