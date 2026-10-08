@@ -652,5 +652,43 @@ Fixtures inventariados: 99029101 queda en `bitacora_c29_empty`; 99029201,
 99029202 y 99029210 quedan en `bitacora_c29_test`; 99029203 fue eliminado por
 la prueba. Ciclos 990294xx y reglas 990293xx quedaron en cero.
 
-- Al finalizar se deben inventariar y retirar ÃƒÂºnicamente los fixtures autorizados,
-  previa comprobaciÃƒÂ³n de sus relaciones y conforme al procedimiento de datos.
+7. VERIFICACIÓN FÍSICA FINAL EN APLICACIÓN PRINCIPAL — 2026-10-08
+
+Dispositivo: V2035 `3065397347006YM`, desbloqueado. Paquete instalado:
+`com.cactus.bitacora`, versionCode 51, versionName
+`maria51-c29-administracion-proceso`. Instalación realizada con `adb install -r`;
+`firstInstallTime=2026-10-06 13:50:35` se conservó y no se borró almacenamiento.
+APK de instalación SHA-256:
+`0D8E55CD3EB17286C181615AE1D681BAD9EEC5503EAA6020D83ADBE4E6172E2E`.
+Certificado firmante SHA-256:
+`81346B9DEA2351E96E2A02A01B52596DD7865B538F67F2009B7127692E7A98F0`.
+Backend visible en el dispositivo: `https://161-22-47-89.sslip.io/bitacora/`;
+base efectiva comprobada por MariaDB: `bitacora`.
+
+Incidencia encontrada durante la comprobación final:
+- El árbol interactivo añadía al final los descendientes de raíces válidas aunque
+  estuvieran replegadas. Por ello pulsar el nombre cambiaba estado interno, pero la
+  estructura seguía pareciendo desplegada. Se corrigió la construcción de filas para
+  que la recuperación de componentes inconsistentes incluya solo huérfanos/ciclos y
+  no descendientes válidos ocultos. El nombre se dejó como `TextButton` compacto para
+  disponer de un blanco táctil inequívoco.
+- Regresión añadida: `expansion flag exposes children only when selected`.
+- Prueba focal y suite completa `testProductionDebugUnitTest`: APROBADAS.
+
+Resultados físicos posteriores a la corrección:
+
+| Verificación | Resultado | Evidencia |
+|---|---|---|
+| Apertura, paquete, versión y backend productivo | APROBADO | `docs/evidencias/C29/final/01-home.png`, metadatos ADB consignados arriba. |
+| C29 carga 41 procesos y presenta resumen/árbol | APROBADO | `05-prod-catalog.png`, SELECT final `bitacora / 41 / suma IDs 1079`. |
+| Expansión y repliegue por nombre | APROBADO | `06-tree-expanded-fixed.png`, `07-jornadas-expanded.png`; se observaron `▶/▼` y los hijos solo al expandir. |
+| Detalle de Jornadas | APROBADO | `08-jornadas-detail.png`; código 2 y tipo 1. |
+| Formulario de alta y `tipo_proceso=1` solo lectura | APROBADO | `09-create-type-readonly.png`; borrar/escribir `2` fue ignorado y permaneció `1`; formulario cancelado. |
+| Formulario de modificación y `tipo_proceso=1` solo lectura | APROBADO | `12-edit-type-readonly.png`; borrar/escribir `2` fue ignorado y permaneció `1`; formulario cancelado. |
+| C16 Áreas: resumen, árbol, `+` y expansión/repliegue | APROBADO | `10-c16-areas.png`; Gerencia pasó de `▼` a `▶` y volvió a expandirse. |
+| C28 Actividades: nota, catálogo, detalle y apertura de alta | APROBADO | `11-c28-catalog.png`; detalle y formulario se cerraron sin guardar. |
+| Ausencia de cambios productivos | APROBADO | MariaDB final: `dim_proceso=41`, suma de IDs `1079`; `cat_actividad=3`, suma de IDs `6`. No se crearon fixtures ni se guardaron formularios. |
+
+Estado final de CP-C29: 36 APROBADOS, 0 FALLIDOS, 0 BLOQUEADOS y 0 NO
+EJECUTADOS. La verificación física final de la aplicación principal queda APROBADA.
+C29 queda TERMINADO respecto del alcance implementado y probado.

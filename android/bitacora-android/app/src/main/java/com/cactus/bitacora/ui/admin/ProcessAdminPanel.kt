@@ -1,8 +1,8 @@
 package com.cactus.bitacora.ui.admin
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,6 +124,12 @@ internal fun buildProcessTreeRows(
     }
     val rows = mutableListOf<ProcessTreeRow>()
     val visited = mutableSetOf<Int>()
+    val reachableFromRoots = mutableSetOf<Int>()
+    fun markReachable(item: ProcessAdminOut) {
+        if (!reachableFromRoots.add(item.id_proceso)) return
+        children[item.id_proceso].orEmpty().forEach(::markReachable)
+    }
+    children[null].orEmpty().forEach(::markReachable)
     fun visit(item: ProcessAdminOut, depth: Int) {
         if (!visited.add(item.id_proceso)) return
         val childItems = children[item.id_proceso].orEmpty()
@@ -131,7 +138,9 @@ internal fun buildProcessTreeRows(
         if (includeCollapsedChildren || isExpanded) childItems.forEach { visit(it, depth + 1) }
     }
     children[null].orEmpty().forEach { visit(it, 0) }
-    processes.filter { it.id_proceso !in visited }.sortedBy { it.id_proceso }.forEach {
+    // Keep malformed/orphan components visible, but do not append valid descendants
+    // merely because their parent is currently collapsed.
+    processes.filter { it.id_proceso !in reachableFromRoots }.sortedBy { it.id_proceso }.forEach {
         rows += ProcessTreeRow(it, 0, children[it.id_proceso].orEmpty().isNotEmpty(), false, it.id_proceso_padre != null && it.id_proceso_padre !in ids || hasProcessAncestryCycle(processes, it.id_proceso))
         visited += it.id_proceso
     }
@@ -215,11 +224,17 @@ internal fun ProcessAdminPanel(repository: BitacoraRepository, actor: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { creating = true; editing = null; presetParent = row.process.id_proceso }, modifier = Modifier.size(36.dp)) { Text("+") }
-                Text(
-                    when { row.hasChildren && row.expanded -> "▼ ${row.process.nombre}"; row.hasChildren -> "▶ ${row.process.nombre}"; else -> "└─ ${row.process.nombre}" },
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(1f).clickable(enabled = row.hasChildren) { expanded = if (row.expanded) expanded - row.process.id_proceso else expanded + row.process.id_proceso }
-                )
+                TextButton(
+                    onClick = { if (row.hasChildren) expanded = if (row.expanded) expanded - row.process.id_proceso else expanded + row.process.id_proceso },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        when { row.hasChildren && row.expanded -> "▼ ${row.process.nombre}"; row.hasChildren -> "▶ ${row.process.nombre}"; else -> "└─ ${row.process.nombre}" },
+                        fontSize = 12.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 IconButton(onClick = { viewing = row.process }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_view), "Consultar", tint = Color(0xFF1976D2), modifier = Modifier.size(18.dp)) }
                 IconButton(onClick = { editing = row.process; creating = false; presetParent = row.process.id_proceso_padre }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_edit), "Editar", tint = Color(0xFFF9A825), modifier = Modifier.size(18.dp)) }
                 IconButton(onClick = { deleting = row.process; deleteError = null }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_retire), "Eliminar", tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp)) }

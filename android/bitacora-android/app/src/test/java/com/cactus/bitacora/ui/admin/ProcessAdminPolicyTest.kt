@@ -19,6 +19,12 @@ class ProcessAdminPolicyTest {
         assertEquals(listOf(0, 1, 1), rows.map { it.depth })
     }
 
+    @Test fun `expansion flag exposes children only when selected`() {
+        val values = listOf(process(1, "Raíz"), process(2, "Hijo", 1))
+        assertEquals(listOf(1), buildProcessTreeRows(values, emptySet()).map { it.process.id_proceso })
+        assertEquals(listOf(1, 2), buildProcessTreeRows(values, setOf(1)).map { it.process.id_proceso })
+    }
+
     @Test fun `descendants are excluded from parent candidates`() {
         val values = listOf(process(1, "Raíz"), process(2, "Hijo", 1), process(3, "Nieto", 2))
         assertEquals(setOf(2, 3), descendantProcessIds(values, 1))

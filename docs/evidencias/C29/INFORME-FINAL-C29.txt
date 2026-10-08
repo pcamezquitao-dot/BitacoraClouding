@@ -1,0 +1,49 @@
+INFORME FINAL — C29 ADMINISTRACIÓN PROCESO
+Fecha: 2026-10-08
+
+Base de entrega
+- Rama: C29-administracion-proceso.
+- Commit de instalación inicial: 41cad32.
+- Corrección final: árbol interactivo no debe mostrar descendientes de nodos
+  replegados como filas sueltas; incluye regresión unitaria específica.
+
+Instalación verificada
+- Dispositivo: V2035, serial 3065397347006YM.
+- Paquete: com.cactus.bitacora.
+- versionCode: 51.
+- versionName: maria51-c29-administracion-proceso.
+- Actualización conservando datos: sí; firstInstallTime 2026-10-06 13:50:35.
+- APK SHA-256: 0D8E55CD3EB17286C181615AE1D681BAD9EEC5503EAA6020D83ADBE4E6172E2E.
+- Certificado SHA-256: 81346B9DEA2351E96E2A02A01B52596DD7865B538F67F2009B7127692E7A98F0.
+- Backend: https://161-22-47-89.sslip.io/bitacora/.
+- Base efectiva: bitacora.
+
+Comprobación física final
+- C29 cargó el catálogo productivo de 41 filas.
+- El resumen de solo lectura, árbol inferior, expansión/repliegue por el nombre,
+  detalle y formularios de alta/modificación funcionaron.
+- En alta y modificación, tipo_proceso mostró 1 y rechazó físicamente el intento
+  de borrarlo/cambiarlo por 2. No se guardaron formularios.
+- C16 Áreas cargó resumen y árbol; Gerencia replegó y expandió; se conservaron
+  Adicionar área raíz y el + por fila.
+- C28 cargó nota, búsqueda y tres actividades; se abrieron detalle y alta y se
+  cancelaron sin escritura.
+- MariaDB al finalizar: dim_proceso 41 filas/suma IDs 1079; cat_actividad 3
+  filas/suma IDs 6. No se introdujeron fixtures productivos.
+
+Pruebas
+- Regresión focal ProcessAdminPolicyTest: APROBADA.
+- Suite testProductionDebugUnitTest: APROBADA.
+- CP-C29: 36 APROBADOS, 0 FALLIDOS, 0 BLOQUEADOS, 0 NO EJECUTADOS.
+
+Evidencia
+- 05-prod-catalog.png
+- 06-tree-expanded-fixed.png
+- 07-jornadas-expanded.png
+- 08-jornadas-detail.png
+- 09-create-type-readonly.png
+- 10-c16-areas.png
+- 11-c28-catalog.png
+- 12-edit-type-readonly.png
+
+Resultado: C29 TERMINADO.
