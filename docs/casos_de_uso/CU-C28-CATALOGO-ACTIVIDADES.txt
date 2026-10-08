@@ -1,0 +1,32 @@
+CU-C28 — CATÁLOGO DE ACTIVIDADES
+Versión: 02 | Fecha: 8 de octubre de 2026
+Estado: implementado y verificado.
+
+Objetivo
+Administrar el catálogo único bitacora.cat_actividad desde Administrador → Más →
+Administrar maestros → Catálogo de Actividades. El actor autorizado puede consultar,
+buscar, crear, ver detalle y modificar. C28 no ofrece eliminación, activación ni
+desactivación.
+
+Pantalla
+Muestra la nota «Estas actividades son únicas y se pueden repetir en varios procesos».
+El catálogo vacío se distingue de carga y error. Crear usa (+). El formulario contiene
+nombre obligatorio (1..100 caracteres tras recortar extremos), descripción opcional,
+Guardar y Cancelar. El id_actividad lo genera MariaDB y nunca se edita.
+
+Reglas confirmadas
+- Tabla singular cat_actividad; no existe ni se usa cat_actividades.
+- nombre es VARCHAR(100), NOT NULL y UNIQUE con utf8mb4_unicode_ci.
+- descripcion es TEXT NULL; vacío se persiste como NULL.
+- Los duplicados exactos o equivalentes según la collation se rechazan, incluso en
+  concurrencia.
+- El éxito solo se muestra tras respuesta confirmada del servidor. Un fallo conserva
+  el formulario; el UNIQUE impide duplicados al reintentar.
+- La modificación conserva id_actividad y las referencias entrantes de dim_proceso.
+- Los permisos se validan en interfaz y API mediante el control vigente de
+  Administrar maestros.
+
+Resultado
+Implementación backend y Android probada en bitacora_c28_test y verificada después en
+com.cactus.bitacora contra la base efectiva bitacora. La primera actividad puede
+crearse desde un catálogo vacío y permanece tras reentrada y reinicio.

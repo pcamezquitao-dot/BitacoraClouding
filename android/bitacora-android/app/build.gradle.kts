@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 49
-        versionName = "maria49-c22-bitacora-prueba-dev"
+        versionCode = 51
+        versionName = "maria51-c29-administracion-proceso"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -51,6 +51,18 @@ android {
             applicationId = "com.cactus.bitacora.c07test"
             manifestPlaceholders["appLabel"] = "Bitacora C07 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-tip-test/\"")
+        }
+        create("c28test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c28test"
+            manifestPlaceholders["appLabel"] = "Bitacora C28 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c28-test/\"")
+        }
+        create("c29test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c29test"
+            manifestPlaceholders["appLabel"] = "Bitacora C29 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c29-test/\"")
         }
         create("facial1") {
             dimension = "edition"

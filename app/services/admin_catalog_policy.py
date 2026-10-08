@@ -18,7 +18,7 @@ def legacy_capabilities(type_code: int) -> set[str]:
 
 
 def normalize_type_description(value: str) -> str:
-    normalized = (value or "").strip()
+    normalized = " ".join((value or "").split())
     if not normalized:
         raise ValueError("La descripción es obligatoria")
     if len(normalized) > 100:

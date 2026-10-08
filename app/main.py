@@ -37,6 +37,8 @@ from app.routers.worker import router as worker_router
 from app.routers.management import router as management_router
 from app.routers.hours_report import router as hours_report_router
 from app.routers.control_supervisor import router as control_supervisor_router
+from app.routers.activity_catalog import router as activity_catalog_router
+from app.routers.process_admin import router as process_admin_router
 from app.services.evidencia_file_service import evidencia_root
 from app.services.audio_transcription_service import recover_pending_transcriptions
 
@@ -83,6 +85,8 @@ app.include_router(worker_router)
 app.include_router(management_router)
 app.include_router(hours_report_router)
 app.include_router(control_supervisor_router)
+app.include_router(activity_catalog_router)
+app.include_router(process_admin_router)
 
 
 @app.on_event("startup")

@@ -99,7 +99,9 @@ private enum class AdminMasterSection {
     EMPLOYEE_AREA,
     ADMINISTRATIVE_AREAS,
     GENERAL_CALENDAR,
-    WORK_SCHEDULES
+    WORK_SCHEDULES,
+    ACTIVITY_CATALOG,
+    PROCESS_ADMIN
 }
 
 internal enum class ParticipantTypeFilter { ALL, ACTIVE, INACTIVE }
@@ -1114,6 +1116,14 @@ fun AdminCatalogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.WORK_SCHEDULES }
             ) { Text(WORK_SCHEDULES_LABEL) }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.ACTIVITY_CATALOG }
+            ) { Text("Catálogo de Actividades") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.PROCESS_ADMIN }
+            ) { Text("Administración Proceso") }
             return@Column
         }
         OutlinedButton(
@@ -1138,6 +1148,8 @@ fun AdminCatalogScreen(
                         AdminMasterSection.ADMINISTRATIVE_AREAS -> loadAreas(refreshRemote = true)
                         AdminMasterSection.EMPLOYEE_AREA -> loadEmployeeAreaTree()
                         AdminMasterSection.PARTICIPANT_TYPES -> loadParticipantTypes()
+                        AdminMasterSection.ACTIVITY_CATALOG -> Unit
+                        AdminMasterSection.PROCESS_ADMIN -> Unit
                         else -> refresh()
                     }
                 },
@@ -1152,6 +1164,14 @@ fun AdminCatalogScreen(
                 actor = actor,
                 refreshToken = participantRefreshToken
             )
+        }
+
+        if (section == AdminMasterSection.ACTIVITY_CATALOG) {
+            ActivityCatalogPanel(repository, actor)
+        }
+
+        if (section == AdminMasterSection.PROCESS_ADMIN) {
+            ProcessAdminPanel(repository, actor)
         }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {

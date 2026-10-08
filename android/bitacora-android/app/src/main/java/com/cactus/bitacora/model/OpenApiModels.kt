@@ -400,6 +400,49 @@ data class ParticipantTypeAdminIn(
 
 data class ParticipantTypeStatusIn(val activo: Boolean)
 
+data class ActivityCatalogOut(
+    val id_actividad: Long,
+    val nombre: String,
+    val descripcion: String? = null
+)
+
+data class ActivityCatalogIn(
+    val nombre: String,
+    val descripcion: String? = null
+)
+
+data class ProcessAdminOut(
+    val id_proceso: Int,
+    val nombre: String,
+    val descripcion: String? = null,
+    val id_proceso_padre: Int? = null,
+    val tiempo_estimado: Int? = null,
+    val costo_estimado: Double? = null,
+    val tipo_proceso: Int,
+    val precondicion: String? = null,
+    val id_actividad: Long? = null,
+    val nombre_corto: String? = null,
+    val nombre_padre: String? = null,
+    val nombre_actividad: String? = null,
+    val fingerprint: String
+)
+
+data class ProcessAdminIn(
+    val id_proceso: Int,
+    val nombre: String,
+    val descripcion: String? = null,
+    val id_proceso_padre: Int? = null,
+    val tiempo_estimado: Int? = 0,
+    val costo_estimado: Double? = 0.0,
+    val tipo_proceso: Int = 1,
+    val precondicion: String? = null,
+    val id_actividad: Long? = null,
+    val nombre_corto: String? = null,
+    val original_fingerprint: String? = null
+)
+
+data class ProcessDeleteOut(val id_proceso: Int, val mensaje: String)
+
 data class WorkScheduleDetailIn(
     val id_detalle: Long? = null,
     val dia_semana_num: Int,

@@ -1,5 +1,6 @@
 package com.cactus.bitacora.ui.query
 
+import com.cactus.bitacora.BuildConfig
 import com.cactus.bitacora.data.AudioTranscriptionState
 import com.cactus.bitacora.data.local.BitacoraEvidenceEntity
 import com.cactus.bitacora.data.local.BitacoraLocalEntity
@@ -13,7 +14,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BitacoraQueryPolicyTest {
-    @Test
     private fun transcription(
         state: String,
         text: String? = null,
@@ -39,13 +39,13 @@ class BitacoraQueryPolicyTest {
     @Test
     fun audioTranscriptionStatesRemainVisibleWithoutReplacingAudio() {
         assertEquals(
-            "Transcripci?n: pendiente de sincronizar el audio",
+            "Transcripción: pendiente de sincronizar el audio",
             transcriptionStatusLabel(AudioTranscriptionState.PendingSync)
         )
-        assertEquals("Transcripci?n: pendiente", transcriptionStatusLabel(transcription("PENDIENTE")))
-        assertEquals("Transcripci?n: procesando", transcriptionStatusLabel(transcription("PROCESANDO")))
+        assertEquals("Transcripción: pendiente", transcriptionStatusLabel(transcription("PENDIENTE")))
+        assertEquals("Transcripción: procesando", transcriptionStatusLabel(transcription("PROCESANDO")))
         assertEquals(
-            "Transcripci?n: error ? audio ilegible",
+            "Transcripción: error · audio ilegible",
             transcriptionStatusLabel(transcription("ERROR", error = "audio ilegible"))
         )
     }
@@ -62,7 +62,7 @@ class BitacoraQueryPolicyTest {
         val corrected = transcription(
             state = "COMPLETADA",
             text = "Texto compatible",
-            automatic = "Texto autom?tico",
+            automatic = "Texto automático",
             corrected = "Texto corregido"
         )
         assertEquals("Texto corregido", transcriptionText(corrected))
@@ -71,10 +71,10 @@ class BitacoraQueryPolicyTest {
         val automatic = transcription(
             state = "COMPLETADA",
             text = "Texto compatible",
-            automatic = "Texto autom?tico"
+            automatic = "Texto automático"
         )
-        assertEquals("Texto autom?tico", transcriptionText(automatic))
-        assertEquals("Texto autom?tico", transcriptionTextLabel(automatic))
+        assertEquals("Texto automático", transcriptionText(automatic))
+        assertEquals("Texto automático", transcriptionTextLabel(automatic))
     }
     fun deletionActionsAreOnlyVisibleForAdministratorPermission() {
         assertTrue(canShowDeletionActions(allowDelete = true))
@@ -164,7 +164,7 @@ class BitacoraQueryPolicyTest {
         assertEquals("Disponible en servidor", evidenceStatusLabel(item, localFileExists = false))
         assertFalse(canOpenEvidenceLocally(item.localFilePath, fileExists = false))
         assertEquals(
-            "https://161-22-47-89.sslip.io/bitacora/bitacora-area-evidencias/44/archivo",
+            "${BuildConfig.API_BASE_URL}bitacora-area-evidencias/44/archivo",
             evidenceRemoteUrl(requireNotNull(item.remoteId))
         )
     }

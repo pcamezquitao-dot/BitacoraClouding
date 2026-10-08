@@ -41,9 +41,9 @@ class FaceNavigationStructureTest {
 
     @Test
     fun recognizedParticipantRoleIsResolvedAfterIdentityMatch() {
-        assertTrue(assignmentAllowsTarget(cargo = 2, target = DailyLogQrTarget.EMPLEADO))
-        assertTrue(assignmentAllowsTarget(cargo = 3, target = DailyLogQrTarget.SUPERVISOR))
-        assertFalse(assignmentAllowsTarget(cargo = 3, target = DailyLogQrTarget.EMPLEADO))
+        assertTrue(assignmentAllowsTarget(cargo = 2, target = DailyLogQrTarget.EMPLEADO, supervisorTypeCode = 3))
+        assertTrue(assignmentAllowsTarget(cargo = 3, target = DailyLogQrTarget.SUPERVISOR, supervisorTypeCode = 3))
+        assertTrue(assignmentAllowsTarget(cargo = 3, target = DailyLogQrTarget.EMPLEADO, supervisorTypeCode = 3))
         assertEquals(
             "El participante reconocido no tiene el rol activo requerido: Supervisor",
             missingRoleMessage(DailyLogQrTarget.SUPERVISOR)

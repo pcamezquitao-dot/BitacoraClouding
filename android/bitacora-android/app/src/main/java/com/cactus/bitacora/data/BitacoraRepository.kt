@@ -35,6 +35,9 @@ import com.cactus.bitacora.model.ParticipanteOut
 import com.cactus.bitacora.model.EmployeeAreaAdminIn
 import com.cactus.bitacora.model.ParticipantTypeAdminIn
 import com.cactus.bitacora.model.ParticipantTypeStatusIn
+import com.cactus.bitacora.model.ActivityCatalogIn
+import com.cactus.bitacora.model.ProcessAdminIn
+import com.cactus.bitacora.model.ProcessAdminOut
 import com.cactus.bitacora.model.AdministrativeAreaIn
 import com.cactus.bitacora.model.CalendarHolidayUpdateIn
 import com.cactus.bitacora.model.CalendarTreeNodeOut
@@ -337,6 +340,44 @@ class BitacoraRepository(
             actor.trim(),
             Build.MODEL
         )
+
+    suspend fun adminActivities(actor: String, search: String = "") =
+        api.getAdminActivities(
+            adminAuthorization(), actor.trim(), Build.MODEL, search.trim()
+        )
+
+    suspend fun adminActivity(actor: String, id: Long) =
+        api.getAdminActivity(adminAuthorization(), actor.trim(), Build.MODEL, id)
+
+    suspend fun createAdminActivity(actor: String, name: String, description: String?) =
+        api.createAdminActivity(
+            adminAuthorization(), actor.trim(), Build.MODEL,
+            ActivityCatalogIn(name.trim(), description?.takeIf { it.isNotBlank() })
+        )
+
+    suspend fun updateAdminActivity(
+        actor: String, id: Long, name: String, description: String?
+    ) = api.updateAdminActivity(
+        adminAuthorization(), actor.trim(), Build.MODEL, id,
+        ActivityCatalogIn(name.trim(), description?.takeIf { it.isNotBlank() })
+    )
+
+    suspend fun adminProcesses(actor: String): List<ProcessAdminOut> =
+        api.getAdminProcesses(adminAuthorization(), actor.trim(), Build.MODEL)
+
+    suspend fun adminProcess(actor: String, id: Int): ProcessAdminOut =
+        api.getAdminProcess(adminAuthorization(), actor.trim(), Build.MODEL, id)
+
+    suspend fun createAdminProcess(actor: String, payload: ProcessAdminIn): ProcessAdminOut =
+        api.createAdminProcess(adminAuthorization(), actor.trim(), Build.MODEL, payload)
+
+    suspend fun updateAdminProcess(actor: String, payload: ProcessAdminIn): ProcessAdminOut =
+        api.updateAdminProcess(
+            adminAuthorization(), actor.trim(), Build.MODEL, payload.id_proceso, payload
+        )
+
+    suspend fun deleteAdminProcess(actor: String, id: Int) =
+        api.deleteAdminProcess(adminAuthorization(), actor.trim(), Build.MODEL, id)
 
     suspend fun createAdminParticipantType(
         actor: String,

@@ -14,6 +14,8 @@ def test_endpoint_oficial_acepta_origen_prueba_sin_ruta_paralela():
         return_value=None,
     ), patch(
         "app.routers.bitacora_uc03.require_asignacion_activa"
+    ), patch(
+        "app.routers.bitacora_uc03._require_daily_log_responsible"
     ):
         result = _crear_bitacora_diaria(
             db=db,

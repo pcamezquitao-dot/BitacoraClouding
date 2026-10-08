@@ -1,0 +1,49 @@
+CP-C28 — RESULTADOS DEL CATÁLOGO DE ACTIVIDADES
+Versión: 02 | Ejecución: 8 de octubre de 2026
+Entorno aislado: com.cactus.bitacora.c28test, v50, /bitacora-c28-test/,
+bitacora_c28_test. Dispositivo: V2035, serie 3065397347006YM.
+Entorno final: com.cactus.bitacora, v50, /bitacora/, bitacora.
+
+Matriz
+CP-C28-01 APROBADA — navegación, título y nota exacta comprobados físicamente.
+CP-C28-02 APROBADA — creación llegó a bitacora_c28_test.cat_actividad; producción quedó intacta durante aislamiento.
+CP-C28-03 APROBADA — catálogo vacío y (+) comprobados físicamente.
+CP-C28-04 APROBADA — creación Android, HTTP 201, ID 13 y listado actualizado.
+CP-C28-05 APROBADA — descripción vacía persistió NULL.
+CP-C28-06 APROBADA — vacío/espacios rechazados sin fila.
+CP-C28-07 APROBADA — 100 aceptado; 101 rechazado sin truncar.
+CP-C28-08 APROBADA — espacios extremos recortados.
+CP-C28-09 APROBADA — duplicado exacto HTTP 409 y una sola fila.
+CP-C28-10 APROBADA — utf8mb4_unicode_ci rechazó variante equivalente.
+CP-C28-11 APROBADA — modificación física conservó ID 13.
+CP-C28-12 APROBADA — nombre ocupado rechazado; valores previos conservados.
+CP-C28-13 APROBADA — Cancelar físico; consulta posterior: cero filas del borrador.
+CP-C28-14 APROBADA — listado, búsqueda y detalle verificados.
+CP-C28-15 APROBADA — servicio detenido produjo HTTP 502 y Reintentar; al recuperarlo cargó registros.
+CP-C28-16 APROBADA — fallo físico no mostró éxito, conservó formulario y dejó cero filas; reintento creó exactamente una.
+CP-C28-17 APROBADA — dos clientes concurrentes: HTTP 201/409 y una fila.
+CP-C28-18 APROBADA — llamada directa sin credencial: HTTP 401, sin cambios.
+CP-C28-19 APROBADA — dos filas reales de dim_proceso de prueba referenciaron el mismo id_actividad.
+CP-C28-20 APROBADA — edición conservó el ID y las dos referencias.
+CP-C28-21 APROBADA — interfaz/API sin eliminar, activar ni desactivar; no existe tabla plural.
+CP-C28-22 APROBADA — texto admitido íntegro y exceso rechazado sin truncamiento.
+CP-C28-23 APROBADA — fila visible tras salir, reentrar y forzar cierre/reiniciar aplicación.
+CP-C28-24 APROBADA — edición de ID inexistente respondió HTTP 404 sin recreación.
+
+Regresión y defecto
+Defecto reproducido: al abrir C28 con actor inicialmente vacío, LaunchedEffect(Unit)
+dejaba el error «Identifique al administrador» aunque luego se escribiera p0002. La
+corrección vincula la carga al cambio del actor, espera el debounce y recarga. Prueba
+unitaria focal: «catalog becomes loadable after actor is entered». También se resolvió
+la compilación de FaceNavigationStructureTest y se ejecutaron ambas clases: BUILD
+SUCCESSFUL. Backend: 6 pruebas unitarias aprobadas.
+
+Regresiones físicas aprobadas: Crear (+) abrió Crear Bitácora Diaria; C16 mostró el
+resumen superior de solo lectura y el árbol; C08 abrió Novedades con participante,
+tipos y campos de fecha/hora.
+
+Instalación final
+APK SHA-256 F668D28CD1A1675F75BAAE66BA998B979C9D50735330E91A061830E2E0EAD7BF.
+Firma SHA-256 81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0,
+igual a la v49 sustituida mediante install -r. Registro final controlado:
+id_actividad=1, C28-VALIDACION-V2035-20261008, exactamente una fila en bitacora.

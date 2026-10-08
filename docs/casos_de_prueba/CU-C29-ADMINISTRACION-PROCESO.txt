@@ -1,0 +1,237 @@
+CASO DE USO C-29 Ã¢â‚¬â€ ADMINISTRACIÃƒâ€œN PROCESO
+CÃƒÂ³digo documental: CU-C29-ADMINISTRACION-PROCESO
+VersiÃƒÂ³n: 01 Ã¢â‚¬â€ propuesta funcional
+Fecha: 2026-10-08
+Proyecto: BitÃƒÂ¡cora / ERPWizard
+Tabla objeto: bitacora.dim_proceso
+Referencia funcional: C16_ADMINISTRACION_AREAS
+
+1. OBJETIVO Y ALCANCE
+Permitir al Administrador crear, consultar, modificar y eliminar registros de
+dim_proceso mediante una interfaz jerÃƒÂ¡rquica semejante a ÃƒÂreas administrativas.
+Administrar el catÃƒÂ¡logo de procesos y su relaciÃƒÂ³n padreÃ¢â‚¬â€œhijo, con asociaciÃƒÂ³n
+opcional de cada registro a una actividad existente en cat_actividad.
+
+C29 administra dim_proceso. No crea ni ejecuta automÃƒÂ¡ticamente definiciones
+bpm_proceso, etapas, transiciones o casos BPM. id_proceso e id_bpm_proceso son
+identificadores distintos y no deben intercambiarse.
+
+2. ACTOR, ACCESO Y DISPARADOR
+Actor principal: Administrador autorizado para administrar maestros.
+Ruta: Administrador Ã¢â€ â€™ (...) Ã¢â€ â€™ Administrar maestros Ã¢â€ â€™ AdministraciÃƒÂ³n Proceso.
+Disparador: pulsar el botÃƒÂ³n Ã‚Â«AdministraciÃƒÂ³n ProcesoÃ‚Â».
+La autorizaciÃƒÂ³n debe comprobarse tanto en la interfaz como en el servidor.
+
+3. FUENTES Y ESTADO DE LA DEFINICIÃƒâ€œN
+La estructura de ambas tablas se transcribe de la imagen aportada por Patricia.
+El documento original de C16 no estuvo disponible para comparaciÃƒÂ³n literal.
+Se retoman del contexto conocido su resumen de solo lectura, ÃƒÂ¡rbol interactivo,
+orden padreÃ¢â‚¬â€œdescendientes y controles +, ojo, lÃƒÂ¡piz y X.
+Las reglas funcionales propuestas aquÃƒÂ­ se distinguen de las restricciones que
+pueden comprobarse con DESCRIBE. Antes de implementar se requiere consultar
+SHOW CREATE TABLE y las referencias entrantes reales; DESCRIBE no muestra todas
+las claves forÃƒÂ¡neas, CHECK ni acciones ON DELETE/ON UPDATE.
+
+4. CORRESPONDENCIA CON C16
+Elemento C16                         Elemento C29
+id_Area_Administrativa               id_proceso
+descripcion (nombre del ÃƒÂ¡rea)        nombre (nombre del proceso)
+nodo_padre                          id_proceso_padre
+nombre_corto                        nombre_corto
+ÃƒÂrbol de ÃƒÂ¡reas                      ÃƒÂrbol de procesos
+Referencia                          nombre_corto
+
+La descripcion de dim_proceso es un detalle opcional de hasta 250 caracteres;
+no debe usarse como sustituto del campo nombre.
+
+5. DATOS Y FORMULARIO
+Campo               Estructura observada                 Tratamiento
+id_proceso          INT, PK, NOT NULL, sin AUTO_INCREMENT CÃƒÂ³digo obligatorio
+nombre              VARCHAR(50), NOT NULL, UNIQUE         Obligatorio
+descripcion         VARCHAR(250), NULL                   Opcional
+id_proceso_padre    INT, NULL, ÃƒÂ­ndice                    Selector de padre
+tiempo_estimado     INT, NULL, DEFAULT 0                 Opcional, inicial 0
+costo_estimado      DECIMAL(10,2), NULL, DEFAULT 0.00     Opcional, inicial 0.00
+tipo_proceso        TINYINT, NOT NULL, DEFAULT 1          Obligatorio, inicial 1
+precondicion        VARCHAR(250), NULL                   Opcional
+id_actividad        INT UNSIGNED, NULL, ÃƒÂ­ndice           Selector de actividad
+nombre_corto        VARCHAR(100), NULL, UNIQUE           Referencia opcional
+
+DecisiÃƒÂ³n propuesta para esta versiÃƒÂ³n: el Administrador ingresa id_proceso al
+crear. Una vez creado es de solo lectura. No usar MAX(id_proceso)+1 como mecanismo
+de asignaciÃƒÂ³n. Si se desea generaciÃƒÂ³n automÃƒÂ¡tica, definirla expresamente como
+un cambio separado del esquema y de este contrato.
+
+Padre: mostrar nombre y referencia; incluir Ã‚Â«Sin padre / Proceso raÃƒÂ­zÃ‚Â».
+Actividad: mostrar el nombre de cat_actividad y permitir Ã‚Â«Sin actividadÃ‚Â».
+Mostrar su identificador en el detalle cuando ayude a distinguir registros.
+El selector no permite crear actividades; esa funciÃƒÂ³n corresponde a C28.
+
+6. PRESENTACIÃƒâ€œN DE LA PANTALLA
+6.1 Encabezado: Ã‚Â«AdministraciÃƒÂ³n ProcesoÃ‚Â».
+Nota: Ã‚Â«Organice los procesos por niveles y asocie, cuando corresponda, una
+actividad del CatÃƒÂ¡logo de ActividadesÃ‚Â».
+
+6.2 Resumen superior de solo lectura:
+Columnas Ã‚Â«ÃƒÂrbol de procesosÃ‚Â» y Ã‚Â«ReferenciaÃ‚Â», esta ÃƒÂºltima tomada de nombre_corto.
+Mostrar nombre con sangrÃƒÂ­a jerÃƒÂ¡rquica, sin IDs en el resumen. Si no hay referencia,
+mostrar un guion. Cada padre precede inmediatamente a su conjunto de descendientes.
+Propuesta de orden entre hermanos: nombre ascendente y luego id_proceso.
+
+6.3 ÃƒÂrbol inferior interactivo:
+Cada fila muestra + al frente, nombre del proceso y controles ojo, lÃƒÂ¡piz y X.
+Pulsar el nombre expande o repliega sus hijos. En nodos hoja no altera datos.
+Ojo abre todos los campos en modo consulta; lÃƒÂ¡piz abre modificaciÃƒÂ³n; X inicia
+eliminaciÃƒÂ³n; + crea un hijo con el padre precargado.
+Un botÃƒÂ³n Ã‚Â«Crear proceso raÃƒÂ­z (+)Ã‚Â» permite iniciar un catÃƒÂ¡logo vacÃƒÂ­o.
+Conservar el estilo compacto de C16: texto reducido, sangrÃƒÂ­a aproximada 10 dp,
+iconos aproximados 18 dp y controles visuales 32 dp; asegurar objetivos tÃƒÂ¡ctiles
+accesibles sin superposiciÃƒÂ³n. No modificar C16 para incorporar C29.
+
+6.4 Estados: cargando, catÃƒÂ¡logo vacÃƒÂ­o, datos disponibles y error con Reintentar.
+Durante una operaciÃƒÂ³n bloquear envÃƒÂ­os repetidos. Un error no vacÃƒÂ­a el catÃƒÂ¡logo
+local previamente vÃƒÂ¡lido ni presenta datos antiguos como reciÃƒÂ©n confirmados.
+
+7. PRECONDICIONES
+- Actor autorizado y sesiÃƒÂ³n vÃƒÂ¡lida segÃƒÂºn el mecanismo vigente.
+- dim_proceso disponible con la estructura compatible.
+- Para seleccionar una actividad, cat_actividad debe poder consultarse.
+- Las escrituras requieren conexiÃƒÂ³n con el servidor en esta versiÃƒÂ³n propuesta.
+  La consulta local, si existe en la aplicaciÃƒÂ³n, debe indicar cuando estÃƒÂ¡ sin
+  actualizar. No se incorpora una cola nueva de modificaciones offline.
+
+8. FLUJO PRINCIPAL: CONSULTAR
+1. El actor abre AdministraciÃƒÂ³n Proceso.
+2. El sistema consulta los registros y construye la jerarquÃƒÂ­a.
+3. Valida que cada registro aparezca una sola vez y que no existan ciclos.
+4. Presenta resumen y ÃƒÂ¡rbol con los estados correspondientes.
+5. El actor expande, repliega o abre el detalle con el ojo.
+6. El sistema muestra los diez campos y el nombre del padre y actividad, si existen.
+
+9. FLUJO: CREAR
+1. El actor pulsa Crear proceso raÃƒÂ­z o + en una fila.
+2. El sistema abre el formulario con padre NULL o padre seleccionado.
+3. Inicializa tiempo_estimado=0, costo_estimado=0.00 y tipo_proceso=1.
+4. El actor ingresa cÃƒÂ³digo, nombre y los demÃƒÂ¡s datos que correspondan.
+5. Al Guardar, el sistema valida campos, unicidad, padre y actividad en servidor.
+6. Inserta un ÃƒÂºnico registro y confirma el resultado.
+7. Actualiza el resumen y ÃƒÂ¡rbol; expande el padre y hace visible el nuevo registro.
+8. Muestra Ã‚Â«Proceso creado correctamenteÃ‚Â» ÃƒÂºnicamente tras confirmaciÃƒÂ³n.
+
+Cancelar cierra sin escritura. Un fallo conserva el formulario para corregir o
+reintentar. Ante pÃƒÂ©rdida de respuesta, consultar el cÃƒÂ³digo antes de reintentar y
+confirmar si existe con los mismos datos; no generar un segundo cÃƒÂ³digo por error.
+
+10. FLUJO: MODIFICAR
+1. El actor pulsa lÃƒÂ¡piz.
+2. El sistema carga los valores vigentes; id_proceso permanece de solo lectura.
+3. El actor modifica datos o cambia el padre.
+4. El selector de padre excluye el propio registro y todos sus descendientes.
+5. El servidor vuelve a validar las reglas y las dependencias reales.
+6. Guarda de forma atÃƒÂ³mica y recarga ambas representaciones.
+7. Si cambiÃƒÂ³ el padre, muestra el registro bajo el nuevo padre con sus hijos.
+
+Cancelar no cambia datos. Si el registro fue eliminado o cambiÃƒÂ³ mientras se
+editaba, informar y recargar; no sobrescribir silenciosamente una ediciÃƒÂ³n ajena.
+La implementaciÃƒÂ³n debe definir el control de concurrencia, sin inventar una
+columna de versiÃƒÂ³n que no existe en el esquema mostrado.
+
+11. FLUJO: ELIMINAR
+1. El actor pulsa X.
+2. El sistema comprueba hijos y referencias entrantes existentes.
+3. Si hay dependencias, bloquea y explica cuÃƒÂ¡les impiden eliminar.
+4. Si no hay dependencias, pide confirmaciÃƒÂ³n mostrando cÃƒÂ³digo y nombre.
+5. Tras confirmar, el servidor vuelve a comprobar y elimina solo ese registro.
+6. Actualiza resumen y ÃƒÂ¡rbol y muestra Ã‚Â«Proceso eliminado correctamenteÃ‚Â».
+
+No se permite eliminaciÃƒÂ³n en cascada de descendientes ni registros relacionados.
+No se desactiva el proceso: dim_proceso no contiene un campo activo.
+Una asociaciÃƒÂ³n saliente con cat_actividad no significa por sÃƒÂ­ sola que el proceso
+estÃƒÂ© en uso. Eliminar dim_proceso no debe eliminar su actividad del catÃƒÂ¡logo.
+
+12. REGLAS FUNCIONALES PROPUESTAS
+R01. CÃƒÂ³digo: entero vÃƒÂ¡lido para INT, ÃƒÂºnico y obligatorio; inmutable al editar.
+R02. Nombre: obligatorio, entre 1 y 50 caracteres despuÃƒÂ©s de trim; sin espacios
+     extremos al persistir; ÃƒÂºnico segÃƒÂºn la collation real de MariaDB.
+R03. Referencia: opcional, mÃƒÂ¡ximo 100 caracteres despuÃƒÂ©s de trim; vacÃƒÂ­a se guarda
+     como NULL; si se informa, debe ser ÃƒÂºnica segÃƒÂºn la collation vigente.
+R04. DescripciÃƒÂ³n y precondiciÃƒÂ³n: mÃƒÂ¡ximo 250 caracteres cada una; vacÃƒÂ­as se guardan
+     como NULL. La precondiciÃƒÂ³n es texto; C29 no la ejecuta como cÃƒÂ³digo o SQL.
+R05. Padre NULL define una raÃƒÂ­z. Se admiten varias raÃƒÂ­ces mientras no exista una
+     regla documentada que obligue a una sola. Todo padre informado debe existir.
+R06. Prohibido asignar el propio registro o un descendiente como padre. Validar
+     tambiÃƒÂ©n en servidor, incluyendo cambios concurrentes que pudieran formar ciclos.
+R07. Tiempo: valor NULL o entero no negativo. Falta definir su unidad funcional;
+     no etiquetar minutos u horas como si estuviera acordado.
+R08. Costo: NULL o nÃƒÂºmero no negativo, mÃƒÂ¡ximo 99.999.999,99 y dos decimales.
+     Falta definir moneda y base del costo; no asumir COP, USD o costo por hora.
+R09. Tipo: obligatorio, predeterminado 1. Falta documentar significado y valores
+     permitidos. No inventar etiquetas como macroproceso/proceso/actividad.
+     Antes de implementar el selector, verificar dominio, CHECK y datos vigentes.
+R10. Actividad: opcional; si se informa debe existir en cat_actividad. Varias filas
+     pueden compartir id_actividad: en la imagen aparece indexado, no UNIQUE.
+R11. Eliminar solo registros sin hijos ni referencias entrantes impeditivas,
+     comprobadas sobre el esquema efectivo. No asumir cuÃƒÂ¡les tablas los referencian.
+R12. No modificar actividades, tablas BPM ni bitÃƒÂ¡coras como efecto de este CRUD.
+R13. Campos derivados del ÃƒÂ¡rbol y nombres relacionados no se persisten como columnas
+     nuevas. Los errores de unicidad o integridad se traducen a mensajes comprensibles.
+R14. Guardar y actualizar las representaciones solo tras una confirmaciÃƒÂ³n vÃƒÂ¡lida.
+     La preservaciÃƒÂ³n de datos locales ante fallos sigue el patrÃƒÂ³n de C16.
+
+13. EXCEPCIONES Y MENSAJES
+- CÃƒÂ³digo existente: Ã‚Â«Ya existe un proceso con este cÃƒÂ³digoÃ‚Â».
+- Nombre duplicado: Ã‚Â«Ya existe un proceso con este nombreÃ‚Â».
+- Referencia duplicada: Ã‚Â«Ya existe un proceso con esta referenciaÃ‚Â».
+- Nombre vacÃƒÂ­o: Ã‚Â«Ingrese el nombre del procesoÃ‚Â».
+- Ciclo: Ã‚Â«El proceso no puede depender de sÃƒÂ­ mismo ni de sus descendientesÃ‚Â».
+- Padre o actividad ausente: Ã‚Â«El registro seleccionado ya no existe; actualiceÃ‚Â».
+- Con hijos: Ã‚Â«No se puede eliminar: el proceso tiene subprocesosÃ‚Â».
+- En uso: Ã‚Â«No se puede eliminar: el proceso estÃƒÂ¡ referenciadoÃ‚Â», con detalle ÃƒÂºtil.
+- Red o servidor: informar el fallo, conservar los datos y ofrecer Reintentar.
+- Datos jerÃƒÂ¡rquicos invÃƒÂ¡lidos al cargar: informar la inconsistencia sin ocultar
+  registros; permitir consulta de los afectados y bloquear cambios que la agraven.
+
+14. POSTCONDICIONES
+Ãƒâ€°xito: operaciÃƒÂ³n confirmada en dim_proceso; resumen y ÃƒÂ¡rbol consistentes; ninguna
+otra tabla modificada por efectos no previstos.
+Fallo o cancelaciÃƒÂ³n: no hay modificaciÃƒÂ³n parcial; se conservan datos y entradas
+ÃƒÂºtiles para recuperar la operaciÃƒÂ³n. No se informa un ÃƒÂ©xito no comprobado.
+
+15. CRITERIOS DE ACEPTACIÃƒâ€œN PARA EL POSTERIOR CP-C29
+A01. Acceso desde la ruta indicada y rechazo de actor no autorizado.
+A02. CatÃƒÂ¡logo vacÃƒÂ­o: crear el primer proceso desde la interfaz real y verificar
+     su persistencia despuÃƒÂ©s de salir, entrar y recargar desde el servidor.
+A03. Crear raÃƒÂ­z, hijo y nieto; orden y sangrÃƒÂ­a correctos sin duplicados ni omisiones.
+A04. ExpansiÃƒÂ³n/repliegue, resumen de solo lectura y controles equivalentes a C16.
+A05. Consultar todos los campos; editar datos y trasladar un subÃƒÂ¡rbol vÃƒÂ¡lido.
+A06. Rechazar cÃƒÂ³digo, nombre y referencia duplicados, lÃƒÂ­mites excedidos y vacÃƒÂ­os.
+A07. Admitir referencias NULL mÃƒÂºltiples y campos opcionales NULL conforme al esquema.
+A08. Rechazar padre inexistente, autoparentesco y ciclos directos e indirectos.
+A09. Asociar una actividad a varios procesos y retirar la asociaciÃƒÂ³n sin eliminarla.
+A10. Eliminar hoja sin uso; cancelar eliminaciÃƒÂ³n; bloquear hijos y referencias reales.
+A11. Probar fallo de red, pÃƒÂ©rdida de respuesta, doble pulsaciÃƒÂ³n y escritura concurrente.
+A12. Conservar catÃƒÂ¡logo local vÃƒÂ¡lido ante fallo y comprobar actualizaciÃƒÂ³n al reconectar.
+A13. Verificar que C16 y C28 siguen funcionando y que otras tablas no fueron alteradas.
+A14. Comprobar el flujo completo fÃƒÂ­sicamente en Android antes de declarar aprobado;
+     compilar o probar ÃƒÂºnicamente la API no acredita el CRUD desde el celular.
+
+16. DEFINICIONES PENDIENTES ANTES DE IMPLEMENTAR
+1. Unidad de tiempo_estimado.
+2. Moneda y alcance de costo_estimado.
+3. Significado y dominio permitido de tipo_proceso.
+4. Confirmar ingreso manual de id_proceso o aprobar un mecanismo automÃƒÂ¡tico explÃƒÂ­cito.
+17. DEFINICIÓN FUNCIONAL AUTORIZADA — TIPO DE PROCESO
+
+Decisión aprobada por Patricia el 2026-10-08:
+- `tipo_proceso` tiene un único valor permitido: `1`.
+- Android asigna automáticamente `1` y muestra el campo de solo lectura.
+- El backend rechaza cualquier valor distinto de `1`.
+- No se modifica el esquema de `dim_proceso`; otros tipos quedan fuera de alcance.
+- `id_proceso` se ingresa manualmente y es inmutable al editar.
+- Tiempo y costo se presentan numéricamente, sin inventar unidad o moneda.
+
+5. Obtener SHOW CREATE TABLE dim_proceso y referencias entrantes para ajustar las
+   validaciones al esquema real. Comparar con el C16 original cuando estÃƒÂ© disponible.
+
+Este documento define el caso de uso; no acredita implementaciÃƒÂ³n, instalaciÃƒÂ³n
+ni ejecuciÃƒÂ³n de pruebas y no realiza cambios en la base de datos.

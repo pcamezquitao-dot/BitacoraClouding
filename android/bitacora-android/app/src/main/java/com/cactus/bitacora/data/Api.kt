@@ -43,6 +43,11 @@ import com.cactus.bitacora.model.ObjetoMonitoreoSatelitalOut
 import com.cactus.bitacora.model.ParticipantTypeAdminIn
 import com.cactus.bitacora.model.ParticipantTypeAdminOut
 import com.cactus.bitacora.model.ParticipantTypeStatusIn
+import com.cactus.bitacora.model.ActivityCatalogIn
+import com.cactus.bitacora.model.ActivityCatalogOut
+import com.cactus.bitacora.model.ProcessAdminIn
+import com.cactus.bitacora.model.ProcessAdminOut
+import com.cactus.bitacora.model.ProcessDeleteOut
 import com.cactus.bitacora.model.ReservoirSatelliteImageOut
 import com.cactus.bitacora.model.ReservoirSatelliteOut
 import okhttp3.ResponseBody
@@ -59,6 +64,79 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("admin/procesos")
+    suspend fun getAdminProcesses(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String
+    ): List<ProcessAdminOut>
+
+    @GET("admin/procesos/{id}")
+    suspend fun getAdminProcess(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("id") id: Int
+    ): ProcessAdminOut
+
+    @POST("admin/procesos")
+    suspend fun createAdminProcess(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: ProcessAdminIn
+    ): ProcessAdminOut
+
+    @PUT("admin/procesos/{id}")
+    suspend fun updateAdminProcess(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("id") id: Int,
+        @Body payload: ProcessAdminIn
+    ): ProcessAdminOut
+
+    @DELETE("admin/procesos/{id}")
+    suspend fun deleteAdminProcess(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("id") id: Int
+    ): ProcessDeleteOut
+
+    @GET("admin/actividades")
+    suspend fun getAdminActivities(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Query("search") search: String = ""
+    ): List<ActivityCatalogOut>
+
+    @GET("admin/actividades/{id}")
+    suspend fun getAdminActivity(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("id") id: Long
+    ): ActivityCatalogOut
+
+    @POST("admin/actividades")
+    suspend fun createAdminActivity(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: ActivityCatalogIn
+    ): ActivityCatalogOut
+
+    @PUT("admin/actividades/{id}")
+    suspend fun updateAdminActivity(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Path("id") id: Long,
+        @Body payload: ActivityCatalogIn
+    ): ActivityCatalogOut
+
     @GET("admin/jornadas")
     suspend fun getWorkSchedules(
         @Query("search") search: String = "",

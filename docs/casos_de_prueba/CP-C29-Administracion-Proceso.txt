@@ -1,0 +1,656 @@
+CP-C29 Ã¢â‚¬â€ ADMINISTRACIÃƒâ€œN DE PROCESO
+CÃƒÂ³digo documental: CP-C29-ADMINISTRACION-PROCESO
+VersiÃƒÂ³n: 01 Ã¢â‚¬â€ propuesta para ejecuciÃƒÂ³n
+Fecha de elaboraciÃƒÂ³n: 2026-10-08
+Trazabilidad: CU-C29-ADMINISTRACION-PROCESO, versiÃƒÂ³n 01
+Tabla objeto: bitacora.dim_proceso
+Referencia de formato y comportamiento: C16_ADMINISTRACION_AREAS
+Estado general inicial: NO EJECUTADO
+
+1. OBJETIVO
+
+Verificar desde la interfaz Android, API y persistencia efectiva el CRUD de
+bitacora.dim_proceso, su representaciÃƒÂ³n jerÃƒÂ¡rquica, las asociaciones opcionales
+con cat_actividad, la protecciÃƒÂ³n de referencias y el tratamiento de fallos,
+conforme a CU-C29.
+
+Este documento define pruebas. No acredita ejecuciÃƒÂ³n ni autoriza implementar,
+escribir bases de datos, desplegar o instalar aplicaciones.
+
+2. CONDICIONES GENERALES DE EJECUCIÃƒâ€œN
+
+- Identificar antes de ejecutar: ambiente, base efectiva, backend, paquete,
+  versiÃƒÂ³n APK, commit, dispositivo, actor y fecha/hora America/Bogota.
+- Ejecutar solamente en un ambiente de pruebas autorizado y respaldado. Los
+  datos sintÃƒÂ©ticos usarÃƒÂ¡n el prefijo CP-C29 y deberÃƒÂ¡n quedar inventariados.
+- Confirmar mediante SHOW CREATE TABLE la estructura, collation, restricciones,
+  ÃƒÂ­ndices, claves forÃƒÂ¡neas y acciones referenciales reales de dim_proceso.
+- Confirmar las referencias entrantes antes de ejecutar eliminaciones.
+- Registrar estado inicial y final en dim_proceso, cat_actividad y tablas que
+  realmente referencien id_proceso. No asumir relaciones no comprobadas.
+- Las definiciones pendientes del CU Ã¢â‚¬â€unidad de tiempo_estimado, moneda/alcance
+  de costo_estimado, dominio de tipo_proceso y mecanismo de id_procesoÃ¢â‚¬â€ deben
+  resolverse antes de las pruebas que dependan de ellas. Si no estÃƒÂ¡n resueltas,
+  la prueba correspondiente se registra BLOQUEADA, nunca aprobada.
+- Para cada caso conservar capturas Android, solicitudes/respuestas API sin
+  credenciales, registros de backend y consultas antes/despuÃƒÂ©s cuando apliquen.
+- Estado inicial de todos los casos de este documento: NO EJECUTADO.
+
+3. CASOS DE PRUEBA
+
+CP-C29-001 Ã¢â‚¬â€ Acceso autorizado, navegaciÃƒÂ³n, encabezado y nota
+Requisito/regla cubierta: secciones 2 y 6.1; A01.
+Objetivo: comprobar el acceso del Administrador y la presentaciÃƒÂ³n contractual.
+Precondiciones: actor autorizado; sesiÃƒÂ³n vigente; aplicaciÃƒÂ³n conectada al ambiente identificado.
+Datos: actor administrador de prueba autorizado.
+Pasos:
+1. Iniciar sesiÃƒÂ³n como Administrador.
+2. Abrir Administrador Ã¢â€ â€™ navegaciÃƒÂ³n vigente Ã¢â€ â€™ Administrar maestros.
+3. Pulsar Ã‚Â«AdministraciÃƒÂ³n ProcesoÃ‚Â».
+4. Observar encabezado, nota y estado inicial de carga.
+Resultado esperado: aparece el botÃƒÂ³n y se abre Ã‚Â«AdministraciÃƒÂ³n ProcesoÃ‚Â» con la nota exacta Ã‚Â«Organice los procesos por niveles y asocie, cuando corresponda, una actividad del CatÃƒÂ¡logo de ActividadesÃ‚Â»; la consulta se inicia una sola vez.
+Evidencia requerida: captura de la ruta y pantalla; log de la consulta; versiÃƒÂ³n y actor.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-002 Ã¢â‚¬â€ DenegaciÃƒÂ³n de actor sin permiso
+Requisito/regla cubierta: secciÃƒÂ³n 2; A01.
+Objetivo: verificar permisos tanto en interfaz como en servidor.
+Precondiciones: actor autenticado sin permiso de Administrar maestros; endpoint identificado.
+Datos: actor no autorizado de prueba.
+Pasos:
+1. Intentar acceder a C29 desde la interfaz.
+2. Invocar directamente las operaciones de consulta y escritura con ese actor.
+3. Consultar dim_proceso antes y despuÃƒÂ©s.
+Resultado esperado: interfaz no permite administrar; API responde 401/403 segÃƒÂºn contrato; no cambia ningÃƒÂºn registro.
+Evidencia requerida: capturas, cÃƒÂ³digos HTTP, logs y conteos antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-003 Ã¢â‚¬â€ CatÃƒÂ¡logo vacÃƒÂ­o y creaciÃƒÂ³n de la primera raÃƒÂ­z
+Requisito/regla cubierta: secciones 6.3, 6.4 y 9; R05, R14; A02.
+Objetivo: comprobar el inicio del catÃƒÂ¡logo desde cero mediante Android.
+Precondiciones: ambiente aislado preparado sin procesos, sin vaciar datos preexistentes; actor autorizado.
+Datos: id_proceso CP29_ID_RAIZ_1 vÃƒÂ¡lido segÃƒÂºn decisiÃƒÂ³n aprobada; nombre Ã‚Â«CP-C29 RaÃƒÂ­z 1Ã‚Â»; padre NULL.
+Pasos:
+1. Abrir C29 y esperar la carga.
+2. Verificar el mensaje de catÃƒÂ¡logo vacÃƒÂ­o.
+3. Pulsar Ã‚Â«Crear proceso raÃƒÂ­z (+)Ã‚Â».
+4. Completar los datos mÃƒÂ­nimos y guardar.
+5. Salir, volver a entrar y recargar desde el servidor.
+Resultado esperado: el vacÃƒÂ­o no se confunde con error; se crea exactamente una raÃƒÂ­z, queda visible y persiste tras reentrada y recarga; el ÃƒÂ©xito aparece solo despuÃƒÂ©s de confirmaciÃƒÂ³n.
+Evidencia requerida: captura del vacÃƒÂ­o y de la fila; HTTP; fila en dim_proceso; evidencia posterior a reentrada.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-004 Ã¢â‚¬â€ PresentaciÃƒÂ³n del resumen y ÃƒÂ¡rbol interactivo
+Requisito/regla cubierta: secciones 6.2 y 6.3; A03, A04.
+Objetivo: validar preorden, referencias, sangrÃƒÂ­a y controles equivalentes a C16.
+Precondiciones: catÃƒÂ¡logo con al menos dos raÃƒÂ­ces, hermanos y tres niveles.
+Datos: ÃƒÂ¡rbol CP-C29 preparado con nombres y nombre_corto conocidos.
+Pasos:
+1. Abrir C29 con todos los nodos replegados.
+2. Comparar el resumen superior con una consulta jerÃƒÂ¡rquica de referencia.
+3. Expandir sucesivamente raÃƒÂ­z, hijo y nieto pulsando sus nombres.
+4. Replegar en orden inverso.
+5. Inspeccionar cada fila y controles.
+Resultado esperado: resumen de solo lectura con Ã‚Â«ÃƒÂrbol de procesosÃ‚Â» y Ã‚Â«ReferenciaÃ‚Â», sin IDs; padre seguido de descendientes; hermanos por nombre/id; ÃƒÂ¡rbol inferior compacto con + antes del nombre y ojo/lÃƒÂ¡piz/X; nombre expande/repliega sin modificar datos.
+Evidencia requerida: capturas expandida/replegada, consulta ordenada y comparaciÃƒÂ³n fila a fila.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-005 Ã¢â‚¬â€ Consulta de detalle completa
+Requisito/regla cubierta: secciones 5, 6.3 y 8; A05.
+Objetivo: verificar el detalle de todos los campos en modo de solo lectura.
+Precondiciones: proceso con padre, actividad y todos los campos informados.
+Datos: registro CP-C29 conocido.
+Pasos:
+1. Pulsar el ojo del proceso.
+2. Comparar cada valor con dim_proceso.
+3. Intentar editar o guardar desde el detalle.
+Resultado esperado: se muestran los diez campos, nombre del padre y actividad; id_proceso es visible cuando corresponda; no hay ediciÃƒÂ³n ni guardado.
+Evidencia requerida: captura completa del detalle y SELECT del registro.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-006 Ã¢â‚¬â€ Crear raÃƒÂ­z con valores predeterminados
+Requisito/regla cubierta: secciÃƒÂ³n 9; R01, R05, R07, R08, R09.
+Objetivo: validar la creaciÃƒÂ³n raÃƒÂ­z y valores iniciales acordados.
+Precondiciones: mecanismo de id_proceso y dominio de tipo_proceso confirmados; cÃƒÂ³digo/nombre ÃƒÂºnicos.
+Datos: cÃƒÂ³digo CP29_ID_RAIZ_2; nombre Ã‚Â«CP-C29 RaÃƒÂ­z 2Ã‚Â»; padre NULL; opcionales vacÃƒÂ­os.
+Pasos:
+1. Pulsar Ã‚Â«Crear proceso raÃƒÂ­z (+)Ã‚Â».
+2. Verificar valores iniciales.
+3. Completar cÃƒÂ³digo y nombre; guardar.
+4. Consultar dim_proceso y recargar la pantalla.
+Resultado esperado: una fila con padre NULL; tiempo_estimado=0, costo_estimado=0.00 y tipo_proceso=1 cuando esos valores sean los aprobados; opcionales vacÃƒÂ­os como NULL; mensaje Ã‚Â«Proceso creado correctamenteÃ‚Â» tras confirmaciÃƒÂ³n.
+Evidencia requerida: formulario, HTTP, INSERT confirmado y fila final.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-007 Ã¢â‚¬â€ Crear hijo y nieto mediante + por proceso
+Requisito/regla cubierta: secciones 6.3 y 9; R05; A03.
+Objetivo: comprobar la creaciÃƒÂ³n jerÃƒÂ¡rquica con padre precargado.
+Precondiciones: raÃƒÂ­z CP-C29 existente.
+Datos: hijo y nieto con cÃƒÂ³digos, nombres y referencias ÃƒÂºnicos.
+Pasos:
+1. Pulsar + en la raÃƒÂ­z y comprobar el padre precargado.
+2. Crear el hijo.
+3. Pulsar + en el hijo y crear el nieto.
+4. Recargar y expandir la rama.
+Resultado esperado: cada registro aparece una vez bajo el padre correcto; el padre se expande; no hay duplicados ni omisiones.
+Evidencia requerida: formularios, filas de dim_proceso y ÃƒÂ¡rbol final.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-008 Ã¢â‚¬â€ CÃƒÂ³digo obligatorio, ÃƒÂºnico e inmutable
+Requisito/regla cubierta: R01; A06.
+Objetivo: validar identidad manual de id_proceso segÃƒÂºn decisiÃƒÂ³n aprobada.
+Precondiciones: ingreso manual confirmado; proceso existente.
+Datos: cÃƒÂ³digo vacÃƒÂ­o, no entero, fuera de rango y duplicado.
+Pasos:
+1. Intentar crear con cada dato invÃƒÂ¡lido.
+2. Intentar crear con un cÃƒÂ³digo existente.
+3. Abrir ediciÃƒÂ³n de un proceso vÃƒÂ¡lido.
+4. Intentar modificar id_proceso.
+Resultado esperado: datos invÃƒÂ¡lidos/duplicados se rechazan sin escritura; en ediciÃƒÂ³n el cÃƒÂ³digo es solo lectura; no se usa MAX(id_proceso)+1.
+Evidencia requerida: mensajes, HTTP y conteos/valores antes y despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-009 Ã¢â‚¬â€ Nombre obligatorio, trim y lÃƒÂ­mites
+Requisito/regla cubierta: R02; A06.
+Objetivo: verificar obligatoriedad y longitud 1..50 despuÃƒÂ©s de trim.
+Precondiciones: cÃƒÂ³digos ÃƒÂºnicos disponibles.
+Datos: vacÃƒÂ­o, espacios, nombre de 50, nombre de 51 y Ã‚Â«  CP-C29 Nombre  Ã‚Â».
+Pasos:
+1. Intentar guardar vacÃƒÂ­o y solo espacios.
+2. Crear con 50 caracteres.
+3. Intentar crear con 51.
+4. Crear con espacios extremos.
+Resultado esperado: vacÃƒÂ­o/espacios y 51 se rechazan; 50 se acepta; extremos se recortan; no hay truncamiento silencioso.
+Evidencia requerida: mensajes, payloads y filas finales.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-010 Ã¢â‚¬â€ Nombre duplicado y collation real
+Requisito/regla cubierta: R02, R13; A06.
+Objetivo: comprobar unicidad con la comparaciÃƒÂ³n efectiva de MariaDB.
+Precondiciones: SHOW CREATE TABLE y collation documentados; proceso base existente.
+Datos: nombre exacto y variantes de mayÃƒÂºsculas/acentos del nombre base.
+Pasos:
+1. Intentar crear el duplicado exacto.
+2. Probar variantes segÃƒÂºn la collation confirmada.
+3. Repetir al editar otro proceso.
+Resultado esperado: interfaz y servidor coinciden con UNIQUE; cada conflicto se explica; filas previas quedan intactas.
+Evidencia requerida: DDL/collation, respuestas y conteos antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-011 Ã¢â‚¬â€ Referencia opcional, trim, lÃƒÂ­mite y unicidad
+Requisito/regla cubierta: R03; A06, A07.
+Objetivo: validar nombre_corto.
+Precondiciones: procesos de prueba y collation confirmada.
+Datos: NULL en dos procesos; referencia de 100 y 101 caracteres; espacios extremos; duplicado y variante equivalente.
+Pasos:
+1. Crear dos procesos con referencia vacÃƒÂ­a.
+2. Crear con referencia de 100.
+3. Intentar 101.
+4. Crear con espacios extremos.
+5. Intentar duplicado exacto y equivalente.
+Resultado esperado: mÃƒÂºltiples NULL permitidos; vacÃƒÂ­o se guarda NULL; 100 aceptado y 101 rechazado; trim aplicado; duplicados rechazados segÃƒÂºn collation.
+Evidencia requerida: formularios, HTTP y SELECT de nombre_corto.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-012 Ã¢â‚¬â€ DescripciÃƒÂ³n y precondiciÃƒÂ³n opcionales
+Requisito/regla cubierta: R04.
+Objetivo: verificar nulabilidad, lÃƒÂ­mites y tratamiento literal de precondicion.
+Precondiciones: cÃƒÂ³digo/nombre ÃƒÂºnicos.
+Datos: vacÃƒÂ­o, textos de 250 y 251 caracteres; precondiciÃƒÂ³n con texto semejante a SQL.
+Pasos:
+1. Crear con ambos campos vacÃƒÂ­os.
+2. Crear/editar con 250 caracteres.
+3. Intentar 251.
+4. Guardar texto de precondiciÃƒÂ³n y consultar efectos.
+Resultado esperado: vacÃƒÂ­os como NULL; 250 ÃƒÂ­ntegros; 251 rechazado sin truncar; precondiciÃƒÂ³n se guarda como texto y no se ejecuta.
+Evidencia requerida: payloads, respuestas, filas y comprobaciÃƒÂ³n de ausencia de efectos laterales.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-013 Ã¢â‚¬â€ Tiempo estimado
+Requisito/regla cubierta: R07.
+Objetivo: validar NULL, cero, entero positivo y rechazo de negativos/no enteros sin inventar unidad.
+Precondiciones: unidad funcional definida o presentaciÃƒÂ³n neutra aprobada.
+Datos: NULL, 0, 1, valor mÃƒÂ¡ximo INT vÃƒÂ¡lido, -1 y decimal.
+Pasos:
+1. Guardar cada valor vÃƒÂ¡lido en procesos separados o mediante ediciÃƒÂ³n controlada.
+2. Intentar los valores invÃƒÂ¡lidos.
+3. Consultar el detalle y dim_proceso.
+Resultado esperado: se aceptan NULL y enteros no negativos dentro de INT; negativos/no enteros se rechazan; la interfaz no etiqueta horas/minutos sin definiciÃƒÂ³n.
+Evidencia requerida: decisiÃƒÂ³n funcional, capturas, respuestas y SELECT.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-014 Ã¢â‚¬â€ Costo estimado
+Requisito/regla cubierta: R08.
+Objetivo: validar precisiÃƒÂ³n, rango y presentaciÃƒÂ³n sin inventar moneda.
+Precondiciones: moneda/alcance definidos o presentaciÃƒÂ³n numÃƒÂ©rica neutra aprobada.
+Datos: NULL, 0, 0.01, 99999999.99, -0.01, tres decimales y exceso de rango.
+Pasos:
+1. Guardar los valores vÃƒÂ¡lidos.
+2. Intentar negativos, exceso de decimales y rango.
+3. Consultar detalle y base.
+Resultado esperado: NULL y rango no negativo con dos decimales se conservan; invÃƒÂ¡lidos se rechazan sin redondeo/truncamiento silencioso; no se muestra moneda no acordada.
+Evidencia requerida: decisiÃƒÂ³n funcional, payloads, mensajes y SELECT.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-015 Ã¢â‚¬â€ Tipo de proceso
+Requisito/regla cubierta: R09.
+Objetivo: verificar obligatoriedad, predeterminado y dominio aprobado.
+Precondiciones: significado y valores permitidos confirmados contra DDL/datos vigentes.
+Datos: 1, cada valor aprobado, NULL y valor fuera del dominio.
+Pasos:
+1. Crear sin cambiar el predeterminado.
+2. Probar cada valor permitido.
+3. Intentar NULL y valores no permitidos.
+Resultado esperado: predeterminado 1; solo dominio aprobado aceptado; sin etiquetas funcionales inventadas.
+Evidencia requerida: definiciÃƒÂ³n aprobada, DDL/datos, capturas y respuestas.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-016 Ã¢â‚¬â€ AsociaciÃƒÂ³n opcional con actividad y reutilizaciÃƒÂ³n
+Requisito/regla cubierta: R10, R12; A09.
+Objetivo: asociar una actividad existente a varios procesos sin duplicarla.
+Precondiciones: actividad C28 existente; dos procesos; cat_actividad consultable.
+Datos: un id_actividad vÃƒÂ¡lido compartido.
+Pasos:
+1. Seleccionar la actividad en el primer proceso.
+2. Seleccionar la misma actividad en el segundo.
+3. Consultar ambos detalles y cat_actividad.
+4. Retirar la asociaciÃƒÂ³n de uno mediante Ã‚Â«Sin actividadÃ‚Â».
+Resultado esperado: ambos pueden compartir id_actividad; retirar una asociaciÃƒÂ³n deja NULL y no modifica/elimina la actividad ni la otra asociaciÃƒÂ³n.
+Evidencia requerida: filas de dim_proceso y cat_actividad antes/despuÃƒÂ©s; capturas.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-017 Ã¢â‚¬â€ Padre o actividad inexistentes
+Requisito/regla cubierta: R05, R10; excepciones.
+Objetivo: comprobar integridad ante selecciones obsoletas o llamadas directas.
+Precondiciones: IDs inexistentes identificados; ambiente aislado.
+Datos: id_proceso_padre e id_actividad inexistentes.
+Pasos:
+1. Intentar crear/modificar mediante API con padre inexistente.
+2. Repetir con actividad inexistente.
+3. Simular que una opciÃƒÂ³n desaparece despuÃƒÂ©s de abrir el formulario.
+Resultado esperado: guardado rechazado con Ã‚Â«El registro seleccionado ya no existe; actualiceÃ‚Â»; no hay escritura parcial.
+Evidencia requerida: solicitudes/respuestas, logs y SELECT antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-018 Ã¢â‚¬â€ Autoparentesco y ciclos directos/indirectos
+Requisito/regla cubierta: R06; A08.
+Objetivo: impedir que un proceso dependa de sÃƒÂ­ mismo o de descendientes.
+Precondiciones: ÃƒÂ¡rbol raÃƒÂ­zÃ¢â€ â€™hijoÃ¢â€ â€™nieto.
+Datos: IDs del ÃƒÂ¡rbol de prueba.
+Pasos:
+1. Abrir la ediciÃƒÂ³n de la raÃƒÂ­z y revisar el selector.
+2. Intentar asignar la propia raÃƒÂ­z como padre.
+3. Intentar asignar hijo y nieto.
+4. Repetir las solicitudes directamente contra el servidor.
+Resultado esperado: opciones excluidas o rechazadas en UI y servidor; mensaje contractual de ciclo; jerarquÃƒÂ­a intacta.
+Evidencia requerida: selector, respuestas, logs y consulta jerÃƒÂ¡rquica posterior.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-019 Ã¢â‚¬â€ ModificaciÃƒÂ³n vÃƒÂ¡lida conservando identidad
+Requisito/regla cubierta: secciÃƒÂ³n 10; R01, R14; A05.
+Objetivo: editar campos permitidos sin cambiar id_proceso.
+Precondiciones: proceso completo y valores nuevos ÃƒÂºnicos.
+Datos: nombre, descripciÃƒÂ³n, tiempo, costo, tipo, precondiciÃƒÂ³n, actividad y referencia nuevos vÃƒÂ¡lidos.
+Pasos:
+1. Pulsar el lÃƒÂ¡piz.
+2. Verificar id_proceso de solo lectura y valores vigentes.
+3. Cambiar los campos permitidos y guardar.
+4. Recargar y consultar detalle/base.
+Resultado esperado: misma fila e ID con valores nuevos; una sola actualizaciÃƒÂ³n; ambas representaciones se refrescan tras confirmaciÃƒÂ³n.
+Evidencia requerida: antes/despuÃƒÂ©s en UI, HTTP y SELECT.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-020 Ã¢â‚¬â€ Traslado vÃƒÂ¡lido de un subÃƒÂ¡rbol
+Requisito/regla cubierta: secciÃƒÂ³n 10; R05, R06; A05.
+Objetivo: cambiar el padre conservando el proceso y sus descendientes.
+Precondiciones: dos ramas y subÃƒÂ¡rbol de prueba.
+Datos: nodo trasladable y nuevo padre vÃƒÂ¡lido.
+Pasos:
+1. Expandir ambas ramas y registrar el estado.
+2. Editar el nodo y elegir el nuevo padre.
+3. Guardar y recargar.
+4. Expandir la nueva rama y comparar IDs.
+Resultado esperado: nodo y descendientes aparecen bajo el nuevo padre; todos conservan IDs; no hay duplicados, omisiones ni ciclos.
+Evidencia requerida: ÃƒÂ¡rbol antes/despuÃƒÂ©s y consulta jerÃƒÂ¡rquica.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-021 Ã¢â‚¬â€ CancelaciÃƒÂ³n de creaciÃƒÂ³n y modificaciÃƒÂ³n
+Requisito/regla cubierta: secciones 9, 10 y 14.
+Objetivo: comprobar que Cancelar no persiste cambios.
+Precondiciones: conteos y valores iniciales registrados.
+Datos: borrador nuevo y modificaciÃƒÂ³n de un registro existente.
+Pasos:
+1. Diligenciar una creaciÃƒÂ³n y pulsar Cancelar.
+2. Abrir una ediciÃƒÂ³n, cambiar varios campos y cancelar.
+3. Recargar desde servidor y consultar la base.
+Resultado esperado: no se crea el borrador; el proceso existente conserva todos sus valores; no aparece mensaje de ÃƒÂ©xito.
+Evidencia requerida: capturas y SELECT/conteos antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-022 Ã¢â‚¬â€ EliminaciÃƒÂ³n cancelada
+Requisito/regla cubierta: secciÃƒÂ³n 11; A10.
+Objetivo: verificar confirmaciÃƒÂ³n explÃƒÂ­cita y cancelaciÃƒÂ³n segura.
+Precondiciones: hoja sin referencias.
+Datos: proceso CP-C29 eliminable.
+Pasos:
+1. Pulsar X.
+2. Verificar que la confirmaciÃƒÂ³n muestre cÃƒÂ³digo y nombre.
+3. Pulsar Cancelar.
+4. Recargar y consultar dim_proceso.
+Resultado esperado: el registro permanece sin cambios y no se muestra ÃƒÂ©xito de eliminaciÃƒÂ³n.
+Evidencia requerida: diÃƒÂ¡logo y fila antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-023 Ã¢â‚¬â€ EliminaciÃƒÂ³n permitida de hoja sin uso
+Requisito/regla cubierta: secciÃƒÂ³n 11; R11, R12; A10.
+Objetivo: eliminar ÃƒÂºnicamente una hoja sin dependencias.
+Precondiciones: SHOW CREATE TABLE/referencias revisados; hoja sintÃƒÂ©tica sin hijos ni referencias.
+Datos: ID y nombre de la hoja.
+Pasos:
+1. Ejecutar SELECT previo del registro, hijos y referencias.
+2. Pulsar X y confirmar.
+3. Recargar, reiniciar la aplicaciÃƒÂ³n y consultar otra vez.
+4. Verificar tablas relacionadas.
+Resultado esperado: se elimina exactamente esa fila; no reaparece; no se modifica/elimina actividad ni registros relacionados; mensaje Ã‚Â«Proceso eliminado correctamenteÃ‚Â» tras confirmaciÃƒÂ³n.
+Evidencia requerida: SELECT previo/final, HTTP, logs y capturas tras reinicio.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-024 Ã¢â‚¬â€ EliminaciÃƒÂ³n bloqueada por hijos
+Requisito/regla cubierta: secciÃƒÂ³n 11; R11; A10.
+Objetivo: impedir la eliminaciÃƒÂ³n de un proceso padre.
+Precondiciones: proceso con al menos un hijo.
+Datos: padre e hijo CP-C29.
+Pasos:
+1. Registrar padre/hijo en la base.
+2. Pulsar X del padre y confirmar.
+3. Repetir mediante llamada directa autorizada.
+Resultado esperado: Ã‚Â«No se puede eliminar: el proceso tiene subprocesosÃ‚Â»; no hay cascada ni cambios.
+Evidencia requerida: ÃƒÂ¡rbol, respuesta y filas antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-025 Ã¢â‚¬â€ EliminaciÃƒÂ³n bloqueada por referencias entrantes
+Requisito/regla cubierta: secciÃƒÂ³n 11; R11; A10.
+Objetivo: proteger todas las referencias reales impeditivas.
+Precondiciones: referencias entrantes comprobadas; proceso sintÃƒÂ©tico referenciado mediante cada relaciÃƒÂ³n aplicable.
+Datos: ID del proceso y relaciones de prueba.
+Pasos:
+1. Registrar las referencias existentes.
+2. Intentar eliminar desde Android.
+3. Comprobar proceso y relaciones.
+Resultado esperado: eliminaciÃƒÂ³n rechazada con detalle ÃƒÂºtil; ninguna referencia ni proceso se modifica; no hay cascada.
+Evidencia requerida: DDL, consultas de referencias, mensaje, logs y estado final.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-026 Ã¢â‚¬â€ Fallo de carga, reintento y conservaciÃƒÂ³n del catÃƒÂ¡logo
+Requisito/regla cubierta: secciones 6.4 y 13; R14; A12.
+Objetivo: distinguir error de vacÃƒÂ­o y conservar la ÃƒÂºltima informaciÃƒÂ³n vÃƒÂ¡lida.
+Precondiciones: catÃƒÂ¡logo vÃƒÂ¡lido visible; mecanismo controlado para interrumpir el servicio.
+Datos: catÃƒÂ¡logo CP-C29 vigente.
+Pasos:
+1. Registrar el catÃƒÂ¡logo visible.
+2. Interrumpir el servicio y solicitar actualizaciÃƒÂ³n.
+3. Observar estado y datos.
+4. Recuperar servicio y pulsar Reintentar.
+Resultado esperado: error comprensible distinto de vacÃƒÂ­o; catÃƒÂ¡logo previamente vÃƒÂ¡lido no se borra ni se presenta como reciÃƒÂ©n confirmado; Reintentar carga datos reales sin duplicar.
+Evidencia requerida: capturas, logs de red/backend y comparaciÃƒÂ³n antes/despuÃƒÂ©s.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-027 Ã¢â‚¬â€ Fallo de guardado y pÃƒÂ©rdida de respuesta
+Requisito/regla cubierta: secciones 9, 13 y 14; R14; A11.
+Objetivo: impedir falso ÃƒÂ©xito y duplicados cuando no se confirma una escritura.
+Precondiciones: formulario con cÃƒÂ³digo ÃƒÂºnico; mecanismo para simular fallo antes de escritura y pÃƒÂ©rdida de respuesta despuÃƒÂ©s del commit.
+Datos: dos procesos CP-C29 distintos para cada variante.
+Pasos:
+1. Interrumpir antes del commit e intentar guardar.
+2. Verificar mensaje, formulario y base.
+3. Simular commit con respuesta perdida.
+4. Restablecer conexiÃƒÂ³n y reintentar desde el formulario.
+5. Consultar por cÃƒÂ³digo antes de cualquier nuevo intento.
+Resultado esperado: primer fallo no escribe ni muestra ÃƒÂ©xito y conserva datos; tras respuesta perdida se consulta el cÃƒÂ³digo, se reconoce la fila existente con los mismos datos y no se crea otro cÃƒÂ³digo/fila.
+Evidencia requerida: cronologÃƒÂ­a, logs, capturas y conteos exactos.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-028 Ã¢â‚¬â€ Doble pulsaciÃƒÂ³n e idempotencia
+Requisito/regla cubierta: secciÃƒÂ³n 6.4; A11.
+Objetivo: impedir envÃƒÂ­os repetidos desde la interfaz.
+Precondiciones: creaciÃƒÂ³n vÃƒÂ¡lida preparada; red con latencia controlada.
+Datos: cÃƒÂ³digo/nombre ÃƒÂºnicos CP-C29.
+Pasos:
+1. Pulsar Guardar repetidamente durante la solicitud.
+2. Esperar la respuesta y recargar.
+3. Consultar por cÃƒÂ³digo y revisar logs.
+Resultado esperado: controles bloqueados durante la operaciÃƒÂ³n; una solicitud efectiva y una fila; un solo mensaje de ÃƒÂ©xito.
+Evidencia requerida: video/capturas, trÃƒÂ¡fico y conteo en base.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-029 Ã¢â‚¬â€ Concurrencia de creaciÃƒÂ³n y unicidad
+Requisito/regla cubierta: R01, R02, R03, R13; A11.
+Objetivo: validar conflictos simultÃƒÂ¡neos mediante dos clientes.
+Precondiciones: dos sesiones/clientes autorizados equivalentes.
+Datos: mismo cÃƒÂ³digo; luego cÃƒÂ³digos distintos con mismo nombre; luego misma referencia.
+Pasos:
+1. Enviar simultÃƒÂ¡neamente cada par de creaciones.
+2. Registrar respuestas.
+3. Consultar filas y auditorÃƒÂ­a.
+Resultado esperado: en cada conflicto solo una operaciÃƒÂ³n se confirma; la otra recibe mensaje comprensible; no hay duplicados ni escrituras parciales.
+Evidencia requerida: mÃƒÂ©todo de concurrencia, respuestas, logs y conteos.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-030 Ã¢â‚¬â€ EdiciÃƒÂ³n concurrente o registro eliminado durante ediciÃƒÂ³n
+Requisito/regla cubierta: secciÃƒÂ³n 10; A11.
+Objetivo: impedir sobrescritura silenciosa y actualizaciÃƒÂ³n de registros inexistentes.
+Precondiciones: dos clientes; mecanismo de control de concurrencia definido por implementaciÃƒÂ³n.
+Datos: proceso editable CP-C29.
+Pasos:
+1. Abrir el mismo proceso en ambos clientes.
+2. Guardar un cambio desde el primero.
+3. Intentar guardar datos obsoletos desde el segundo.
+4. Repetir eliminando el registro antes del segundo guardado.
+Resultado esperado: conflicto informado y recarga; no se sobrescribe silenciosamente; registro eliminado produce no disponible/404 y no se recrea ni afecta otro ID.
+Evidencia requerida: cronologÃƒÂ­a, payloads/respuestas, logs y estado final.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-031 Ã¢â‚¬â€ Datos jerÃƒÂ¡rquicos inconsistentes al cargar
+Requisito/regla cubierta: secciones 8 y 13.
+Objetivo: tratar huÃƒÂ©rfanos/ciclos preexistentes sin ocultar registros ni agravar datos.
+Precondiciones: ambiente aislado y procedimiento autorizado para preparar cada inconsistencia.
+Datos: huÃƒÂ©rfano y ciclo sintÃƒÂ©ticos identificados.
+Pasos:
+1. Preparar y documentar cada inconsistencia.
+2. Abrir C29 y observar resumen/ÃƒÂ¡rbol.
+3. Abrir detalle del afectado.
+4. Intentar una modificaciÃƒÂ³n que agrave el problema.
+Resultado esperado: inconsistencia informada; registros afectados visibles/consultables mediante reserva segura; cambios agravantes bloqueados; aplicaciÃƒÂ³n no entra en recursiÃƒÂ³n infinita ni se cierra.
+Evidencia requerida: datos preparados, capturas, logs y ausencia de ANR/crash.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-032 Ã¢â‚¬â€ Persistencia y actualizaciÃƒÂ³n despuÃƒÂ©s de reinicio
+Requisito/regla cubierta: R14; A02, A12.
+Objetivo: comprobar permanencia de operaciones confirmadas y actualizaciÃƒÂ³n al reconectar.
+Precondiciones: creaciÃƒÂ³n y modificaciÃƒÂ³n confirmadas; estado local registrado.
+Datos: procesos CP-C29 conocidos.
+Pasos:
+1. Salir de C29 y volver a entrar.
+2. Forzar cierre y reiniciar la aplicaciÃƒÂ³n.
+3. Consultar con el estado de conectividad admitido por la implementaciÃƒÂ³n.
+4. Reconectar y actualizar desde servidor.
+Resultado esperado: datos confirmados permanecen sin duplicados; si se muestra catÃƒÂ¡logo local se identifica como no actualizado; al reconectar coincide con servidor.
+Evidencia requerida: capturas antes/despuÃƒÂ©s, base efectiva y almacenamiento local si existe.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-033 Ã¢â‚¬â€ Ausencia de efectos en BPM y tablas no autorizadas
+Requisito/regla cubierta: objetivo/secciÃƒÂ³n 1; R12; postcondiciones; A13.
+Objetivo: demostrar que el CRUD C29 solo produce efectos previstos.
+Precondiciones: inventario y conteos/huellas de tablas BPM, bitÃƒÂ¡coras y actividades.
+Datos: operaciÃƒÂ³n completa crear-consultar-modificar-eliminar sobre un proceso sin uso.
+Pasos:
+1. Registrar estado inicial de tablas protegidas.
+2. Ejecutar el CRUD C29 controlado.
+3. Comparar estado final y auditorÃƒÂ­a.
+Resultado esperado: no se crean/ejecutan bpm_proceso, etapas, transiciones o casos; no se modifica cat_actividad ni bitÃƒÂ¡coras; id_proceso nunca se intercambia con id_bpm_proceso.
+Evidencia requerida: consultas comparativas, logs y diff de datos.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-034 Ã¢â‚¬â€ RegresiÃƒÂ³n C16 AdministraciÃƒÂ³n de ÃƒÂ¡reas
+Requisito/regla cubierta: R14; A13.
+Objetivo: comprobar que C29 no altera C16 ni su presentaciÃƒÂ³n aceptada.
+Precondiciones: versiÃƒÂ³n C16 identificada y catÃƒÂ¡logo disponible.
+Datos: ÃƒÂ¡reas existentes; no crear fixtures salvo autorizaciÃƒÂ³n de ejecuciÃƒÂ³n.
+Pasos:
+1. Abrir Administrar maestros Ã¢â€ â€™ ÃƒÂreas administrativas.
+2. Verificar resumen superior, ÃƒÂ¡rbol inferior, Ã‚Â«Adicionar ÃƒÂ¡rea raÃƒÂ­zÃ‚Â», + por ÃƒÂ¡rea, ojo/lÃƒÂ¡piz/X y expansiÃƒÂ³n por nombre.
+3. Consultar sin modificar datos.
+Resultado esperado: C16 conserva tipografÃƒÂ­a compacta, orden, jerarquÃƒÂ­a y controles; no presenta regresiones.
+Evidencia requerida: capturas y referencia de versiÃƒÂ³n.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-035 Ã¢â‚¬â€ RegresiÃƒÂ³n C28 CatÃƒÂ¡logo de Actividades
+Requisito/regla cubierta: R10, R12; A13.
+Objetivo: comprobar que C29 consume C28 sin modificar su CRUD ni catÃƒÂ¡logo.
+Precondiciones: C28 disponible y una actividad existente.
+Datos: actividad conocida, consulta ÃƒÂºnicamente.
+Pasos:
+1. Abrir CatÃƒÂ¡logo de Actividades.
+2. Verificar nota, consulta, bÃƒÂºsqueda y detalle.
+3. Regresar a C29 y comprobar el selector de actividad.
+4. Comparar cat_actividad antes/despuÃƒÂ©s.
+Resultado esperado: C28 funciona sin regresiÃƒÂ³n; C29 lista actividades existentes pero no ofrece crearlas; cat_actividad no cambia.
+Evidencia requerida: capturas y SELECT comparativo.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+CP-C29-036 Ã¢â‚¬â€ Recorrido fÃƒÂ­sico integral Android
+Requisito/regla cubierta: A14 y criterio general de aceptaciÃƒÂ³n.
+Objetivo: acreditar el CRUD completo en el dispositivo, no solo mediante API.
+Precondiciones: CP-C29-001 a CP-C29-035 aplicables aprobadas; APK, backend, base y dispositivo identificados; respaldo y fixtures controlados.
+Datos: conjunto final CP-C29 de raÃƒÂ­z, hijo, nieto, actividad y hoja eliminable.
+Pasos:
+1. Desde Android abrir C29 y consultar resumen/ÃƒÂ¡rbol/detalle.
+2. Crear raÃƒÂ­z, hijo y nieto.
+3. Modificar datos y trasladar el subÃƒÂ¡rbol.
+4. Asociar y retirar una actividad.
+5. Cancelar y luego completar una eliminaciÃƒÂ³n permitida.
+6. Probar una eliminaciÃƒÂ³n bloqueada.
+7. Reiniciar la aplicaciÃƒÂ³n y volver a consultar.
+Resultado esperado: recorrido completo conforme al CU, persistencia efectiva, mensajes correctos, jerarquÃƒÂ­a consistente y ausencia de duplicados o efectos laterales.
+Evidencia requerida: video/capturas por operaciÃƒÂ³n, logcat, trÃƒÂ¡fico API, logs backend y consultas finales.
+Resultado obtenido: PENDIENTE.
+Estado: NO EJECUTADO.
+
+4. MATRIZ DE TRAZABILIDAD RESUMIDA
+
+- A01: CP-C29-001, 002.
+- A02: CP-C29-003, 032.
+- A03: CP-C29-004, 007.
+- A04: CP-C29-004.
+- A05: CP-C29-005, 019, 020.
+- A06: CP-C29-008 a 012.
+- A07: CP-C29-011, 012.
+- A08: CP-C29-017, 018.
+- A09: CP-C29-016.
+- A10: CP-C29-022 a 025.
+- A11: CP-C29-027 a 030.
+- A12: CP-C29-026, 032.
+- A13: CP-C29-033 a 035.
+- A14: CP-C29-036.
+- R01Ã¢â‚¬â€œR14: cubiertas por CP-C29-003 a 035 segÃƒÂºn la trazabilidad individual.
+
+5. CRITERIO DE CIERRE
+
+- Cada prueba aplicable debe registrar resultado obtenido, estado y evidencia real.
+- Estados permitidos al ejecutar: APROBADO, FALLIDO, BLOQUEADO o NO EJECUTADO.
+- Una prueba no ejecutada, fallida o bloqueada no puede presentarse como aprobada.
+- Las pruebas dependientes de una definiciÃƒÂ³n pendiente permanecen BLOQUEADAS hasta
+  que Patricia apruebe la decisiÃƒÂ³n correspondiente.
+- C29 no se declara validada con pruebas exclusivas de API: CP-C29-036 debe estar
+  ejecutada fÃƒÂ­sicamente en Android y Patricia conserva la autoridad para declarar
+  el estado VALIDADA.
+6. EJECUCIÓN — 2026-10-08
+
+Versión probada: rama `C29-administracion-proceso`; APK aislada
+`com.cactus.bitacora.c29test`, versionCode 51, versión
+`maria51-c29-administracion-proceso`; V2035 `3065397347006YM`; backend
+`/bitacora-c29-test/`; bases efectivas `bitacora_c29_empty` y
+`bitacora_c29_test`; actor físico `p0002`. Producción no fue intervenida.
+
+Definición resuelta: `tipo_proceso` solo permite `1`; Android lo asigna y lo
+muestra de solo lectura. El backend rechazó `2` con HTTP 422.
+
+Matriz de resultados:
+
+| Casos | Estado | Evidencia resumida |
+|---|---|---|
+| 001–007 | APROBADOS | Acceso, vacío real, primera raíz persistente, árbol, detalle y raíz–hijo–nieto físicos. |
+| 008–015 | APROBADOS | Identidad, trim, longitudes, UNIQUE, nulos, rangos, precisión y tipo único verificados en UI/API/MariaDB. |
+| 016–020 | APROBADOS | Actividad compartida/retirada, FKs, ciclos, modificación y traslado físico. |
+| 021–025 | APROBADOS | Cancelaciones, eliminación de hoja y bloqueos por hijos/referencias. |
+| 026–030 | APROBADOS | Pérdida de servicio, reintentos, doble envío, concurrencia y huella obsoleta/404. |
+| 031–033 | APROBADOS | Ciclo preexistente advertido sin ANR, reinicio y ausencia de efectos laterales. |
+| 034–036 | APROBADOS | Regresiones físicas C16/C28 y CRUD integral Android. |
+
+Totales: 36 APROBADOS, 0 FALLIDOS, 0 BLOQUEADOS, 0 NO EJECUTADOS.
+
+Resultados físicos destacados:
+- CP-003: `bitacora_c29_empty` empezó con cero filas; Android creó 99029101
+  con padre NULL, tiempo 0, costo 0.00 y tipo 1; persistió tras force-stop.
+- CP-007/016/019/020: 99029201–99029203 formaron tres niveles; el nieto se
+  trasladó a la raíz, usó y retiró actividad 1, y cambió tiempo a 7.
+- CP-021/022/023/024: cancelar no escribió; la hoja se eliminó; el padre se
+  conservó mostrando «No se puede eliminar: el proceso tiene subprocesos».
+- CP-026/027: con el servicio detenido no hubo falso éxito ni escritura; el
+  catálogo se conservó y el reintento creó exactamente 99029210.
+- CP-031: ciclo 99029401↔99029402 se mostró y advirtió; se retiró después.
+
+Evidencias: `docs/evidencias/C29/`, `tests/integration_c29_isolated.py`,
+`tests/integration_c29_rules_isolated.py` y reportes Gradle.
+
+Incidencias corregidas:
+1. Creación raíz: dos nulos se confundían con autoparentesco; se exigió ID actual.
+2. APK inicial sin credencial aislada: recompilada sin imprimir/versionar secretos.
+3. HTTP 409 oculto: ahora `detail` aparece dentro del diálogo.
+4. Ciclos heredados: detección por ascendencia y regresión focal.
+
+Corrección preexistente separada: `BitacoraQueryPolicyTest` tenía `@Test` sobre
+un auxiliar parametrizado, literales dañados y URL productiva fija. Se corrigió
+solo la infraestructura de prueba; no altera C29 ni Consulta en ejecución.
+
+Fixtures inventariados: 99029101 queda en `bitacora_c29_empty`; 99029201,
+99029202 y 99029210 quedan en `bitacora_c29_test`; 99029203 fue eliminado por
+la prueba. Ciclos 990294xx y reglas 990293xx quedaron en cero.
+
+- Al finalizar se deben inventariar y retirar ÃƒÂºnicamente los fixtures autorizados,
+  previa comprobaciÃƒÂ³n de sus relaciones y conforme al procedimiento de datos.
