@@ -1,0 +1,255 @@
+CU-C31-XML2ER — Importar definición XML al modelo relacional BPM
+Versión documental: 1.0
+Fecha: 2026-10-09
+Proyecto: Bitácora / ERPWizard
+Estado: ESPECIFICADO; implementación y pruebas no ejecutadas.
+Autor solicitante: Patricia Amézquita
+
+1. OBJETIVO
+Permitir que un administrador autorizado seleccione un XML de definición de proceso, lo valide y cargue de forma consistente en cat_actividad, dim_proceso, bpm_proceso, bpm_etapa y bpm_transicion de la base bitacora.
+
+XML2ER significa transformar una definición XML en registros del modelo entidad-relación existente. El XML describe el proceso; este CU no ejecuta sus actividades ni evalúa sus decisiones sobre casos reales.
+
+2. ALCANCE Y RELACIÓN CON OTROS CASOS
+Entrada: archivo XML conforme al contrato de la sección 10.
+Salida: definición relacional completa, reporte de validación y correspondencia de referencias XML con identificadores de base.
+Catálogos compartidos: cat_actividad y dim_proceso crecen incrementalmente; los registros compatibles existentes se reutilizan.
+Definición versionada: bpm_proceso, bpm_etapa y bpm_transicion.
+No se escriben bpm_caso, bpm_actividad, bpm_enlace_actividad, bitacora_diaria ni novedades.
+No se vacían tablas, no se eliminan definiciones anteriores y no se cambia el esquema durante la importación.
+La ejecución de procesos pertenece a otro caso de uso.
+Este documento usa la denominación solicitada CU-C31-XML2ER. No presupone que sea equivalente al anterior CU30 Normaliza Proceso: su relación deberá registrarse en el índice documental del proyecto sin sobrescribir ese documento.
+
+3. ACTORES
+Principal: Administrador o gerente con permiso explícito para importar definiciones BPM.
+Secundarios: aplicación Bitácora, backend importador y MariaDB.
+El backend verifica el permiso; ocultar un botón no sustituye esa verificación.
+rol_responsable describe un rol; no es el identificador de una persona.
+
+4. ACTIVACIÓN Y PANTALLA
+Ruta propuesta: Administrador > Administrar maestros > XML2ER.
+Controles: Seleccionar XML, Validar, Importar y Cancelar.
+Mostrar nombre del archivo, proceso, versión y base/entorno de destino antes de importar.
+Validar muestra errores y una vista previa por tabla: nuevos, reutilizados y conflictos.
+Importar se habilita únicamente con validación satisfactoria.
+Cambiar el archivo invalida la validación anterior.
+La lectura puede hacerse desde el selector de archivos Android; el backend conserva la autoridad sobre validación y escritura.
+Sin conexión se puede seleccionar el archivo, pero no declarar validación de base ni importación exitosa.
+
+5. PRECONDICIONES
+P01. Usuario identificado y autorizado.
+P02. Conexión disponible con backend y base de destino.
+P03. Existen las cinco tablas y sus restricciones son compatibles con el mapeo.
+P04. Todas las tablas de escritura admiten transacciones.
+P05. XML legible, UTF-8, no vacío y dentro de límites publicados.
+P06. No se exige que las tablas estén vacías.
+P07. Antes de implementar se verificará el DDL efectivo: la fuente documental usada es Texto pegado(7).txt, con SHOW CREATE TABLE de bitacora del 6 de octubre. Este CU no certifica el estado actual del servidor.
+
+6. POSTCONDICIONES
+Éxito: todas las referencias están resueltas y la versión está íntegramente persistida.
+Reimportación equivalente: no se insertan duplicados y se informa SIN CAMBIOS.
+Error o cancelación antes del commit: ninguna modificación de las cinco tablas queda confirmada.
+Los datos previos y las versiones utilizadas por casos permanecen intactos.
+
+7. FLUJO PRINCIPAL
+F01. Actor abre XML2ER.
+F02. Sistema muestra destino y permite seleccionar archivo.
+F03. Sistema lee el XML con parser seguro y calcula su huella para trazabilidad.
+F04. Sistema comprueba sintaxis y versión del contrato.
+F05. Sistema construye en memoria actividades, jerarquía, proceso, etapas y transiciones.
+F06. Sistema valida atributos, longitudes, tipos, duplicados y referencias.
+F07. Sistema valida árbol y grafo BPM.
+F08. Sistema consulta la base y determina altas, reutilizaciones y conflictos.
+F09. Sistema presenta vista previa; todavía no escribe en las cinco tablas.
+F10. Actor pulsa Importar.
+F11. Backend vuelve a comprobar autorización, contenido y conflictos dentro de una transacción; una vista previa no garantiza que la base siga igual.
+F12. Inserta actividades nuevas y resuelve sus IDs.
+F13. Inserta nodos nuevos de dim_proceso en orden padre-descendientes.
+F14. Inserta bpm_proceso y obtiene id_bpm_proceso.
+F15. Inserta etapas con id_etapa igual al id_proceso resuelto.
+F16. Inserta transiciones con los extremos de esa misma versión.
+F17. Verifica cantidades, referencias y consistencia; confirma la transacción.
+F18. Devuelve IMPORTADO, identificadores y cantidades por tabla.
+F19. Aplicación muestra el resultado y permite consultar la definición.
+
+8. REGLAS DE NEGOCIO Y REQUISITOS
+R01. Solo se acepta el contrato XML explícito de este CU. Un XML BPMN de bpmn.io no se interpreta automáticamente como este formato: requiere conversión documentada y validada.
+R02. Se rechazan DOCTYPE, entidades externas, resolución de red, XInclude y contenido ejecutable. Límite propuesto: 5 MiB por archivo, profundidad 64 y 10.000 elementos; el sistema debe publicar el límite efectivo.
+R03. Elementos y atributos desconocidos se rechazan para evitar pérdida silenciosa. No se ejecuta SQL ni código incluido en el archivo.
+R04. Los nombres obligatorios no están vacíos ni tienen espacios extremos. La comparación de unicidad sigue la collation efectiva de cada tabla, también dentro del lote.
+R05. Se rechaza toda longitud excedida; nunca se trunca silenciosamente.
+R06. Las referencias XML son claves locales del archivo, únicas dentro de su sección. No son IDs autoincrementales de la base.
+R07. cat_actividad se identifica por nombre único. Si existe con descripción equivalente se reutiliza. Si difiere, se informa conflicto; este CU no modifica actividades compartidas.
+R08. Un nodo dim_proceso se identifica por id_proceso explícito. nombre y nombre_corto también deben respetar sus índices únicos. Si el ID existe, todos sus campos de negocio deben coincidir para reutilizarlo; cualquier diferencia es conflicto.
+R09. Cada id_proceso debe ser entero entre 0 y 2147483647. No se asigna mediante MAX(id)+1. id_proceso e id_bpm_proceso pertenecen a dominios diferentes.
+R10. id_proceso_padre se resuelve desde padre_ref. Debe existir en el XML o en la base mediante una referencia explícita declarada. Se rechazan autorreferencia y ciclos, incluyendo los que involucren nodos existentes.
+R11. Los nodos raíz tienen padre NULL. Se admiten varias raíces porque dim_proceso es un catálogo jerárquico compartido.
+R12. id_actividad de dim_proceso puede ser NULL para agrupadores. Una misma actividad puede aparecer en varios nodos; no se impone unicidad sobre ese campo.
+R13. tipo_proceso=1 para nodos nuevos, conforme al contrato funcional vigente de C29. El importador no usa XML para eludir esa regla ni cambiar tipos existentes.
+R14. tiempo_estimado es entero no negativo; costo_estimado y plazo_horas son decimales no negativos, sin exceder DECIMAL(10,2). La unidad de tiempo_estimado no está expresada en el DDL: este CU conserva la unidad adoptada por C29 y no la convierte ni la equipara a plazo_horas.
+R15. bpm_proceso se identifica por (nombre, version); version es entero positivo dentro de INT UNSIGNED.
+R16. Una versión existente e idéntica se reutiliza sin cambios. Una versión existente con definición diferente se rechaza y se solicita un número de versión nuevo. No se sobrescriben sus etapas o transiciones.
+R17. Una nueva versión puede reutilizar catálogos compatibles. Para cambiar un nodo compartido se requiere otro id_proceso y nombres únicos, o un caso de mantenimiento separado; cambiar la versión BPM no copia ni protege automáticamente dim_proceso.
+R18. id_etapa NO es autoincremental: es el id_proceso del nodo referenciado. Dentro de una versión, un nodo corresponde a una sola etapa. Dos etapas distintas deben utilizar nodos distintos, aunque reutilicen la misma actividad.
+R19. Debe haber exactamente una etapa inicial y al menos una final. Para este contrato, inicial y final no pueden ser la misma etapa.
+R20. Cada etapa no final debe tener actividad y rol_responsable válido conforme al catálogo de roles de la aplicación. Una etapa final puede ser un estado de cierre sin actividad y con rol NULL.
+R21. Toda etapa debe ser alcanzable desde la inicial y tener un camino hacia una etapa final, considerando transiciones activas. Una final no tiene transiciones salientes. Se admiten ciclos de devolución siempre que exista un camino de salida a cierre.
+R22. Toda transición referencia etapas de su mismo proceso. No puede unir versiones o procesos diferentes. Se rechazan transiciones con origen igual a destino y duplicados semánticos de origen, destino, regla y resultado.
+R23. codigo_regla tiene de 1 a 300 caracteres; resultado, si existe, máximo 100. El nombre de columna es codigo_regla, no condicion_regla.
+R24. Las reglas se validan como códigos/expresiones de un lenguaje permitido del motor; SIEMPRE es la regla incondicional. Una regla desconocida se rechaza. No se evalúa sobre datos reales durante la importación. No se usa eval ni ejecución arbitraria.
+R25. Este contrato describe flujo secuencial y decisiones exclusivas; no representa ejecución paralela. Varias salidas de una etapa deben tener resultados distintos y condiciones compatibles con selección exclusiva. No se permiten varias salidas SIEMPRE sin discriminador. La exclusividad de expresiones arbitrarias no puede presumirse: reglas no verificables se rechazan.
+R26. activo y banderas admiten solo 0 o 1. Para este contrato las transiciones importadas deben estar activas; cambios de estado de transiciones requieren mantenimiento separado. bpm_proceso puede importarse inactivo para revisión.
+R27. Importar activo=1 conserva ese estado; no crea casos ni dispara actividades. No desactiva otras versiones automáticamente.
+R28. La importación es atómica para todo el documento. Un error tardío revierte también las altas de catálogos.
+R29. No se deshabilitan FKs ni CHECK, ni se usan REPLACE, INSERT IGNORE o truncamientos para ocultar conflictos.
+R30. La concurrencia debe resolverse con transacción, restricciones y un mecanismo de serialización de importaciones compartido por todos los importadores. Ante competencia se relee y valida; no se acepta carga parcial.
+R31. La idempotencia se comprueba comparando la definición persistida completa, con IDs técnicos autogenerados y fecha_creacion excluidos. Orden XML y formato de sangría no cambian la equivalencia; valores de negocio sí.
+R32. Si se pierde la respuesta tras el commit, reintentar produce SIN CAMBIOS cuando la definición ya existe. No se declara fracaso definitivo sin consultar el resultado persistido.
+R33. La huella del archivo es evidencia, no sustituye la comparación semántica. Guardar evidencia mediante el mecanismo de auditoría existente; no se presupone una columna hash en estas cinco tablas.
+
+9. MAPEO XML → TABLAS
+cat_actividad:
+  actividad/@ref: clave local; no se guarda como columna.
+  actividad/@nombre → nombre VARCHAR(100), obligatorio.
+  actividad/descripcion → descripcion TEXT, opcional, dentro del límite de bytes efectivo de TEXT.
+  id_actividad: generado por MariaDB o resuelto por reutilización.
+
+dim_proceso:
+  nodo/@ref: clave local.
+  nodo/@id_proceso → id_proceso INT, obligatorio.
+  nodo/@nombre → nombre VARCHAR(50), obligatorio y único.
+  nodo/@nombre_corto → nombre_corto VARCHAR(100), opcional y único si no es NULL.
+  nodo/descripcion → descripcion VARCHAR(250), opcional.
+  nodo/@padre_ref → id_proceso_padre; opcional.
+  nodo/@actividad_ref → id_actividad resuelto; opcional.
+  nodo/@tiempo_estimado → tiempo_estimado; omisión: 0.
+  nodo/@costo_estimado → costo_estimado; omisión: 0.00.
+  nodo/@tipo_proceso → tipo_proceso; omisión: 1.
+  nodo/precondicion → precondicion VARCHAR(250), opcional.
+  padre_id y actividad_nombre permiten referenciar registros existentes que no se declaran en el XML; son alternativas excluyentes de padre_ref y actividad_ref respectivamente.
+
+bpm_proceso:
+  proceso/@nombre → nombre VARCHAR(100).
+  proceso/@version → version INT UNSIGNED.
+  proceso/descripcion → descripcion TEXT.
+  proceso/@activo → activo; omisión: 1.
+  id_bpm_proceso y fecha_creacion: generados por la base.
+
+bpm_etapa:
+  etapa/@ref: clave local.
+  etapa/@nodo_ref → id_etapa = dim_proceso.id_proceso.
+  etapa/@nodo_id: alternativa para un nodo existente; excluyente de nodo_ref.
+  etapa/@rol_responsable → rol_responsable VARCHAR(100), opcional según R20.
+  etapa/@plazo_horas → plazo_horas DECIMAL(10,2), omisión: NULL.
+  etapa/@es_inicial / @es_final → banderas; omisión: 0.
+  id_bpm_proceso: obtenido del proceso contenedor.
+
+bpm_transicion:
+  transicion/@ref: clave local para diagnósticos.
+  transicion/@origen_ref / @destino_ref → IDs de etapas resueltos.
+  transicion/@codigo_regla → codigo_regla; omisión: SIEMPRE.
+  transicion/@resultado → resultado; omisión: NULL.
+  transicion/@activo → activo; omisión: 1.
+  id_transicion: generado por MariaDB.
+  id_bpm_proceso: obtenido del proceso contenedor.
+En campos opcionales, ausencia significa NULL salvo default explícito. Cadena vacía no se convierte silenciosamente en NULL. Los hijos descripcion y precondicion contienen texto simple; no HTML ejecutable.
+
+10. CONTRATO XML PROPUESTO Y EJEMPLO
+Este contrato es una propuesta explícita para implementar XML2ER; no afirma que un XML previo ya tenga esta estructura.
+Un documento contiene una sección de actividades, una de nodos y exactamente un proceso con sus etapas y transiciones.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<definicion_proceso contrato_version="1">
+  <actividades>
+    <actividad ref="a_registrar" nombre="Registrar excusa">
+      <descripcion>Registrar la excusa y sus soportes.</descripcion>
+    </actividad>
+    <actividad ref="a_validar" nombre="Validar excusa">
+      <descripcion>Recursos Humanos revisa los soportes.</descripcion>
+    </actividad>
+  </actividades>
+  <nodos>
+    <nodo ref="n_raiz" id_proceso="9000" nombre="Excusas_v1"
+          nombre_corto="EXCUSAS_V1" tipo_proceso="1"/>
+    <nodo ref="n_registrar" id_proceso="9001" nombre="Excusas_v1_Registrar"
+          nombre_corto="EXC_V1_REG" padre_ref="n_raiz"
+          actividad_ref="a_registrar" tipo_proceso="1"/>
+    <nodo ref="n_validar" id_proceso="9002" nombre="Excusas_v1_Validar"
+          nombre_corto="EXC_V1_VAL" padre_ref="n_raiz"
+          actividad_ref="a_validar" tipo_proceso="1"/>
+    <nodo ref="n_aceptada" id_proceso="9003" nombre="Excusas_v1_Aceptada"
+          nombre_corto="EXC_V1_ACEP" padre_ref="n_raiz" tipo_proceso="1"/>
+    <nodo ref="n_rechazada" id_proceso="9004" nombre="Excusas_v1_Rechazada"
+          nombre_corto="EXC_V1_RECH" padre_ref="n_raiz" tipo_proceso="1"/>
+  </nodos>
+  <proceso nombre="Validacion_Excusa" version="1" activo="0">
+    <descripcion>Ejemplo de definición; no ejecuta novedades.</descripcion>
+    <etapas>
+      <etapa ref="e_registrar" nodo_ref="n_registrar"
+             rol_responsable="supervisor" es_inicial="1"/>
+      <etapa ref="e_validar" nodo_ref="n_validar"
+             rol_responsable="supervisor_RH" plazo_horas="24.00"/>
+      <etapa ref="e_aceptada" nodo_ref="n_aceptada" es_final="1"/>
+      <etapa ref="e_rechazada" nodo_ref="n_rechazada" es_final="1"/>
+    </etapas>
+    <transiciones>
+      <transicion ref="t_presentar" origen_ref="e_registrar"
+                  destino_ref="e_validar" codigo_regla="SIEMPRE"/>
+      <transicion ref="t_aceptar" origen_ref="e_validar"
+                  destino_ref="e_aceptada" codigo_regla="SIEMPRE"
+                  resultado="ACEPTADA"/>
+      <transicion ref="t_rechazar" origen_ref="e_validar"
+                  destino_ref="e_rechazada" codigo_regla="SIEMPRE"
+                  resultado="RECHAZADA"/>
+    </transiciones>
+  </proceso>
+</definicion_proceso>
+
+Semántica de las dos últimas transiciones: se filtran primero por resultado de la etapa; solo la transición con resultado coincidente es elegible. SIEMPRE no elimina ese filtro.
+Los IDs 9000–9004 son ilustrativos: deben estar libres o coincidir íntegramente con los registros existentes. Los roles deben resolverse conforme a los códigos efectivos de la aplicación.
+Resultado esperado si todo es nuevo: 2 actividades, 5 nodos, 1 proceso, 4 etapas y 3 transiciones. Las etapas usarán IDs 9001–9004; el nodo 9000 es agrupador y no etapa.
+Este ejemplo simplificado no sustituye el proceso completo de EnfermedadComún.
+
+11. ALTERNATIVAS Y ERRORES
+A01. XML mal formado: informar línea y columna; no escribir.
+A02. Contrato desconocido o XML BPMN sin conversión: explicar formato esperado.
+A03. Campo inválido: informar referencia, ruta XML, campo, valor permitido y límite.
+A04. Referencia ausente, duplicada o ambigua: impedir importación.
+A05. Nombre/ID existente con datos incompatibles: listar diferencias; no sobrescribir.
+A06. Versión equivalente existente: devolver SIN CAMBIOS con IDs existentes.
+A07. Versión diferente con el mismo nombre y número: rechazar; indicar nueva versión.
+A08. Grafo inválido o regla desconocida: identificar etapa/transición responsable.
+A09. Base incompatible: informar tabla/restricción; no crear columnas automáticamente.
+A10. Concurrencia o fallo de base: rollback; permitir revalidar y reintentar.
+A11. Cancelación antes de Importar: no se escriben datos.
+A12. Pérdida de conexión con resultado incierto: mostrar VERIFICACIÓN PENDIENTE y consultar/reintentar idempotentemente.
+A13. Acceso no autorizado: denegar sin escritura.
+
+12. RESULTADO Y TRAZABILIDAD
+Estados visibles: SELECCIONADO, VALIDANDO, CON ERRORES, VALIDADO, IMPORTANDO, IMPORTADO, SIN CAMBIOS y VERIFICACIÓN PENDIENTE.
+Reporte: usuario, fecha/hora, entorno/base, archivo, huella, nombre/versión del proceso, estado, errores y cantidades por tabla.
+Correspondencia: actividad.ref → id_actividad; nodo.ref → id_proceso; etapa.ref → id_etapa; transicion.ref → id_transicion; proceso → id_bpm_proceso.
+No afirmar éxito por recibir HTTP 200: se exige confirmación explícita del commit y resultado consistente.
+El reporte distingue validación documental, validación contra base e importación confirmada.
+
+13. CRITERIOS DE ACEPTACIÓN
+CA01. XML válido carga exactamente las cinco tablas con referencias correctas.
+CA02. El ejemplo produce las cantidades y los IDs de etapa indicados.
+CA03. Validar y Cancelar no modifican las cinco tablas.
+CA04. Catálogos existentes compatibles se reutilizan; incompatibles se rechazan.
+CA05. Reimportar contenido equivalente no duplica registros, incluso con distinto orden XML.
+CA06. Una versión nueva conserva anteriores y datos de ejecución.
+CA07. Longitudes, collation, tipos, NULL y defaults respetan el DDL efectivo.
+CA08. Se detectan jerarquías cíclicas, etapas huérfanas y procesos sin salida a cierre.
+CA09. Fallo al insertar una transición revierte todas las altas del documento.
+CA10. Importaciones concurrentes no producen versiones duplicadas ni cargas parciales.
+CA11. Se bloquean entidades externas, reglas ejecutables y XML fuera de límites.
+CA12. No se modifican tablas de ejecución ni se crean casos al importar un proceso activo.
+CA13. Se verifica la importación desde el celular y mediante consulta de base antes de declararla implementada.
+CA14. El reporte permite rastrear cada elemento XML hasta su registro.
+CA15. Una respuesta perdida puede recuperarse sin repetir altas.
+
+14. ENTREGABLES DE IMPLEMENTACIÓN FUTURA
+Parser/validador, contrato formal de estructura, servicio transaccional, interfaz Android, reporte y pruebas derivadas de R01–R33 y CA01–CA15.
+El contrato formal de estructura no sustituye las validaciones contra base, de grafo y de reglas.
+Este pedido genera exclusivamente el caso de uso; no implementa, instala ni ejecuta SQL.

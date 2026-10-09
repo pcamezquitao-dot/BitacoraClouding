@@ -40,6 +40,7 @@ from app.routers.control_supervisor import router as control_supervisor_router
 from app.routers.activity_catalog import router as activity_catalog_router
 from app.routers.process_admin import router as process_admin_router
 from app.routers.normaliza_proceso import router as normaliza_proceso_router
+from app.routers.xml2er import router as xml2er_router
 from app.services.evidencia_file_service import evidencia_root
 from app.services.audio_transcription_service import recover_pending_transcriptions
 
@@ -89,6 +90,7 @@ app.include_router(control_supervisor_router)
 app.include_router(activity_catalog_router)
 app.include_router(process_admin_router)
 app.include_router(normaliza_proceso_router)
+app.include_router(xml2er_router)
 
 
 # Conserva la política operativa del backend principal: la recuperación masiva

@@ -1,0 +1,44 @@
+RESULTADOS RESTANTES CP-C31
+Fecha: 2026-10-09
+Ambiente exclusivo: bitacora_c31_test
+
+Conteo corregido
+- Estado historico reconstruido: 20 aprobadas, 14 no ejecutadas, 1 bloqueada.
+- Despues de 025, 026 y 035: 23 aprobadas y 12 pendientes.
+- Pendientes ejecutadas en el cierre: 007, 008, 009, 011, 014, 015, 016,
+  017, 018, 028, 031 y 032.
+
+Resultados tecnicos
+- 007: conflicto de descripcion detectado.
+- 008: VALIDADO; 2 nodos nuevos; padre y actividad reutilizados; 0 conflictos.
+- 009: conflictos de identificador y nombre detectados.
+- 011: modificacion de version existente rechazada.
+- 014: cambio semantico rechazado como no equivalente.
+- 015: longitud maxima aceptada y exceso rechazado.
+- 016: entero fuera de rango rechazado.
+- 017: NULL, ausencia, vacio y defaults verificados.
+- 018: collation efectiva; 2 actividades reutilizadas y 0 conflictos.
+- 031: esquema incompatible simulado; fallo sin cambio de conteo (1->1).
+- 032: perdida de respuesta posterior al commit; reintento SIN CAMBIOS;
+  exactamente 1 proceso persistido.
+- Arnes 032: timeout cliente ampliado de 20 a 45 s para incluir la ventana
+  acotada de 15 s del bloqueo de la solicitud abandonada; regla funcional sin
+  cambios.
+- pytest focal: 24 passed in 3.49s.
+
+Resultado fisico CP-C31-028
+- Dispositivo: vivo V2035, serie 3065397347006YM.
+- Paquete: com.cactus.bitacora.c31test, versionCode 53,
+  versionName maria53-c31-xml2er.
+- URL: https://161-22-47-89.sslip.io/bitacora-c31-test/.
+- Modo avion activo: error visible `Unable to resolve host`; no exito.
+- SQL durante el corte: 2 actividades, 5 nodos, 1 proceso, 4 etapas y
+  3 transiciones; sin variacion.
+- Red restaurada: vista previa recuperada para CP_C31_FISICO.
+- SQL posterior: 2/5/1/4/3; sin variacion.
+- Evidencias: offline-rechazado.png y offline-recuperado.png.
+- Estado final del telefono: airplane_mode_on=0.
+
+Resultado consolidado
+35 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS, 0 NO EJECUTADAS.
+Produccion no fue modificada.

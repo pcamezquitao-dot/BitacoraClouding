@@ -487,6 +487,24 @@ data class Cu30ApprovalOut(
     val disponible_para_cu31: Boolean
 )
 
+data class Xml2ErCount(val nuevos: Int = 0, val reutilizados: Int = 0, val conflictos: Int = 0)
+data class Xml2ErPreview(
+    val estado: String, val archivo: String, val sha256: String,
+    val entorno: String, val base: String, val proceso: String? = null,
+    val version: Int? = null, val cantidades: Map<String, Xml2ErCount> = emptyMap(),
+    val conflictos: List<String> = emptyList(),
+    val correspondencias: Map<String, Map<String, Long>> = emptyMap(),
+    val token_validacion: String? = null
+)
+data class Xml2ErImportIn(val archivo: String, val xml: String, val token_validacion: String)
+data class Xml2ErResult(
+    val estado: String, val archivo: String, val sha256: String,
+    val entorno: String, val base: String, val proceso: String, val version: Int,
+    val confirmado: Boolean, val cantidades: Map<String, Xml2ErCount> = emptyMap(),
+    val correspondencias: Map<String, Map<String, Long>> = emptyMap(),
+    val usuario: String, val fecha_hora: String
+)
+
 data class WorkScheduleDetailIn(
     val id_detalle: Long? = null,
     val dia_semana_num: Int,

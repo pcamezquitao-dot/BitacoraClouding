@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definicion_proceso contrato_version="1">
+  <actividades>
+    <actividad ref="a_registrar" nombre="CP-C31 Registrar solicitud"><descripcion>Actividad sintética de prueba C31.</descripcion></actividad>
+    <actividad ref="a_validar" nombre="CP-C31 Validar solicitud"><descripcion>Validación sintética de prueba C31.</descripcion></actividad>
+  </actividades>
+  <nodos>
+    <nodo ref="n_raiz" id_proceso="931000" nombre="CP_C31_RAIZ" nombre_corto="CP31_RAIZ"/>
+    <nodo ref="n_registrar" id_proceso="931001" nombre="CP_C31_REGISTRAR" nombre_corto="CP31_REG" padre_ref="n_raiz" actividad_ref="a_registrar"/>
+    <nodo ref="n_validar" id_proceso="931002" nombre="CP_C31_VALIDAR" nombre_corto="CP31_VAL" padre_ref="n_raiz" actividad_ref="a_validar"/>
+    <nodo ref="n_aprobado" id_proceso="931003" nombre="CP_C31_APROBADO" nombre_corto="CP31_OK" padre_ref="n_raiz"/>
+    <nodo ref="n_rechazado" id_proceso="931004" nombre="CP_C31_RECHAZADO" nombre_corto="CP31_NO" padre_ref="n_raiz"/>
+  </nodos>
+  <proceso nombre="CP_C31_PROCESO" version="1" activo="0">
+    <descripcion>Proceso sintético trazable CP-C31.</descripcion>
+    <etapas>
+      <etapa ref="e_registrar" nodo_ref="n_registrar" rol_responsable="supervisor" es_inicial="1"/>
+      <etapa ref="e_validar" nodo_ref="n_validar" rol_responsable="supervisor_RH" plazo_horas="24.00"/>
+      <etapa ref="e_aprobado" nodo_ref="n_aprobado" es_final="1"/>
+      <etapa ref="e_rechazado" nodo_ref="n_rechazado" es_final="1"/>
+    </etapas>
+    <transiciones>
+      <transicion ref="t_presentar" origen_ref="e_registrar" destino_ref="e_validar"/>
+      <transicion ref="t_aprobar" origen_ref="e_validar" destino_ref="e_aprobado" resultado="APROBADA"/>
+      <transicion ref="t_rechazar" origen_ref="e_validar" destino_ref="e_rechazado" resultado="RECHAZADA"/>
+    </transiciones>
+  </proceso>
+</definicion_proceso>

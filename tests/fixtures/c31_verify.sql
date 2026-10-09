@@ -1,0 +1,12 @@
+SELECT 'cat_actividad', COUNT(1) FROM cat_actividad WHERE nombre LIKE 'CP-C31 %';
+SELECT 'dim_proceso', COUNT(1) FROM dim_proceso WHERE id_proceso BETWEEN 931000 AND 931004;
+SELECT 'bpm_proceso', COUNT(1) FROM bpm_proceso WHERE nombre='CP_C31_PROCESO' AND version=1;
+SELECT 'bpm_etapa', COUNT(1) FROM bpm_etapa e JOIN bpm_proceso p USING(id_bpm_proceso) WHERE p.nombre='CP_C31_PROCESO' AND p.version=1;
+SELECT 'bpm_transicion', COUNT(1) FROM bpm_transicion t JOIN bpm_proceso p USING(id_bpm_proceso) WHERE p.nombre='CP_C31_PROCESO' AND p.version=1;
+SELECT 'fisico_cat_actividad', COUNT(1) FROM cat_actividad WHERE nombre IN ('CP-C31 FISICO Registrar','CP-C31 FISICO Validar');
+SELECT 'fisico_dim_proceso', COUNT(1) FROM dim_proceso WHERE id_proceso BETWEEN 932000 AND 932004;
+SELECT 'fisico_bpm_proceso', COUNT(1) FROM bpm_proceso WHERE nombre='CP_C31_FISICO' AND version=1;
+SELECT 'fisico_bpm_etapa', COUNT(1) FROM bpm_etapa e JOIN bpm_proceso p USING(id_bpm_proceso) WHERE p.nombre='CP_C31_FISICO' AND p.version=1;
+SELECT 'fisico_bpm_transicion', COUNT(1) FROM bpm_transicion t JOIN bpm_proceso p USING(id_bpm_proceso) WHERE p.nombre='CP_C31_FISICO' AND p.version=1;
+SELECT e.id_etapa, d.nombre, e.es_inicial, e.es_final FROM bpm_etapa e JOIN bpm_proceso p USING(id_bpm_proceso) JOIN dim_proceso d ON d.id_proceso=e.id_etapa WHERE p.nombre='CP_C31_FISICO' AND p.version=1 ORDER BY e.id_etapa;
+SELECT t.id_etapa_origen, t.id_etapa_destino, t.codigo_regla, t.resultado FROM bpm_transicion t JOIN bpm_proceso p USING(id_bpm_proceso) WHERE p.nombre='CP_C31_FISICO' AND p.version=1 ORDER BY t.id_transicion;

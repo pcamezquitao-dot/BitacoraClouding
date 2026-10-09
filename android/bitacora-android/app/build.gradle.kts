@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 52
-        versionName = "maria52-cu30-normaliza-proceso"
+        versionCode = 53
+        versionName = "maria53-c31-xml2er"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -69,6 +69,12 @@ android {
             applicationId = "com.cactus.bitacora.c30test"
             manifestPlaceholders["appLabel"] = "Bitacora C30 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c30-test/\"")
+        }
+        create("c31test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c31test"
+            manifestPlaceholders["appLabel"] = "Bitacora C31 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c31-test/\"")
         }
         create("facial1") {
             dimension = "edition"

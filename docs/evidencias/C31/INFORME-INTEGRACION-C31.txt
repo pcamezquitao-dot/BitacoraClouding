@@ -1,0 +1,51 @@
+INFORME DE INTEGRACION C31 - XML2ER
+Fecha: 2026-10-09
+Rama: C31-XML2ER
+Base funcional: 57dbe91705439c458df5a335c165de4f33dc622c
+
+1. Ambiente efectivo
+- Backend: /srv/bitacora, servicio bitacora-api, puerto local 8001.
+- API Android: https://161-22-47-89.sslip.io/bitacora/.
+- Base MariaDB: bitacora.
+- Dispositivo: vivo V2035, serie 3065397347006YM.
+- Aplicacion: com.cactus.bitacora.
+
+2. Respaldos
+- MariaDB y backend:
+  /srv/bitacora/db-backups/c31/20261009_175636-pre-integration/
+- bitacora.sql.gz:
+  a5074942469f16c19ff8cfc96421fbebdcde07eb5999440f797361737f44f314
+- backend.tar.gz:
+  2eb8fdbb95c9e3d67310278b36188176077c0b1fcf1c98d666fdeae383e3c921
+- APK anterior y datos privados recuperables, excluidos de Git:
+  backups/20261009_175624-pre-c31-integration/
+
+3. Esquema y despliegue
+- Las cinco tablas productivas coinciden con el esquema aislado en columnas,
+  tipos, nulabilidad, defaults, collations e indices.
+- No se aplicaron migraciones.
+- No se copiaron datos desde bitacora_c31_test.
+- Los hashes de los tres modulos C31 desplegados coinciden con el worktree.
+- bitacora-api reiniciado; salud posterior OK.
+
+4. Pruebas
+- CP-C31 definitivo: 35/35 aprobadas.
+- Backend y regresiones C08, C16, C28, C29 y C30: 87 aprobadas.
+- Android productionDebug: BUILD SUCCESSFUL; 50 tareas ejecutadas.
+- Importar/reimportar: aprobados solo en bitacora_c31_test.
+- Produccion: Validar y Cancelar; nunca se ejecuto Importar.
+- SQL final productivo: 0 procesos CP_C31, 0 nodos del rango de fixtures y
+  0 actividades CP-C31.
+
+5. Instalacion y recorrido fisico
+- adb install -r; firma compatible; firstInstallTime conservado.
+- versionCode: 53.
+- versionName: maria53-c31-xml2er.
+- SHA-256 APK instalada:
+  4E9E7078C972F83A28D58C214E578645972082A8D995FF251DF91611F3F218FC
+- XML2ER principal: selector real, VALIDADO, vista previa 2/5/1/4/3 y
+  Cancelar sin escrituras.
+- Room: bitacora_local.db conservada, 512000 bytes.
+- Regresiones visuales: C08 Novedades, C16, C28, C29 y C30 accesibles.
+
+RESULTADO: C31 INTEGRADA tecnicamente en la aplicacion principal.

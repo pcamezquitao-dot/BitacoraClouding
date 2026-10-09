@@ -102,7 +102,8 @@ private enum class AdminMasterSection {
     WORK_SCHEDULES,
     ACTIVITY_CATALOG,
     PROCESS_ADMIN,
-    NORMALIZE_PROCESS
+    NORMALIZE_PROCESS,
+    XML2ER
 }
 
 internal enum class ParticipantTypeFilter { ALL, ACTIVE, INACTIVE }
@@ -1129,6 +1130,10 @@ fun AdminCatalogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.NORMALIZE_PROCESS }
             ) { Text("Normalizar proceso") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.XML2ER }
+            ) { Text("XML2ER") }
             return@Column
         }
         OutlinedButton(
@@ -1156,6 +1161,7 @@ fun AdminCatalogScreen(
                         AdminMasterSection.ACTIVITY_CATALOG -> Unit
                         AdminMasterSection.PROCESS_ADMIN -> Unit
                         AdminMasterSection.NORMALIZE_PROCESS -> Unit
+                        AdminMasterSection.XML2ER -> Unit
                         else -> refresh()
                     }
                 },
@@ -1182,6 +1188,10 @@ fun AdminCatalogScreen(
 
         if (section == AdminMasterSection.NORMALIZE_PROCESS) {
             Cu30NormalizaProcesoPanel(repository, actor)
+        }
+
+        if (section == AdminMasterSection.XML2ER) {
+            Xml2ErPanel(repository, actor)
         }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {

@@ -41,6 +41,9 @@ import com.cactus.bitacora.model.ProcessAdminOut
 import com.cactus.bitacora.model.Cu30Definition
 import com.cactus.bitacora.model.Cu30VersionUpdate
 import com.cactus.bitacora.model.Cu30WorkCreate
+import com.cactus.bitacora.model.Xml2ErImportIn
+import com.cactus.bitacora.model.Xml2ErPreview
+import com.cactus.bitacora.model.Xml2ErResult
 import com.cactus.bitacora.model.AdministrativeAreaIn
 import com.cactus.bitacora.model.CalendarHolidayUpdateIn
 import com.cactus.bitacora.model.CalendarTreeNodeOut
@@ -399,6 +402,19 @@ class BitacoraRepository(
 
     suspend fun cu30DiagramSvg(actor: String, id: String): String =
         api.getCu30Diagram(adminAuthorization(), actor.trim(), Build.MODEL, id).string()
+
+    suspend fun validateXml2Er(actor: String, filename: String, xml: String): Xml2ErPreview {
+        val body = xml.toRequestBody("application/xml; charset=utf-8".toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("file", filename, body)
+        return api.validateXml2Er(adminAuthorization(), actor.trim(), Build.MODEL, part)
+    }
+
+    suspend fun importXml2Er(
+        actor: String, filename: String, xml: String, token: String
+    ): Xml2ErResult = api.importXml2Er(
+        adminAuthorization(), actor.trim(), Build.MODEL,
+        Xml2ErImportIn(filename, xml, token)
+    )
 
     suspend fun createAdminParticipantType(
         actor: String,

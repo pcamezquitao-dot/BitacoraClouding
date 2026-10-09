@@ -1,0 +1,133 @@
+INFORME DE EJECUCIÓN C31 — XML2ER
+Fecha: 2026-10-09
+Estado: INSTALADA; VALIDACIÓN FÍSICA BLOQUEADA POR PATRÓN
+
+Artefacto y dispositivo
+- vivo V2035, serie 3065397347006YM.
+- Paquete principal com.cactus.bitacora, versionCode 53,
+  versionName maria53-c31-xml2er.
+- SHA-256 APK: 49E355A8191B1CDC0BDAB20DB4C01A04FB5170DFD7E71515C27C29494E226337.
+- `adb install -r`: Success; firstInstallTime conservado 2026-10-06 13:50:35.
+- Room conservado: bitacora_local.db 512000 bytes; WAL 524288; SHM 32768.
+
+Entornos y pruebas
+- Aislamiento: bitacora_c31_test, servicio bitacora-c31-test, puerto 8014.
+- Producción: bitacora, bitacora-api.service, /bitacora/, salud activa.
+- Python: 229 passed, 2 skipped, 17 subtests passed.
+- Gradle C31 y producción: BUILD SUCCESSFUL.
+- Importación: 2/5/1/4/3; etapas 931001–931004 iguales a dim_proceso.
+- Reimportación: SIN CAMBIOS; XXE: HTTP 422.
+- Fallo tardío: rollback 0/0/0/0/0. Concurrencia: IMPORTADO/SIN CAMBIOS.
+- Tablas de ejecución aisladas intactas; producción sin fixtures CP-C31.
+
+Respaldos
+- Aislado: /srv/bitacora/db-backups/c31/20261009_144751-isolated-start/
+- Producción: /srv/bitacora/db-backups/c31/20261009_151229-pre-production/
+- Aplicación/APK: C:/Bitacora/BitacoraClouding-C31/backups/20261009_081211-pre-main/
+
+Bloqueo
+- `dumpsys window`: mDreamingLockscreen=true.
+- Pantalla: «Dibujar patrón»; exige credencial del propietario.
+- ADB permite instalación pero no debe eludir el patrón. Quedan pendientes el
+  selector real, validar/importar/reimportar/cancelar, reinicio visual y las
+  regresiones C28/C29/C30 en pantalla. C31 no se declara terminada.
+
+Continuacion 2026-10-09 08:25-08:36 America/Bogota
+- El bloqueo por patron quedo superado: V2035 desbloqueado y ADB Wi-Fi
+  operativo en 192.168.1.6:5555.
+- Verificacion visual aislada completada para el menu de maestros, C28, C29 y
+  C30. Evidencias: c31-masters-scroll.png, regresion-c28.png,
+  regresion-c29.png y regresion-c30.png.
+- Una sesion humana activa de WhatsApp tomo repetidamente el foco al pulsar
+  XML2ER (com.whatsapp/.mediaview.MediaViewActivity). No se forzo ni cerro una
+  aplicacion ajena al alcance. Continuan pendientes selector real, Validar,
+  vista previa, Importar, SIN CAMBIOS, XML invalido y Cancelar.
+- Prueba focal adicional del parser: 24/24 aprobadas en
+  tests/test_xml2er_pending_matrix.py. Esta evidencia parcial no reclasifica
+  casos que aun exigen BD, API o Android.
+- Rotacion automatica restaurada a accelerometer_rotation=1. Produccion no fue
+  modificada.
+- Estado conservador: 21 APROBADAS, 13 NO EJECUTADAS y 1 BLOQUEADA. C31 no se
+  declara terminada.
+
+Reintento fisico posterior
+- V2035 desbloqueado y disponible inicialmente por USB, serie
+  3065397347006YM; por intermitencia USB se restablecio tambien ADB Wi-Fi en
+  192.168.1.6:5555.
+- Se confirmo com.cactus.bitacora.c31test, versionCode 53,
+  versionName maria53-c31-xml2er, ONLINE contra /bitacora-c31-test/.
+- CP-C31-valid.xml y CP-C31-invalid.xml estaban presentes en Download.
+- En dos recorridos el foco salio de Bitacora durante la navegacion y quedo en
+  com.android.settings/com.android.settings.SubSettings. La interaccion fisica
+  se pauso para no interferir con el uso externo del telefono.
+- No se importaron datos ni se modifico produccion. Selector, Validar, vista
+  previa, Importar, reimportacion, XML invalido y Cancelar siguen pendientes.
+
+Validacion fisica integral posterior
+- Se corrigio el cierre de Compose al abrir XML2ER eliminando el scroll
+  vertical anidado de Xml2ErPanel.
+- Variante aislada recompilada con la credencial efectiva cargada solamente en
+  memoria e instalada mediante adb install -r. SHA-256:
+  F66EE2810F5D2AA86C568C51EDEBC3482FC4DED87A2C64B421062113D65508D4.
+- Selector real, Validar, vista previa, Importar, SIN CAMBIOS, XML invalido y
+  Cancelar fueron ejecutados fisicamente.
+- Fixture CP_C31_FISICO: BASE-ANTES 0/0/0/0/0; BASE-DESPUES 2/5/1/4/3.
+  Reimportacion y Cancelar conservaron exactamente esos conteos; XML invalido
+  devolvio HTTP 422 sin escrituras.
+- Evidencias: selector-real.png, validacion-fisica.png,
+  vista-previa-fisica.png, importado-fisico.png, sin-cambios-fisico.png,
+  cancelar-sin-escrituras.png y xml-invalido-rechazado.png.
+- Produccion permanecio intacta.
+- Estado consolidado: 24 APROBADAS, 10 NO EJECUTADAS, 0 BLOQUEADAS,
+  0 FALLIDAS. C31 no se declara TERMINADA.
+
+Cierre final de CP-C31 - 2026-10-09
+- Se reconstruyo el conteo por identificador. La agrupacion anterior contenia
+  20 aprobadas, 14 no ejecutadas y 1 bloqueada, aunque el resumen decia
+  21/13/1. Tras aprobar 025, 026 y 035, el estado correcto era 23 aprobadas y
+  doce pendientes, no 24/10. Los doce fueron 007-009, 011, 014-018, 028 y
+  031-032.
+- 007-009, 011, 014-018, 031 y 032 se ejecutaron en `bitacora_c31_test`.
+  Se comprobaron conflictos, reutilizacion, version inmutable, equivalencia,
+  limites, NULL/defaults, collation, esquema incompatible sin persistencia y
+  respuesta perdida con reintento `SIN CAMBIOS` sin duplicados.
+- En CP-C31-032 se corrigio solo el arnes: timeout de reintento 20->45 s para
+  cubrir la ventana maxima de bloqueo de 15 s de la solicitud abandonada. La
+  repeticion aprobo con `SIN CAMBIOS` y exactamente un proceso.
+- Suite focal final: 24 passed en 3.49 s.
+- CP-C31-028 se ejecuto fisicamente en el V2035. Con modo avion activo,
+  Validar mostro `Unable to resolve host` y no mostro exito; SQL conservo
+  exactamente 2/5/1/4/3. Tras restaurar conectividad, Validar recupero la
+  vista previa de `CP_C31_FISICO`; los conteos continuaron 2/5/1/4/3.
+- Evidencias nuevas: `offline-rechazado.png` y `offline-recuperado.png`.
+- Modo avion quedo desactivado (`airplane_mode_on=0`). Produccion `bitacora`
+  permanecio intacta.
+- Matriz definitiva: 35 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS y
+  0 NO EJECUTADAS. C31 TERMINADA en el ciclo tecnico.
+
+Integracion principal - 2026-10-09
+- Respaldo MariaDB/backend:
+  `/srv/bitacora/db-backups/c31/20261009_175636-pre-integration/`.
+  SHA-256 dump: a5074942469f16c19ff8cfc96421fbebdcde07eb5999440f797361737f44f314.
+  SHA-256 backend: 2eb8fdbb95c9e3d67310278b36188176077c0b1fcf1c98d666fdeae383e3c921.
+- Respaldo local recuperable:
+  `backups/20261009_175624-pre-c31-integration/` (no versionado), con APK
+  anterior y archivo de datos privados/Room.
+- Esquema `bitacora` compatible con las cinco tablas; ninguna migracion ni
+  copia desde `bitacora_c31_test`.
+- Backend productivo identico al aprobado, reiniciado y saludable.
+- Pruebas backend/regresion: 63 + 24 = 87 aprobadas. Android productivo:
+  BUILD SUCCESSFUL, 50 tareas ejecutadas despues de regenerar la cache KSP.
+- APK principal instalada con `adb install -r`: package
+  `com.cactus.bitacora`, versionCode 53, versionName
+  `maria53-c31-xml2er`, SHA-256
+  `4E9E7078C972F83A28D58C214E578645972082A8D995FF251DF91611F3F218FC`.
+  La firma coincidio con la APK anterior y `firstInstallTime` se conservo.
+- Recorrido principal: selector, Validar, vista previa 2/5/1/4/3 y Cancelar.
+  No se pulso Importar; SQL posterior confirmo 0/0/0 fixtures C31.
+- Evidencias: `integracion-main-masters.png`,
+  `integracion-main-preview.png`, `integracion-main-cancel.png`,
+  `integracion-regresion-c08-novedades.png`,
+  `integracion-regresion-c16.png`, `integracion-regresion-c28.png`,
+  `integracion-regresion-c29.png` e `integracion-regresion-c30.png`.
+- Estado: C31 INTEGRADA tecnicamente; produccion conserva sus datos.

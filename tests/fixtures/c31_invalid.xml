@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE definicion_proceso [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<definicion_proceso contrato_version="1"><actividades/><nodos/><proceso nombre="CP-C31-INVALIDO" version="1"><etapas/><transiciones/></proceso></definicion_proceso>

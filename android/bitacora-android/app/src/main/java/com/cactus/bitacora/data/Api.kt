@@ -53,6 +53,9 @@ import com.cactus.bitacora.model.Cu30VersionUpdate
 import com.cactus.bitacora.model.Cu30WorkCreate
 import com.cactus.bitacora.model.Cu30WorkOut
 import com.cactus.bitacora.model.Cu30WorkSummary
+import com.cactus.bitacora.model.Xml2ErImportIn
+import com.cactus.bitacora.model.Xml2ErPreview
+import com.cactus.bitacora.model.Xml2ErResult
 import com.cactus.bitacora.model.ReservoirSatelliteImageOut
 import com.cactus.bitacora.model.ReservoirSatelliteOut
 import okhttp3.ResponseBody
@@ -69,6 +72,23 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @Multipart
+    @POST("admin/xml2er/validar")
+    suspend fun validateXml2Er(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Part file: MultipartBody.Part
+    ): Xml2ErPreview
+
+    @POST("admin/xml2er/importar")
+    suspend fun importXml2Er(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Body payload: Xml2ErImportIn
+    ): Xml2ErResult
+
     @GET("admin/normaliza-proceso")
     suspend fun getCu30Works(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String): List<Cu30WorkSummary>
 

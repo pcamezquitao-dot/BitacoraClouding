@@ -1,0 +1,792 @@
+CP-C31-XML2ER — Caso de pruebas de importación XML al modelo relacional BPM
+Versión documental: 1.0
+Fecha: 2026-10-09
+Fuente: CU-C31-XML2ER.txt, versión 1.0 de 2026-10-09
+Estado general: NO EJECUTADO
+
+1. OBJETIVO Y ALCANCE
+
+Verificar la selección, validación e importación atómica e idempotente de una
+definición XML hacia cat_actividad, dim_proceso, bpm_proceso, bpm_etapa y
+bpm_transicion, sin afectar versiones anteriores ni tablas de ejecución.
+
+Este documento define pruebas; no registra ejecuciones. Todos los datos con
+prefijo CP-C31 son sintéticos y deben usarse solamente en un ambiente aislado.
+
+2. OBSERVACIONES Y PENDIENTES DE LA FUENTE
+
+O01. P07 indica que el DDL documental proviene de «Texto pegado(7).txt» y no
+certifica el servidor actual. Ese archivo no está disponible en el worktree
+objetivo. Antes de ejecutar deben archivarse SHOW CREATE TABLE, índices, FKs,
+CHECK, motores y collations efectivos de las cinco tablas. Afecta CP-C31-015,
+016, 017, 018 y 031; no se inventan restricciones ausentes del CU.
+O02. R02 denomina propuestos los límites 5 MiB, profundidad 64 y 10.000
+elementos y exige publicar los efectivos. CP-C31-024 queda parametrizada por
+los límites publicados; no puede aprobarse hasta conocerlos.
+O03. R14 no define la unidad de tiempo_estimado y remite a C29. La prueba
+verifica conservación exacta, no equivalencia ni conversión con plazo_horas.
+O04. R20 remite al catálogo efectivo de roles, sin enumerarlo. CP-C31-021 debe
+usar un rol confirmado por el ambiente y otro inequívocamente inexistente.
+O05. R24 no enumera el lenguaje completo de reglas ni expresiones permitidas.
+CP-C31-022 usa SIEMPRE y requiere la lista efectiva para ampliar fronteras.
+O06. El CU propone la ruta de pantalla, no la declara definitiva. La prueba
+física exige acceso funcional, sin convertir el texto de la ruta en esquema.
+O07. `padre_id` y `actividad_nombre` se describen como referencias alternativas
+pero la sección 10 no ofrece un ejemplo. CP-C31-008 exige ejemplos sintéticos
+inequívocos conforme al contrato formal que se publique antes de ejecutar.
+
+3. CONVENCIONES, AMBIENTE Y EVIDENCIA COMÚN
+
+- XML-BASE: ejemplo íntegro de la sección 10 de CU-C31-XML2ER, sustituyendo
+  9000–9004 y nombres por valores CP-C31 libres cuando el ambiente lo exija.
+- BASE-ANTES/BASE-DESPUÉS: conteos, claves, checksums o consultas ordenadas de
+  las cinco tablas y de bpm_caso, bpm_actividad, bpm_enlace_actividad,
+  bitacora_diaria y novedades. Deben permitir demostrar conservación.
+- Cada ejecución debe registrar paquete/versión, usuario/permiso, dispositivo,
+  backend, URL, base efectiva, DDL efectivo, fecha/hora y huella SHA-256.
+- Evidencia mínima: pantalla o respuesta, solicitud saneada, logs correlacionados,
+  reporte XML→ID y consultas SQL antes/después. No se exponen credenciales.
+- Estados permitidos al ejecutar: APROBADA, FALLIDA, BLOQUEADA o NO EJECUTADA.
+
+4. CLASIFICACIÓN
+
+Automatizables (unidad/contrato): 003–007, 009, 011–025.
+Integración/backend/base: 001, 002, 008, 010, 015–023, 026–034.
+Dispositivo físico: 035. La clasificación se superpone cuando una regla debe
+probarse en más de una capa; la aprobación integral exige todas las capas
+indicadas, no solamente una prueba unitaria.
+
+5. CASOS DE PRUEBA
+
+CP-C31-001 — Importación válida del ejemplo en las cinco tablas
+Objetivo: comprobar el flujo principal y las cantidades exigidas.
+Requisitos/criterios: F01–F19; R01, R04–R06, R09, R11–R15, R18–R20, R23, R26–R29, R33; CA01, CA02, CA13, CA14; postcondición de éxito.
+Precondiciones/estado: usuario autorizado, conexión y transacciones disponibles; IDs/nombres de XML-BASE libres; BASE-ANTES tomada.
+Datos/XML: XML-BASE íntegro de CU §10.
+Pasos: 1) Abrir XML2ER y comprobar destino. 2) Seleccionar XML-BASE. 3) Validar y revisar vista previa. 4) Importar. 5) consultar reporte y las tablas. 6) comparar BASE-DESPUÉS.
+Resultado esperado: pantalla pasa por SELECCIONADO/VALIDANDO/VALIDADO/IMPORTANDO/IMPORTADO y reporta 2 actividades, 5 nodos, 1 proceso, 4 etapas y 3 transiciones; backend confirma commit y correspondencias; BD contiene exactamente esas altas, con id_etapa igual a 9001–9004 (o sustitutos declarados), FKs y defaults correctos. Las tablas y filas anteriores permanecen iguales.
+Comprobaciones por tabla: cat_actividad +2; dim_proceso +5; bpm_proceso +1; bpm_etapa +4; bpm_transicion +3; tablas de ejecución sin cambios.
+Evidencia requerida: evidencia común, vista previa, reporte y consultas de las cinco tablas.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-002 — Reutilización incremental compatible
+Objetivo: reutilizar actividades y nodos compatibles sin duplicarlos.
+Requisitos/criterios: F08, F11–F16; R07, R08, R12, R17, R18; CA04, CA14.
+Precondiciones/estado: una actividad y dos nodos de XML-BASE existen con todos sus datos compatibles; resto ausente; BASE-ANTES.
+Datos/XML: XML-BASE ajustado a esas claves y una misma actividad_ref usada por dos nodos distintos.
+Pasos: 1) Validar. 2) comprobar clasificación nuevos/reutilizados. 3) Importar. 4) consultar IDs y conteos.
+Resultado esperado: vista previa distingue reutilización; backend resuelve IDs existentes; BD no duplica filas compatibles, crea solo faltantes y permite la misma actividad en varios nodos; anteriores intactos.
+Comprobaciones por tabla: cat_actividad y dim_proceso conservan las filas reutilizadas; bpm_* guarda referencias resueltas; ejecución sin cambios.
+Evidencia requerida: antes/después, reporte nuevos/reutilizados y mapa de referencias.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-003 — Contrato desconocido, BPMN y contenido desconocido
+Objetivo: rechazar formatos y elementos no admitidos sin pérdida silenciosa.
+Requisitos/criterios: R01, R03; A02; CA03.
+Precondiciones/estado: BASE-ANTES.
+Datos/XML: a) XML BPMN mínimo; b) contrato_version="999"; c) XML-BASE con elemento/atributo `cp_desconocido`.
+Pasos: 1) seleccionar y validar cada archivo. 2) intentar Importar. 3) comparar tablas.
+Resultado esperado: CON ERRORES explica contrato esperado o elemento/ruta; Importar deshabilitado; backend rechaza acceso directo; ninguna tabla cambia.
+Comprobaciones por tabla: cinco tablas y tablas de ejecución idénticas.
+Evidencia requerida: archivos, mensajes, respuestas y BASE-ANTES/DESPUÉS.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-004 — XML mal formado, vacío y codificación inválida
+Objetivo: validar lectura y diagnóstico seguro.
+Requisitos/criterios: P05; R01; A01, A03; CA03.
+Precondiciones/estado: BASE-ANTES.
+Datos/XML: cierre faltante en línea conocida; archivo 0 bytes; bytes no UTF-8.
+Pasos: 1) seleccionar cada archivo. 2) validar. 3) intentar importación directa por backend.
+Resultado esperado: mal formado informa línea/columna; vacío y codificación informan causa; no hay éxito ni escritura.
+Comprobaciones por tabla: todas sin cambios.
+Evidencia requerida: bytes/huella, mensajes, logs y comparación SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-005 — Nombres vacíos, espacios extremos y duplicados por collation
+Objetivo: comprobar obligatoriedad y unicidad efectiva dentro del lote.
+Requisitos/criterios: R04, R06; A03, A04; CA07.
+Precondiciones/estado: DDL/collation efectivos capturados; BASE-ANTES.
+Datos/XML: variantes con nombre="", nombre=" CP ", refs duplicadas y dos nombres equivalentes según cada collation efectiva.
+Pasos: 1) validar cada variante. 2) revisar referencia/ruta. 3) intentar importar.
+Resultado esperado: todas se rechazan antes de escribir; mensaje identifica valor/regla y no normaliza silenciosamente.
+Comprobaciones por tabla: todas sin cambios.
+Evidencia requerida: DDL/collation, XML, diagnósticos y consultas.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-006 — Referencias inexistentes, duplicadas y ambiguas
+Objetivo: impedir resoluciones no inequívocas.
+Requisitos/criterios: R06, R10, R18, R22; A04; CA08.
+Precondiciones/estado: BASE-ANTES.
+Datos/XML: mutaciones separadas con actividad_ref, padre_ref, nodo_ref, origen_ref o destino_ref inexistente; ref repetida; nodo_ref+nodo_id y padre_ref+padre_id simultáneos.
+Pasos: 1) validar cada mutación. 2) verificar ruta/ref reportada. 3) intentar importar.
+Resultado esperado: CON ERRORES identifica referencia y ambigüedad; ninguna resolución arbitraria ni escritura.
+Comprobaciones por tabla: todas sin cambios.
+Evidencia requerida: XML mutados, errores y SQL antes/después.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-007 — Conflicto de actividad por nombre/descripción
+Objetivo: diferenciar reutilización compatible de conflicto compartido.
+Requisitos/criterios: R07; A05; CA04.
+Precondiciones/estado: actividad `CP-C31-Actividad` existente; BASE-ANTES.
+Datos/XML: a) mismo nombre/descripción equivalente; b) mismo nombre y descripción distinta; c) nombre equivalente por collation.
+Pasos: 1) validar cada variante. 2) importar a). 3) intentar b) y c). 4) consultar actividad.
+Resultado esperado: a) reutiliza id_actividad; b/c) listan diferencias y rechazan; nunca modifica ni duplica la actividad existente.
+Comprobaciones por tabla: cat_actividad conserva ID/contenido; otras tablas solo cambian en la variante válida y atómicamente.
+Evidencia requerida: fila original, vista previa, diferencias y mapa de ID.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-008 — Reutilización de referencias existentes por padre_id y actividad_nombre
+Objetivo: comprobar alternativas explícitas para registros omitidos del XML.
+Requisitos/criterios: R07, R08, R10, R12; mapeo §9; CA04.
+Precondiciones/estado: padre y actividad compatibles existentes; contrato formal publicado; BASE-ANTES.
+Datos/XML: ejemplo sintético CP-C31 conforme al contrato formal usando padre_id y actividad_nombre, y variantes combinadas ambiguas.
+Pasos: 1) validar forma exclusiva. 2) importar. 3) consultar IDs. 4) validar variantes ambiguas.
+Resultado esperado: forma exclusiva reutiliza filas exactas; alternativas dobles se rechazan; no se crean copias ni se cambian compartidos.
+Comprobaciones por tabla: catálogos conservados salvo nodos nuevos previstos; bpm_* coherente; ejecución intacta.
+Evidencia requerida: contrato, XML, mapa y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; depende de O07.
+
+CP-C31-009 — Conflictos de identidad y contenido en dim_proceso
+Objetivo: rechazar colisiones de ID, nombre o nombre_corto.
+Requisitos/criterios: R08, R09, R13, R17; A05; CA04, CA07.
+Precondiciones/estado: nodo existente conocido; BASE-ANTES.
+Datos/XML: variantes: mismo ID/campo distinto; ID nuevo/nombre existente; nombre_corto existente; tipo_proceso distinto; fila íntegramente idéntica.
+Pasos: 1) validar variantes. 2) importar solo compatible. 3) consultar nodo.
+Resultado esperado: idéntico se reutiliza; conflictos enumeran diferencias y no sobrescriben; tipo nuevo es 1.
+Comprobaciones por tabla: dim_proceso existente inmutable; sin altas parciales en las demás.
+Evidencia requerida: fila antes/después, mensajes y reporte.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-010 — Nueva versión y conservación histórica
+Objetivo: importar versión nueva sin alterar versión anterior ni ejecuciones.
+Requisitos/criterios: R15–R18, R27; CA06, CA12; postcondición de conservación.
+Precondiciones/estado: versión 1 y datos de ejecución referenciándola; BASE-ANTES.
+Datos/XML: mismo proceso versión 2, catálogos compatibles y nodos nuevos cuando cambia contenido compartido.
+Pasos: 1) validar. 2) importar. 3) consultar ambas versiones, etapas, transiciones y ejecución.
+Resultado esperado: versión 2 es nueva y completa; versión 1 y sus ejecuciones quedan byte/valor-equivalentes; no se desactiva automáticamente ninguna versión ni se crean casos.
+Comprobaciones por tabla: bpm_proceso +1 y sus filas hijas; catálogos solo altas explícitas; tablas de ejecución iguales.
+Evidencia requerida: consultas históricas y FKs antes/después.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-011 — Rechazo de modificación de versión existente
+Objetivo: impedir sobrescritura bajo el mismo nombre y versión.
+Requisitos/criterios: R15, R16; A07; CA06.
+Precondiciones/estado: proceso CP-C31 versión 1 persistido; BASE-ANTES.
+Datos/XML: mismo nombre/version con descripción, etapa o transición distinta.
+Pasos: 1) validar. 2) intentar importar. 3) consultar definición original.
+Resultado esperado: conflicto indica usar versión nueva; no cambia ninguna fila ni hijos.
+Comprobaciones por tabla: cinco tablas y ejecución iguales.
+Evidencia requerida: diff semántico, respuesta y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-012 — Reimportación idempotente idéntica
+Objetivo: demostrar SIN CAMBIOS e IDs estables.
+Requisitos/criterios: R16, R31, R33; A06; CA05.
+Precondiciones/estado: XML-BASE ya importado; BASE-ANTES posterior al primer commit.
+Datos/XML: mismo archivo y contenido.
+Pasos: 1) revalidar. 2) importar. 3) comparar IDs/conteos y reporte.
+Resultado esperado: SIN CAMBIOS, mismos IDs y cero INSERT/UPDATE/DELETE; huella auditada sin columna inventada.
+Comprobaciones por tabla: todas idénticas.
+Evidencia requerida: dos reportes, IDs y comparaciones.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-013 — XML semánticamente equivalente con distinto orden/formato
+Objetivo: comprobar equivalencia independiente de orden y sangría.
+Requisitos/criterios: R31, R33; A06; CA05.
+Precondiciones/estado: XML-BASE importado; BASE-ANTES.
+Datos/XML: XML-BASE reordenado dentro de secciones, con sangría/fin de línea distintos, sin cambiar valores.
+Pasos: 1) validar. 2) importar. 3) comparar definición persistida.
+Resultado esperado: SIN CAMBIOS aunque la huella del archivo pueda diferir; sin duplicados.
+Comprobaciones por tabla: cinco tablas idénticas; ejecución idéntica.
+Evidencia requerida: ambos XML/huellas y comparación semántica.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-014 — Cambio de valor de negocio no es equivalencia
+Objetivo: evitar que la huella o normalización oculten cambios reales.
+Requisitos/criterios: R16, R31, R33; A07; CA05.
+Precondiciones/estado: versión importada; BASE-ANTES.
+Datos/XML: misma identidad con un valor de negocio cambiado.
+Pasos: 1) validar. 2) intentar importar. 3) revisar diferencias.
+Resultado esperado: no se informa SIN CAMBIOS; se rechaza la versión existente diferente y se conserva completa.
+Comprobaciones por tabla: todas sin cambios.
+Evidencia requerida: diff semántico, mensaje y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-015 — Límites de longitud y TEXT sin truncamiento
+Objetivo: validar fronteras declaradas y bytes efectivos.
+Requisitos/criterios: R05, R23; A03; CA07.
+Precondiciones/estado: DDL/collations efectivos; BASE-ANTES.
+Datos/XML: longitudes límite y límite+1 para nombres 100/50/100, descripción nodo 250, precondición 250, rol 100, codigo_regla 300, resultado 100 y TEXT al límite efectivo multibyte.
+Pasos: 1) validar cada límite. 2) importar casos válidos aislados. 3) intentar excedidos. 4) leer valores.
+Resultado esperado: límites exactos se conservan; +1 se rechaza con campo/límite; jamás se trunca.
+Comprobaciones por tabla: solo casos válidos completos; inválidos cero cambios; ejecución intacta.
+Evidencia requerida: DDL, conteo caracteres/bytes, XML y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; depende de O01.
+
+CP-C31-016 — Tipos, rangos y valores numéricos
+Objetivo: verificar enteros, unsigned, decimales y banderas.
+Requisitos/criterios: R09, R14, R15, R26; A03; CA07.
+Precondiciones/estado: DDL efectivo; BASE-ANTES.
+Datos/XML: id_proceso 0 y 2147483647; fuera de rango/no entero; version 1, 0, negativa y máximo INT UNSIGNED; negativos/exceso DECIMAL(10,2)/escala; banderas -1,2,texto.
+Pasos: 1) validar cada frontera. 2) importar válidas. 3) intentar inválidas. 4) consultar persistencia.
+Resultado esperado: solo dominios válidos pasan y se conservan exactamente; no MAX(id)+1, coerción ni redondeo silencioso.
+Comprobaciones por tabla: altas válidas atómicas; inválidas sin cambios.
+Evidencia requerida: DDL, XML, mensajes y valores SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-017 — NULL, ausencia, cadena vacía y defaults
+Objetivo: distinguir omisión, NULL/default y cadena vacía.
+Requisitos/criterios: R11–R14, R20, R23, R26; mapeo §9; CA07.
+Precondiciones/estado: DDL efectivo; BASE-ANTES.
+Datos/XML: opcionales omitidos; explícitamente vacíos; defaults omitidos de tiempo/costo/tipo/activo/codigo_regla; final sin actividad/rol.
+Pasos: 1) validar variantes. 2) importar válidas. 3) consultar columnas. 4) verificar rechazo de vacíos donde no equivalen a NULL.
+Resultado esperado: ausencia produce NULL o default exactamente como §9; cadena vacía no se convierte en NULL; raíz padre NULL; agrupador actividad NULL; no final exige actividad/rol.
+Comprobaciones por tabla: valores exactos en cinco tablas; anteriores conservados.
+Evidencia requerida: XML, DDL y SELECT con indicadores IS NULL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-018 — Collation y unicidad efectiva
+Objetivo: probar mayúsculas, acentos y espacios según cada tabla real.
+Requisitos/criterios: R04, R07, R08; CA04, CA07.
+Precondiciones/estado: SHOW FULL COLUMNS/índices efectivos; BASE-ANTES.
+Datos/XML: pares CP-C31 que difieren solo en mayúscula, acento o variante Unicode, según equivalencia real.
+Pasos: 1) determinar equivalencias con consultas no destructivas. 2) validar/importar pares. 3) revisar diagnóstico.
+Resultado esperado: comportamiento coincide con collation e índices efectivos, tanto contra BD como dentro del lote; sin duplicados ni normalización inventada.
+Comprobaciones por tabla: cat_actividad y dim_proceso respetan únicos reales; resto atómico.
+Evidencia requerida: DDL/collation, consultas comparativas y resultados.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; depende de O01.
+
+CP-C31-019 — Árbol válido, autorreferencia y ciclos
+Objetivo: validar jerarquía incluso contra nodos existentes.
+Requisitos/criterios: R10, R11; A08; CA08.
+Precondiciones/estado: nodo existente preparado para ciclo mixto; BASE-ANTES.
+Datos/XML: árbol válido con varias raíces; autorreferencia; ciclo interno; ciclo XML↔base.
+Pasos: 1) validar/importar válido. 2) validar cada ciclo. 3) intentar importar inválidos.
+Resultado esperado: árbol válido pasa; cada ciclo identifica nodos responsables y no escribe.
+Comprobaciones por tabla: dim_proceso solo recibe el caso válido; otras tablas atómicas; previos intactos.
+Evidencia requerida: grafos, mensajes y consultas recursivas.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-020 — Correspondencia de etapa y unicidad por versión
+Objetivo: garantizar bpm_etapa.id_etapa = dim_proceso.id_proceso.
+Requisitos/criterios: R09, R18; CA01, CA02.
+Precondiciones/estado: nodos distintos, dos de ellos con misma actividad; BASE-ANTES.
+Datos/XML: XML válido y variantes con nodo repetido como dos etapas o intento de usar id_bpm_proceso como id_etapa.
+Pasos: 1) importar válido. 2) consultar join. 3) validar variantes.
+Resultado esperado: join uno-a-uno dentro de versión y IDs de etapa iguales a nodos; nodo repetido/dominio cruzado rechazado; misma actividad en nodos distintos admitida.
+Comprobaciones por tabla: dim_proceso↔bpm_etapa correcto; sin duplicados parciales.
+Evidencia requerida: XML, mapa y SELECT de correspondencia.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-021 — Iniciales, finales, alcanzabilidad y roles
+Objetivo: validar estructura completa de etapas.
+Requisitos/criterios: R19–R21; A08; CA08.
+Precondiciones/estado: catálogo de roles efectivo documentado; BASE-ANTES.
+Datos/XML: válido; cero/dos iniciales; cero finales; inicial=final; etapa huérfana; sin camino a cierre; final con salida; no final sin actividad/rol o rol inválido; ciclo con salida válida.
+Pasos: 1) validar cada XML. 2) importar válido/ciclo con salida. 3) intentar inválidos.
+Resultado esperado: exactamente una inicial, al menos una final distinta, rol efectivo y caminos exigidos; errores identifican etapa; ciclo de devolución con salida se acepta.
+Comprobaciones por tabla: inválidos sin cambios; válidos íntegros; ejecución intacta.
+Evidencia requerida: catálogo de roles, grafos, mensajes y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; dominio completo de roles depende de O04.
+
+CP-C31-022 — Transiciones, decisiones y lenguaje de reglas
+Objetivo: validar extremos, duplicados y exclusividad.
+Requisitos/criterios: R22–R25; A08; CA08.
+Precondiciones/estado: lenguaje de reglas efectivo documentado; BASE-ANTES.
+Datos/XML: SIEMPRE válido; extremo de otra versión; origen=destino; duplicado semántico; dos SIEMPRE sin resultados; resultados distintos; regla desconocida y contenido ejecutable.
+Pasos: 1) validar variantes. 2) importar válidas. 3) intentar inválidas.
+Resultado esperado: solo transiciones del mismo proceso y decisiones exclusivas verificables pasan; regla desconocida/ejecutable no se evalúa y se rechaza; diagnóstico identifica transición.
+Comprobaciones por tabla: bpm_transicion contiene solo válidas activas; otras tablas revierten en inválidas.
+Evidencia requerida: lenguaje permitido, XML, errores y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; fronteras adicionales dependen de O05.
+
+CP-C31-023 — Proceso activo no ejecuta ni desactiva
+Objetivo: separar definición de ejecución.
+Requisitos/criterios: R26, R27; CA06, CA12.
+Precondiciones/estado: otra versión activa y tablas de ejecución pobladas; BASE-ANTES.
+Datos/XML: proceso nuevo activo=1 con transiciones activas.
+Pasos: 1) importar. 2) consultar versiones. 3) consultar tablas de ejecución y efectos externos.
+Resultado esperado: nuevo proceso queda activo, versión anterior conserva estado; no se crean casos/actividades/enlaces/bitácoras/novedades ni se ejecutan reglas.
+Comprobaciones por tabla: cinco tablas según definición; tablas de ejecución idénticas.
+Evidencia requerida: estados y consultas antes/después.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-024 — Seguridad y límites del XML
+Objetivo: impedir XXE, red, XInclude, código y agotamiento de recursos.
+Requisitos/criterios: R02, R03, R24; CA11.
+Precondiciones/estado: límites efectivos publicados; endpoint externo señuelo sin datos reales; BASE-ANTES.
+Datos/XML: DOCTYPE/entidad local y remota, XInclude, SQL/script como elemento, tamaño límite y +1, profundidad límite y +1, 10.000 elementos y límite+1 efectivo.
+Pasos: 1) validar cada archivo bajo monitoreo. 2) comprobar que no hay lectura/red/ejecución. 3) revisar tiempos y memoria. 4) intentar importar.
+Resultado esperado: contenido peligroso siempre rechazado sin resolver recursos; fronteras obedecen límites publicados y exceso se diagnostica; no hay escritura.
+Comprobaciones por tabla: todas sin cambios.
+Evidencia requerida: límites, XML/huellas, captura de red, logs y métricas.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; depende de O02.
+
+CP-C31-025 — Validación y cambio de archivo sin escrituras
+Objetivo: comprobar vista previa y caducidad de validación.
+Requisitos/criterios: F02–F09; R28; CA03.
+Precondiciones/estado: dos XML válidos A/B; BASE-ANTES.
+Datos/XML: XML-BASE A y variante válida B de versión nueva.
+Pasos: 1) validar A. 2) comprobar vista previa. 3) cambiar a B. 4) intentar importar sin revalidar. 5) revalidar B.
+Resultado esperado: validar A/B no escribe; cambio invalida A y deshabilita Importar hasta validar B; vista previa distingue nuevos/reutilizados/conflictos.
+Comprobaciones por tabla: todas iguales durante selección/validación.
+Evidencia requerida: estados de UI, respuestas y SQL en cada punto.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-026 — Cancelación sin escrituras
+Objetivo: confirmar A11 y postcondición de cancelación.
+Requisitos/criterios: CA03; A11; postcondición de cancelación.
+Precondiciones/estado: XML válido y VALIDADO; BASE-ANTES.
+Datos/XML: XML-BASE con claves libres.
+Pasos: 1) pulsar Cancelar antes de Importar. 2) confirmar salida si aplica. 3) consultar tablas. 4) reabrir.
+Resultado esperado: no se declara IMPORTADO ni queda operación escribiendo; las tablas permanecen iguales.
+Comprobaciones por tabla: cinco tablas y ejecución idénticas.
+Evidencia requerida: recorrido, logs y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-027 — Permisos en interfaz y backend
+Objetivo: exigir autenticación/autorización real.
+Requisitos/criterios: P01; F11; A13; actor/seguridad; CA03.
+Precondiciones/estado: administrador/gerente autorizado, usuario autenticado sin permiso y sesión inválida; BASE-ANTES.
+Datos/XML: XML-BASE con claves libres.
+Pasos: 1) revisar acceso visual con cada actor. 2) invocar validar/importar directamente con cada credencial. 3) comparar tablas/auditoría.
+Resultado esperado: autorizado accede; no autorizado no puede importar aunque fuerce endpoint; backend deniega antes de escritura; identidad real queda en reporte solo en operación autorizada.
+Comprobaciones por tabla: intentos denegados sin cambios.
+Evidencia requerida: matriz de permisos, pantallas, respuestas y auditoría.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-028 — Operación sin conexión y recuperación
+Objetivo: evitar validación/importación falsa offline.
+Requisitos/criterios: P02; pantalla §4; A10; CA03.
+Precondiciones/estado: dispositivo con XML local; conexión controlable; BASE-ANTES.
+Datos/XML: XML-BASE.
+Pasos: 1) cortar conexión. 2) seleccionar archivo. 3) intentar validar/importar. 4) restablecer. 5) revalidar.
+Resultado esperado: selección local permitida; no se declara validación contra base ni éxito offline; mensaje conserva archivo/trabajo; al volver conexión exige validación vigente.
+Comprobaciones por tabla: sin cambios durante desconexión.
+Evidencia requerida: video/capturas con estado de red, logs y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-029 — Atomicidad ante fallo tardío
+Objetivo: revertir todas las altas si falla la última transición.
+Requisitos/criterios: R28, R29; A10; CA09.
+Precondiciones/estado: ambiente aislado con mecanismo controlado que haga fallar la última inserción sin deshabilitar restricciones; BASE-ANTES.
+Datos/XML: XML-BASE con todas las filas inicialmente nuevas.
+Pasos: 1) validar. 2) activar fallo tardío. 3) importar. 4) consultar cada tabla. 5) retirar fallo y reintentar.
+Resultado esperado: primer intento informa error/rollback y deja cero altas del documento; segundo crea todo una sola vez; no REPLACE/IGNORE ni FK/CHECK deshabilitada.
+Comprobaciones por tabla: tras fallo todas iguales a BASE-ANTES; tras éxito cantidades de CP-C31-001.
+Evidencia requerida: log transaccional correlacionado, SQL y segundo reporte.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-030 — Importaciones concurrentes
+Objetivo: verificar serialización e idempotencia bajo competencia.
+Requisitos/criterios: R30; A10; CA10.
+Precondiciones/estado: dos clientes autorizados sincronizados; XML válido con filas nuevas; BASE-ANTES.
+Datos/XML: mismo XML en ambos y variante competidora incompatible para igual nombre/versión.
+Pasos: 1) validar en ambos. 2) importar simultáneamente el mismo XML. 3) repetir con variantes incompatibles. 4) consultar tablas.
+Resultado esperado: mismo XML produce un IMPORTADO y otro SIN CAMBIOS/revalidación equivalente; incompatibles producen un ganador completo y un conflicto/rollback; nunca duplicados ni carga parcial.
+Comprobaciones por tabla: una sola definición completa; únicos/FKs preservados; ejecución intacta.
+Evidencia requerida: marcas de tiempo, IDs de correlación, logs de bloqueo y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-031 — Base o esquema incompatible
+Objetivo: rechazar un destino que no cumple P03/P04 sin migrarlo.
+Requisitos/criterios: P03, P04, P07; R29; A09; CA07.
+Precondiciones/estado: copia aislada con una incompatibilidad controlada documentada; producción intacta; DDL antes.
+Datos/XML: XML-BASE válido.
+Pasos: 1) mostrar destino. 2) validar/importar en copia incompatible. 3) inspeccionar esquema y datos.
+Resultado esperado: se informa tabla/restricción/motor incompatible; no se crean columnas ni se deshabilitan controles; cero escrituras.
+Comprobaciones por tabla: DDL y datos permanecen iguales.
+Evidencia requerida: DDL, error y comparación del esquema.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES; depende de O01.
+
+CP-C31-032 — Pérdida de respuesta después del commit
+Objetivo: recuperar resultado incierto sin repetir altas.
+Requisitos/criterios: R31–R33; A12; CA05, CA15.
+Precondiciones/estado: proxy o punto de fallo controlado corta respuesta después del commit; BASE-ANTES.
+Datos/XML: XML-BASE con claves libres.
+Pasos: 1) importar y cortar respuesta tras commit. 2) observar estado. 3) consultar/reintentar mismo XML. 4) comparar tablas.
+Resultado esperado: UI muestra VERIFICACIÓN PENDIENTE, no fracaso definitivo; consulta/reintento devuelve SIN CAMBIOS con IDs originales; una sola definición persistida.
+Comprobaciones por tabla: cantidades de una importación, sin duplicados; ejecución intacta.
+Evidencia requerida: prueba temporal del commit/corte, pantallas, logs y SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-033 — Reporte, trazabilidad y estados visibles
+Objetivo: rastrear cada elemento y distinguir validación de importación.
+Requisitos/criterios: F18, F19; R33; §12; CA14.
+Precondiciones/estado: importación válida y una inválida disponibles.
+Datos/XML: XML-BASE y XML con referencia rota.
+Pasos: 1) recorrer estados de ambos. 2) abrir reporte. 3) seguir cada ref hasta su ID. 4) comprobar metadatos y confirmación.
+Resultado esperado: estados corresponden a la operación; reporte contiene usuario, fecha/hora, entorno/base, archivo, huella, proceso/version, errores/cantidades; mapa completo ref→ID; HTTP 200 sin commit explícito no se presenta como éxito.
+Comprobaciones por tabla: reporte coincide con filas reales; inválido no escribe.
+Evidencia requerida: secuencia de estados, reporte y joins SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-034 — Conservación de datos anteriores y tablas de ejecución
+Objetivo: comprobar exhaustivamente el límite de alcance.
+Requisitos/criterios: alcance §2; R17, R27–R29; CA06, CA12; postcondiciones.
+Precondiciones/estado: versiones anteriores y filas relacionadas en todas las tablas de ejecución enumeradas; BASE-ANTES completa.
+Datos/XML: versión nueva válida activa=1.
+Pasos: 1) importar. 2) comparar filas previas columna por columna. 3) revisar auditoría/SQL. 4) comprobar ausencia de casos nuevos.
+Resultado esperado: solo altas previstas en cinco tablas; no UPDATE/DELETE de previos, no cambios de esquema, no escritura en bpm_caso, bpm_actividad, bpm_enlace_actividad, bitacora_diaria o novedades.
+Comprobaciones por tabla: cinco tablas suman únicamente definición nueva; ejecución idéntica.
+Evidencia requerida: inventario, consultas ordenadas/checksums y logs SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+CP-C31-035 — Recorrido completo desde dispositivo físico
+Objetivo: verificar el flujo real Android→backend→base y persistencia visual.
+Requisitos/criterios: F01–F19; P01–P06; CA01–CA05, CA13–CA15.
+Precondiciones/estado: celular identificado y desbloqueado, variante aislada, paquete/versión/backend/base verificados, usuario autorizado, respaldo/BASE-ANTES; no producción.
+Datos/XML: XML-BASE descargado/local, con claves CP-C31 libres; XML inválido controlado.
+Pasos: 1) abrir ruta funcional XML2ER. 2) comprobar destino. 3) seleccionar inválido, validar y cancelar. 4) seleccionar válido y validar. 5) revisar vista previa. 6) importar. 7) comprobar reporte/listado. 8) salir, volver y reiniciar app. 9) reimportar XML equivalente reordenado. 10) comprobar BD/backend.
+Resultado esperado: inválido no escribe; válido muestra transiciones de estado y cantidades exactas, aparece y persiste tras navegación/reinicio; reimportación informa SIN CAMBIOS; trazabilidad Android/API/BD coincide; datos previos se conservan.
+Comprobaciones por tabla: resultado exacto de CP-C31-001, cero duplicados tras reintento y ejecución sin cambios.
+Evidencia requerida: video/capturas, dumpsys paquete, tráfico saneado, logs Android/backend, reporte y consultas SQL.
+Estado inicial: NO EJECUTADA.
+Resultado obtenido y observaciones: PENDIENTES.
+
+6. MATRIZ DE TRAZABILIDAD
+
+| Elemento | Pruebas |
+|---|---|
+| P01 | 027, 035 |
+| P02 | 028, 035 |
+| P03–P04 | 029, 031 |
+| P05 | 004, 024, 035 |
+| P06 | 002, 010, 034 |
+| P07 | 015–018, 031 |
+| F01–F02 | 001, 035 |
+| F03–F07 | 003–006, 019–025, 033 |
+| F08–F09 | 002, 007–009, 025, 033 |
+| F10–F17 | 001, 002, 010, 027, 029–032, 035 |
+| F18–F19 | 001, 033, 035 |
+| R01 | 001, 003, 004 |
+| R02 | 024 |
+| R03 | 003, 024 |
+| R04 | 001, 005, 018 |
+| R05 | 001, 015 |
+| R06 | 001, 005, 006 |
+| R07 | 002, 007, 008, 018 |
+| R08 | 002, 008, 009, 018 |
+| R09 | 001, 009, 016, 020 |
+| R10 | 006, 008, 019 |
+| R11 | 001, 017, 019 |
+| R12 | 001, 002, 008, 017 |
+| R13 | 001, 009, 017 |
+| R14 | 001, 016, 017 |
+| R15 | 001, 010, 011, 016 |
+| R16 | 010–014 |
+| R17 | 002, 009, 010, 034 |
+| R18 | 001, 002, 006, 010, 020 |
+| R19 | 001, 021 |
+| R20 | 001, 017, 021 |
+| R21 | 001, 021 |
+| R22 | 001, 006, 022 |
+| R23 | 001, 015, 017, 022 |
+| R24 | 022, 024 |
+| R25 | 022 |
+| R26 | 001, 016, 017, 023 |
+| R27 | 001, 023, 034 |
+| R28 | 001, 025, 029, 034 |
+| R29 | 001, 029, 031, 034 |
+| R30 | 030 |
+| R31 | 012–014, 032 |
+| R32 | 032 |
+| R33 | 001, 012–014, 032, 033 |
+| A01 | 004 |
+| A02 | 003 |
+| A03 | 004, 005, 015–017 |
+| A04 | 005, 006 |
+| A05 | 007, 009 |
+| A06 | 012, 013 |
+| A07 | 011, 014 |
+| A08 | 019, 021, 022 |
+| A09 | 031 |
+| A10 | 028–030 |
+| A11 | 026 |
+| A12 | 032 |
+| A13 | 027 |
+| CA01 | 001, 020, 035 |
+| CA02 | 001, 020, 035 |
+| CA03 | 003–006, 025–028, 035 |
+| CA04 | 002, 007–009, 018 |
+| CA05 | 012–014, 032, 035 |
+| CA06 | 010, 011, 023, 034 |
+| CA07 | 005, 009, 015–018, 031 |
+| CA08 | 006, 019, 021, 022 |
+| CA09 | 029 |
+| CA10 | 030 |
+| CA11 | 024 |
+| CA12 | 010, 023, 034 |
+| CA13 | 001, 035 |
+| CA14 | 001, 002, 033, 035 |
+| CA15 | 032, 035 |
+| Postcondición éxito | 001, 002, 010, 035 |
+| Postcondición reimportación | 012, 013, 032, 035 |
+| Postcondición error/cancelación | 003–009, 011, 014–022, 024–031 |
+| Conservación de previos/ejecución | 010, 023, 029–035 |
+
+7. CRITERIO DE CIERRE FUTURO
+
+Ningún caso puede cambiar a APROBADA sin evidencia real de todas sus capas.
+Las observaciones O01–O07 deben resolverse o mantenerse como bloqueos explícitos
+de los casos afectados. La aprobación global exige 35 casos ejecutados y sin
+estado FALLIDA, BLOQUEADA o NO EJECUTADA, incluido el recorrido físico 035.
+
+8. EJECUCIÓN PARCIAL REAL — 2026-10-09
+
+Ambiente aislado: `bitacora_c31_test`, servicio `bitacora-c31-test.service`,
+puerto 8014. APK aislada: `com.cactus.bitacora.c31test`, versión 53.
+
+| Caso | Estado real | Evidencia resumida |
+|---|---|---|
+| 001 | APROBADA | API/BD: 2 actividades, 5 nodos, 1 proceso, 4 etapas y 3 transiciones. |
+| 002 | APROBADA | Reutilización 2/5/1/4/3 con IDs estables. |
+| 003–006 | APROBADAS | Pruebas focales de contrato, sintaxis, nombres y referencias. |
+| 007–009 | NO EJECUTADAS | Faltan variantes completas de conflicto/referencia/collation. |
+| 010 | APROBADA | Versiones y tablas de ejecución conservadas. |
+| 011 | NO EJECUTADA | Falta modificación controlada de versión existente. |
+| 012 | APROBADA | Segundo POST: SIN CAMBIOS; cero duplicados. |
+| 013 | APROBADA | Orden de atributos diferente resultó semánticamente equivalente. |
+| 014–018 | NO EJECUTADAS | Faltan matrices exhaustivas de cambios, límites, NULL y Unicode. |
+| 019–024 | APROBADAS | Ciclos, mapeo, grafo, reglas, no ejecución y XXE/límite. |
+| 025–026 | NO EJECUTADAS | Requieren selector y Cancelar en Android. |
+| 027 | APROBADA | Backend exige token y actor. |
+| 028 | NO EJECUTADA | Falta recorrido físico sin conexión. |
+| 029 | APROBADA | Fallo tardío: rollback dejó 0/0/0/0/0 filas del documento. |
+| 030 | APROBADA | Concurrencia: IMPORTADO + SIN CAMBIOS; una definición. |
+| 031–032 | NO EJECUTADAS | Faltan esquema incompatible y corte posterior al commit. |
+| 033–034 | APROBADAS | Reporte XML→ID y conservación de tablas de ejecución. |
+| 035 | BLOQUEADA | V2035 exige patrón; APK aislada y principal sí quedaron instaladas. |
+
+Resumen: 21 APROBADAS, 13 NO EJECUTADAS y 1 BLOQUEADA. C31 no se declara
+terminada. Pruebas agrupadas: 229 aprobadas, 2 omitidas y 17 subpruebas;
+suite Android C31 y ambos APK: BUILD SUCCESSFUL.
+
+9. CONTINUACION REAL - 2026-10-09 08:25-08:36 (America/Bogota)
+
+- V2035 comprobado desbloqueado y accesible por ADB Wi-Fi en
+  `192.168.1.6:5555`; `com.cactus.bitacora.c31test` abrio y mostro el backend
+  aislado `/bitacora-c31-test/` y estado ONLINE.
+- Se llego fisicamente a Administrador -> Administrar maestros y se comprobo
+  la presencia de C28, C29, C30 y XML2ER. Evidencias:
+  `docs/evidencias/C31/c31-masters-scroll.png`, `regresion-c28.png`,
+  `regresion-c29.png` y `regresion-c30.png`.
+- C28 mostro nota, busqueda y alta; C29 mostro el arbol interactivo; C30 abrio
+  su panel y consulta. Son regresiones visuales aisladas, no escrituras.
+- Matriz focal nueva `tests/test_xml2er_pending_matrix.py`: 24/24 aprobadas
+  junto con `tests/test_xml2er.py`. Cubrio fronteras de longitud, enteros,
+  decimales, banderas, vacios, defaults y preservacion Unicode. El DDL real de
+  las cinco tablas fue nuevamente consultado en `bitacora_c31_test`.
+- Los casos 015-018 permanecen NO EJECUTADOS como casos completos: la evidencia
+  nueva cubre parser y esquema, pero no sustituye todas las variantes de BD,
+  API y Android exigidas por esos casos.
+- Se intento abrir XML2ER repetidamente. En cada intento una sesion humana de
+  WhatsApp tomo el foco (`com.whatsapp/.mediaview.MediaViewActivity`) justo al
+  pulsar XML2ER. No se detuvo ni se forzo WhatsApp porque esta fuera del alcance
+  autorizado. Por ello 025, 026, 028 y 035 siguen sin aprobacion fisica.
+- 007-009, 011, 014, 031 y 032 no se reclasifican: no se completaron sus
+  matrices integrales en esta continuacion. No se modifico produccion.
+- La rotacion automatica, desactivada temporalmente para estabilizar capturas,
+  fue restaurada (`accelerometer_rotation=1`).
+
+Estado consolidado sin sobredeclaracion: 21 APROBADAS, 13 NO EJECUTADAS y
+1 BLOQUEADA. La validacion fisica obligatoria continua incompleta.
+
+10. REINTENTO FISICO - CONTINUACION POSTERIOR
+
+- V2035 comprobado desbloqueado (`mDreamingLockscreen=false`) y accesible por
+  USB con serie `3065397347006YM`; tambien se restablecio ADB Wi-Fi en
+  `192.168.1.6:5555` debido a intermitencia del transporte USB.
+- Paquete aislado comprobado: `com.cactus.bitacora.c31test`, versionCode 53,
+  versionName `maria53-c31-xml2er`.
+- La pantalla inicial confirmo estado ONLINE y backend efectivo
+  `https://161-22-47-89.sslip.io/bitacora-c31-test/`.
+- Los archivos `CP-C31-valid.xml` y `CP-C31-invalid.xml` permanecen en el
+  directorio Download del dispositivo.
+- Durante dos intentos de navegacion a XML2ER, el foco fue retirado de Bitacora
+  por una interaccion externa y termino en
+  `com.android.settings/com.android.settings.SubSettings` (Opciones para
+  desarrolladores). Se pauso la interaccion para no interferir con el uso del
+  telefono ni atribuir falsamente resultados fisicos.
+- No se ejecuto Importar, no hubo escrituras en `bitacora_c31_test` y no se
+  modifico produccion. Los estados consolidados permanecen sin cambio.
+
+11. VALIDACION FISICA INTEGRAL EJECUTADA
+
+Dispositivo y ambiente:
+- vivo V2035, serie `3065397347006YM`, desbloqueado.
+- Paquete `com.cactus.bitacora.c31test`, versionCode 53,
+  versionName `maria53-c31-xml2er`.
+- URL visible: `https://161-22-47-89.sslip.io/bitacora-c31-test/`.
+- Base informada por vista previa y comprobada por SQL: `bitacora_c31_test`.
+
+Defectos detectados y corregidos:
+1. Al abrir XML2ER, Compose cerraba la aplicacion por un `verticalScroll`
+   anidado dentro del contenedor desplazable de Administrar maestros. Se
+   elimino el scroll interno de `Xml2ErPanel`; compilacion focal y APK C31test:
+   BUILD SUCCESSFUL. La apertura posterior no produjo excepcion.
+2. La primera recompilacion no recibio `ADMIN_API_TOKEN` y mostro
+   "La credencial administrativa no esta configurada". Se recompilo tomando
+   la credencial en memoria desde la configuracion efectiva aislada, sin
+   imprimirla ni guardarla en archivos. `adb install -r`: Success.
+
+Recorrido y evidencia real:
+- Selector real DocumentsUI: `selector-real.png`.
+- XML `CP-C31-fisico.xml`; BASE-ANTES fisica: 0/0/0/0/0.
+- Validar: VALIDADO; vista previa `2/5/1/4/3`, cero conflictos, base
+  `bitacora_c31_test`: `validacion-fisica.png`, `vista-previa-fisica.png`.
+- Importar: IMPORTADO, commit confirmado, proceso `CP_C31_FISICO` v1,
+  nodos 932000-932004: `importado-fisico.png`.
+- SQL BASE-DESPUES: 2 actividades, 5 nodos, 1 proceso, 4 etapas y 3
+  transiciones; etapas 932001-932004 referencian `dim_proceso`.
+- Segundo Importar: SIN CAMBIOS; los conteos permanecieron 2/5/1/4/3:
+  `sin-cambios-fisico.png`.
+- Cancelar: "Cancelado; no se realizaron escrituras" y conteos sin cambio:
+  `cancelar-sin-escrituras.png`.
+- `CP-C31-invalid.xml`: rechazo visible HTTP 422 y conteos sin cambio:
+  `xml-invalido-rechazado.png`.
+- APK corregida aislada SHA-256:
+  `F66EE2810F5D2AA86C568C51EDEBC3482FC4DED87A2C64B421062113D65508D4`.
+- Produccion no fue consultada para escritura ni modificada.
+
+Reclasificacion:
+- CP-C31-025: APROBADA (selector, validacion, cambio de archivo, sin escritura
+  antes de Importar).
+- CP-C31-026: APROBADA (Cancelacion y SQL sin variacion).
+- CP-C31-035: APROBADA (recorrido fisico integral aislado y persistencia SQL).
+- CP-C31-028 continua NO EJECUTADA: no se completo el corte fisico de red.
+- CP-C31-007-009, 011, 014-018 y 031-032 conservan NO EJECUTADA como casos
+  integrales; las subpruebas automatizadas parciales no sustituyen sus capas.
+
+Estado consolidado real: 24 APROBADAS, 10 NO EJECUTADAS, 0 BLOQUEADAS y
+0 FALLIDAS. C31 no se declara TERMINADA mientras existan esos diez casos
+obligatorios no ejecutados.
+
+12. CIERRE DE EJECUCION Y CORRECCION DEL CONTEO - 2026-10-09
+
+Correccion de la inconsistencia:
+- La matriz historica agrupada no contenia 21 aprobadas, sino 20 codigos
+  individuales aprobados: 001-006, 010, 012-013, 019-024, 027, 029-030 y
+  033-034.
+- Antes del cierre fisico, los codigos pendientes enumerados eran catorce:
+  007-009, 011, 014-018, 025-026, 028 y 031-032; 035 estaba bloqueada.
+- Al aprobar 025, 026 y 035 quedaron 23 aprobadas y doce pendientes, no
+  24/10. Los doce codigos eran 007, 008, 009, 011, 014, 015, 016, 017, 018,
+  028, 031 y 032. Esta enumeracion individual sustituye los dos totales
+  historicos incorrectos, sin cambiar retrospectivamente su evidencia.
+
+Ejecucion de los doce casos restantes, exclusivamente en
+`bitacora_c31_test`:
+
+| Caso | Estado real | Resultado obtenido y evidencia |
+|---|---|---|
+| 007 | APROBADA | Nombre equivalente con descripcion incompatible produjo conflicto de descripcion y cero escrituras. |
+| 008 | APROBADA | Reutilizo padre y actividad persistidos; vista previa VALIDADO, dos nodos nuevos y cero conflictos. |
+| 009 | APROBADA | Conflictos controlados de ID y nombre de `dim_proceso` fueron rechazados antes del commit. |
+| 011 | APROBADA | Intento de modificar una version existente fue rechazado; version persistida conservada. |
+| 014 | APROBADA | Cambio semantico de negocio no fue tratado como XML equivalente. |
+| 015 | APROBADA | Frontera maxima aceptada; exceso rechazado; TEXT y Unicode permanecieron sin truncamiento. |
+| 016 | APROBADA | Enteros fuera de rango y tipos invalidos fueron rechazados sin escrituras. |
+| 017 | APROBADA | Ausencia, NULL, cadena vacia y valores predeterminados se distinguieron conforme al contrato y DDL. |
+| 018 | APROBADA | La collation efectiva reutilizo dos actividades compatibles, sin duplicados ni conflictos. |
+| 028 | APROBADA | En V2035, modo avion mostro error DNS visible, sin exito ni escrituras; al restablecer red, Validar recupero la vista previa del mismo XML. Conteos 2/5/1/4/3 antes, durante y despues. Evidencias `offline-rechazado.png` y `offline-recuperado.png`. |
+| 031 | APROBADA | Simulacion controlada del contrato de esquema incompatible fallo antes de persistir; conteo testigo permanecio 1->1. No se renombraron tablas reales. |
+| 032 | APROBADA | Corte deliberado del cliente despues del commit y reintento: `SIN CAMBIOS`, un solo proceso y cero duplicados. |
+
+Correccion del arnes de CP-C31-032: una repeticion agotaba el timeout cliente
+de 20 segundos mientras la primera solicitud abandonada aun podia consumir la
+ventana acotada de 15 segundos del bloqueo de importacion. Se amplio solamente
+el timeout del cliente de prueba a 45 segundos; no se relajo ninguna regla de
+producto. La repeticion posterior termino `SIN CAMBIOS` y con un unico proceso.
+
+Matriz definitiva individual (35 identificadores):
+
+| Caso | Estado | Caso | Estado | Caso | Estado | Caso | Estado | Caso | Estado |
+|---|---|---|---|---|---|---|---|---|---|
+| 001 | APROBADA | 002 | APROBADA | 003 | APROBADA | 004 | APROBADA | 005 | APROBADA |
+| 006 | APROBADA | 007 | APROBADA | 008 | APROBADA | 009 | APROBADA | 010 | APROBADA |
+| 011 | APROBADA | 012 | APROBADA | 013 | APROBADA | 014 | APROBADA | 015 | APROBADA |
+| 016 | APROBADA | 017 | APROBADA | 018 | APROBADA | 019 | APROBADA | 020 | APROBADA |
+| 021 | APROBADA | 022 | APROBADA | 023 | APROBADA | 024 | APROBADA | 025 | APROBADA |
+| 026 | APROBADA | 027 | APROBADA | 028 | APROBADA | 029 | APROBADA | 030 | APROBADA |
+| 031 | APROBADA | 032 | APROBADA | 033 | APROBADA | 034 | APROBADA | 035 | APROBADA |
+
+Comprobaciones finales:
+- Parser y matriz focal: `24 passed`.
+- Bateria de integracion restante ejecutada contra la base efectiva
+  `bitacora_c31_test`; todas las aserciones finalizaron correctamente.
+- SQL fisico final: 2 actividades, 5 nodos, 1 proceso, 4 etapas y 3
+  transiciones para `CP_C31_FISICO`; relaciones de etapas y transiciones
+  coinciden con el XML.
+- Modo avion restaurado a 0. La aplicacion recupero conectividad y la vista
+  previa. No se escribio ni se altero la base `bitacora`.
+
+Resultado final: 35 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS y 0 NO EJECUTADAS.
+C31 queda TERMINADA en su ciclo tecnico de implementacion y pruebas.
+
+13. INTEGRACION EN APLICACION PRINCIPAL - 2026-10-09
+
+- Base funcional integrada: commit padre `57dbe91705439c458df5a335c165de4f33dc622c`
+  (CU30), rama `C31-XML2ER`. La rama Git historica `main` no representa la
+  linea funcional vigente del dispositivo.
+- Los DDL, indices y collations de `cat_actividad`, `dim_proceso`,
+  `bpm_proceso`, `bpm_etapa` y `bpm_transicion` coincidieron entre
+  `bitacora` y `bitacora_c31_test`; no se aplicaron migraciones.
+- Backend productivo: modulos C31 con hashes identicos a los aprobados,
+  servicio `bitacora-api` reiniciado y `/health` respondio `{"status":"ok"}`.
+- Validacion no destructiva productiva: HTTP 200, `VALIDADO`, base efectiva
+  `bitacora`, proceso `CP_C31_FISICO`, vista previa 2/5/1/4/3. No se ejecuto
+  Importar en produccion.
+- V2035: selector real, Validar, vista previa y Cancelar ejecutados en
+  `com.cactus.bitacora`; el mensaje final fue
+  `Cancelado; no se realizaron escrituras`.
+- SQL posterior en produccion: cero `bpm_proceso` con nombre `CP_C31%`, cero
+  nodos 932000-938999 y cero actividades `CP-C31%`.
+- Importar y reimportar permanecen aprobados exclusivamente en el ambiente
+  aislado, con `IMPORTADO` y `SIN CAMBIOS` sin duplicados.
+- Regresiones backend C08/C16/C28-C30: 87 pruebas aprobadas. Suite Android
+  `productionDebug`: BUILD SUCCESSFUL, 50 tareas ejecutadas.
+- Regresiones fisicas: C08 abrio Novedades con supervisor productivo vigente
+  sin guardar; C16 mostro arbol y resumen; C28 mostro catalogo/nota/busqueda;
+  C29 mostro arbol; C30 mostro normalizacion y consulta.
+- APK instalada mediante `adb install -r`: `com.cactus.bitacora`,
+  versionCode 53, versionName `maria53-c31-xml2er`, SHA-256
+  `4E9E7078C972F83A28D58C214E578645972082A8D995FF251DF91611F3F218FC`.
+- `firstInstallTime` se conservo en 2026-10-06 13:50:35 y Room conservo
+  `bitacora_local.db` de 512000 bytes.
+
+Estado de integracion: C31 INTEGRADA tecnicamente en la aplicacion principal.
