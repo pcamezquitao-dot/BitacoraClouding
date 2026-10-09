@@ -443,6 +443,50 @@ data class ProcessAdminIn(
 
 data class ProcessDeleteOut(val id_proceso: Int, val mensaje: String)
 
+data class Cu30CandidateOut(
+    val id_actividad: Long, val nombre: String, val descripcion: String? = null,
+    val coincidencias: List<String> = emptyList(), val diferencias: List<String> = emptyList(),
+    val puntuacion: Double = 0.0
+)
+
+data class Cu30Step(
+    val paso_id: String, val requerimiento: String, val responsable: String? = null,
+    val documentos: List<String> = emptyList(), val reglas: List<String> = emptyList(),
+    val datos: List<String> = emptyList(), val integraciones: List<String> = emptyList(),
+    val tipo: String = "actividad", val siguiente: List<String> = emptyList(),
+    val id_actividad: Long? = null, val nombre_actividad: String? = null,
+    val propuesta_codigo: String? = null, val propuesta_nombre: String? = null,
+    val propuesta_descripcion: String? = null,
+    val candidates: List<Cu30CandidateOut> = emptyList()
+)
+
+data class Cu30Definition(
+    val nombre: String, val pasos: List<Cu30Step>, val observaciones: List<String> = emptyList()
+)
+
+data class Cu30WorkCreate(val titulo: String, val requerimiento_original: String)
+data class Cu30VersionUpdate(val definicion: Cu30Definition, val version_esperada: Int)
+data class Cu30WorkSummary(
+    val id_trabajo: String, val titulo: String, val estado: String, val version_actual: Int,
+    val creado_por: String, val creado_en: String, val actualizado_en: String
+)
+data class Cu30VersionOut(
+    val id_version: String, val numero: Int, val estado: String, val definicion: Cu30Definition,
+    val texto_normalizado: String, val plantuml: String, val xml_definicion: String,
+    val pendientes: List<String>, val catalogo_sha256: String, val contenido_sha256: String,
+    val aprobado_por: String? = null, val aprobado_en: String? = null
+)
+data class Cu30WorkOut(
+    val id_trabajo: String, val titulo: String, val estado: String, val version_actual: Int,
+    val creado_por: String, val creado_en: String, val actualizado_en: String,
+    val requerimiento_original: String, val requerimiento_sha256: String, val version: Cu30VersionOut
+)
+data class Cu30ApprovalOut(
+    val id_trabajo: String, val numero_version: Int, val estado: String,
+    val aprobado_por: String, val aprobado_en: String, val contenido_sha256: String,
+    val disponible_para_cu31: Boolean
+)
+
 data class WorkScheduleDetailIn(
     val id_detalle: Long? = null,
     val dia_semana_num: Int,

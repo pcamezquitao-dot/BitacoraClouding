@@ -101,7 +101,8 @@ private enum class AdminMasterSection {
     GENERAL_CALENDAR,
     WORK_SCHEDULES,
     ACTIVITY_CATALOG,
-    PROCESS_ADMIN
+    PROCESS_ADMIN,
+    NORMALIZE_PROCESS
 }
 
 internal enum class ParticipantTypeFilter { ALL, ACTIVE, INACTIVE }
@@ -1124,6 +1125,10 @@ fun AdminCatalogScreen(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.PROCESS_ADMIN }
             ) { Text("Administración Proceso") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.NORMALIZE_PROCESS }
+            ) { Text("Normalizar proceso") }
             return@Column
         }
         OutlinedButton(
@@ -1150,6 +1155,7 @@ fun AdminCatalogScreen(
                         AdminMasterSection.PARTICIPANT_TYPES -> loadParticipantTypes()
                         AdminMasterSection.ACTIVITY_CATALOG -> Unit
                         AdminMasterSection.PROCESS_ADMIN -> Unit
+                        AdminMasterSection.NORMALIZE_PROCESS -> Unit
                         else -> refresh()
                     }
                 },
@@ -1172,6 +1178,10 @@ fun AdminCatalogScreen(
 
         if (section == AdminMasterSection.PROCESS_ADMIN) {
             ProcessAdminPanel(repository, actor)
+        }
+
+        if (section == AdminMasterSection.NORMALIZE_PROCESS) {
+            Cu30NormalizaProcesoPanel(repository, actor)
         }
 
         if (section == AdminMasterSection.PARTICIPANT_TYPES) {

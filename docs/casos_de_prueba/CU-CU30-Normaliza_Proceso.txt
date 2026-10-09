@@ -1,0 +1,150 @@
+CU-CU30 — NORMALIZA PROCESO
+Versión: 01 | Fecha: 2026-10-08
+Estado: AUTORIZADA PARA IMPLEMENTACIÓN Y PRUEBAS
+
+1. IDENTIFICACIÓN
+
+Caso de uso: CU30 Normaliza Proceso.
+Ruta: Administrador → Administración → Procesos → Normalizar proceso, integrada
+en la navegación administrativa vigente.
+Actores: participante autorizado para definir procesos; participante autorizado
+para aprobar procesos. Los permisos efectivos se validan también en backend.
+Objetivo: convertir un requerimiento textual conservado en una definición
+estructurada, texto normalizado, PlantUML y XML coherentes, vinculando cada paso
+con una actividad existente o una propuesta nueva explícita.
+
+2. LÍMITES
+
+CU30 no inserta, modifica ni elimina cat_actividad. No escribe tablas de
+definición o ejecución BPM, no inicia casos y no ejecuta las integraciones
+descritas por el proceso. No implementa CU31-XML2ER ni MOTOR_BPM.
+
+CU31 podrá insertar actividades nuevas aprobadas y cargar la definición solo
+después de la aprobación conjunta de los tres productos CU30. CU31 no repite una
+segunda aceptación funcional rutinaria.
+
+3. PRECONDICIONES
+
+- Actor autenticado y autorizado.
+- cat_actividad disponible en modo de consulta.
+- Estructuras propias CU30 disponibles.
+- Para renderizar el diagrama, renderizador PlantUML local configurado.
+
+4. MODELO CONCEPTUAL
+
+- Requerimiento original: texto inmutable conservado con SHA-256.
+- Trabajo: contenedor estable que puede tener varias revisiones.
+- Versión: definición estructurada y tres productos generados desde ella.
+- Paso: visita dentro del proceso; conserva responsable, documentos, reglas,
+  datos, integraciones, tipo y transiciones.
+- Actividad existente: referencia por id_actividad y nombre exacto vigente.
+- Propuesta nueva: código provisional estable `PROP-<paso>`, nombre y descripción;
+  no es todavía una fila de cat_actividad.
+- Paquete aprobado: versión exacta, tres contenidos, huella conjunta, aprobador y fecha.
+
+5. FLUJO PRINCIPAL
+
+1. El actor abre Normalizar proceso y pulsa Nuevo.
+2. Ingresa nombre y requerimiento textual original.
+3. El sistema conserva texto y huella, identifica pasos, responsables,
+   decisiones, documentos, reglas, datos e integraciones.
+4. Para cada actividad consulta id, nombre y descripción de cat_actividad y
+   calcula candidatas considerando acción, objeto, significado y contexto.
+5. Presenta id, nombre exacto, descripción, coincidencias y diferencias. No
+   selecciona automáticamente por similitud.
+6. El actor selecciona explícitamente una actividad existente o crea una
+   propuesta con código provisional, nombre y descripción.
+7. El sistema valida responsables, selección/propuesta, referencias,
+   decisiones, transiciones y final explícito.
+8. Genera texto normalizado, PlantUML y XML CU30-1 desde la misma definición.
+9. El actor consulta, exporta y revisa los tres productos y el diagrama PlantUML renderizado.
+10. Si corrige la definición, el sistema crea una nueva revisión pendiente y regenera todo.
+11. Antes de aprobar, el sistema vuelve a consultar el catálogo y detecta cambios.
+12. Sin pendientes, el actor autorizado aprueba conjuntamente los tres productos.
+13. Se registran versión, huella conjunta, aprobador y fecha; el paquete queda
+    disponible para el futuro CU31.
+
+6. FLUJOS ALTERNATIVOS
+
+A. Varias candidatas: permanecen sin selección hasta la decisión explícita.
+B. Ninguna adecuada: se crea una propuesta; cat_actividad no cambia.
+C. Misma actividad en varios pasos: se conserva el mismo id/nombre, mientras
+   responsable, parámetros, reglas y contexto permanecen propios de cada paso.
+D. Ambigüedad, dato incompleto o contradicción: se registra pendiente y se bloquea aprobación.
+E. Catálogo no disponible: se informa como error, no como catálogo vacío; se
+   conserva el borrador y se bloquean selección y aprobación.
+F. Catálogo modificado: se invalida la aprobación hasta actualizar selecciones y regenerar.
+G. Rechazo o ajuste: ninguna parte se aprueba aisladamente; la revisión queda
+   pendiente y los tres productos se regeneran juntos.
+H. Modificación posterior a aprobación: la aprobada permanece inmutable; se crea
+   una revisión nueva pendiente.
+I. Actor sin permiso: interfaz y backend deniegan la operación sin efectos parciales.
+
+7. REGLAS
+
+RN-01. El requerimiento original nunca se sustituye por el texto normalizado.
+RN-02. Una actividad de catálogo se conserva por id_actividad y nombre exacto.
+RN-03. La comparación utiliza nombre y descripción y presenta coincidencias y diferencias.
+RN-04. La semejanza no equivale a selección ni aprobación automática.
+RN-05. Un paso referencia una actividad existente o una propuesta, nunca ambas.
+RN-06. Las propuestas usan código provisional estable y no modifican cat_actividad.
+RN-07. Una actividad puede reutilizarse en cualquier cantidad de pasos.
+RN-08. Texto, PlantUML y XML proceden de una única definición y versión.
+RN-09. Toda transición apunta a un paso existente; decisiones requieren al menos
+dos salidas y el proceso requiere al menos un final explícito.
+RN-10. Cualquier pendiente bloquea la aprobación conjunta.
+RN-11. La aprobación registra la huella de los contenidos exactos.
+RN-12. Un cambio posterior genera una revisión y conserva la aprobada anterior.
+RN-13. Las integraciones se documentan con `ejecutar=false`; CU30 no las invoca.
+RN-14. CU30 solo consulta cat_actividad y no escribe tablas BPM.
+RN-15. CU31 recibe únicamente un paquete aprobado; sus validaciones técnicas no
+constituyen otra aceptación funcional rutinaria.
+
+8. XML CU30-1
+
+El elemento raíz es `proceso`, con `version_gramatica="cu30-1"` y nombre. Contiene
+`pasos/paso`; cada paso declara id, tipo, responsable, requerimiento,
+transiciones e integraciones. Una actividad existente declara `actividad_tipo`,
+`id_actividad` y `actividad_nombre`; una propuesta declara `actividad_tipo`,
+`codigo_provisional` y `actividad_nombre`. Las integraciones solo admiten
+`ejecutar="false"`. El esquema normativo está en `docs/contratos/CU30_XML_1.xsd`.
+
+9. VERSIONADO Y CONCURRENCIA
+
+Cada trabajo mantiene `version_actual`. Guardar correcciones exige la versión
+observada; si cambió, se rechaza y se solicita actualizar. Cada regeneración crea
+una revisión nueva. Una versión aprobada no se sobrescribe. La aprobación solo
+actualiza una versión pendiente cuya huella coincide.
+
+10. SEGURIDAD Y AUDITORÍA
+
+Todas las rutas requieren credencial administrativa vigente, actor y dispositivo.
+Se auditan creación, regeneración y aprobación con actor, versión y fecha. No se
+guardan credenciales dentro del trabajo ni de los productos.
+
+11. POSTCONDICIONES
+
+Éxito de borrador: original y versión pendiente persistidos.
+Éxito de regeneración: revisión nueva coherente, anterior conservada.
+Éxito de aprobación: paquete exacto aprobado y disponible para CU31.
+Error, rechazo o cancelación: ningún cambio en cat_actividad, BPM o integraciones.
+
+12. LIMITACIÓN MATERIAL DOCUMENTADA
+
+La base funcional no contenía un servicio de IA autorizado. La correspondencia
+implementada es local, explicable y reproducible: normalización lingüística,
+conceptos funcionales, acción, objeto, nombre y descripción. Presenta diferencias
+y nunca decide automáticamente. La incorporación futura de un modelo semántico
+externo exige autorización específica sobre proveedor, cuenta, costo y datos.
+
+13. DECISIONES TÉCNICAS ADOPTADAS
+
+- Los permisos reales disponibles son los de Administración de maestros:
+  credencial administrativa, actor obligatorio y dispositivo auditado. El
+  proyecto no dispone hoy de dos permisos efectivos separados “definir” y
+  “aprobar”; no se inventó un segundo rol.
+- Las observaciones de ambigüedad o contradicción son editables y bloqueantes.
+- “Rechazar” significa no aprobar la revisión y corregir/regenerar una versión
+  nueva; no existe aceptación parcial ni un segundo trámite de aprobación.
+- La disponibilidad para CU31 se representa con una versión APROBADA inmutable,
+  su huella conjunta, aprobador y fecha. CU31 permanece fuera de este alcance.

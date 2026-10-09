@@ -1,0 +1,18 @@
+DISPOSITIVO Y DATOS FINALES — CU30
+
+Serial: 3065397347006YM
+Estado ADB: device
+Producto/modelo: 2036E / V2035
+Paquete: com.cactus.bitacora
+versionCode: 52
+versionName: maria52-cu30-normaliza-proceso
+lastUpdateTime: 2026-10-09 00:52:12
+firstInstallTime conservado: 2026-10-06 13:50:35
+
+Room después de la verificación:
+- bitacora_local.db: 512000 bytes
+- bitacora_local.db-shm: 32768 bytes
+- bitacora_local.db-wal: 1285472 bytes
+
+Los archivos permanecen bajo el UID original de la aplicación. No se desinstaló
+el paquete ni se borró su almacenamiento.

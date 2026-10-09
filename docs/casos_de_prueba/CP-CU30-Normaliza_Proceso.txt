@@ -1,0 +1,494 @@
+CP-CU30 — NORMALIZA PROCESO
+Código documental: CP-CU30-Normaliza_Proceso
+Versión: 02 — ejecución real CU30
+Fecha de elaboración: 2026-10-08
+Trazabilidad solicitada: CU-CU30-Normaliza_Proceso
+Estado general: PRUEBAS AISLADAS APROBADAS Y VERIFICACIÓN PRINCIPAL COMPLETADA
+
+1. OBJETIVO
+
+Verificar que CU30 reciba un requerimiento textual, lo analice contra
+cat_actividad sin modificar el catálogo, permita revisión y aprobación conjunta
+del texto normalizado, PlantUML y XML de una misma versión, y habilite CU31
+únicamente para el paquete aprobado.
+
+Este documento define pruebas. No acredita ejecución y no autoriza implementar,
+consultar o escribir bases de datos, ejecutar servicios, instalar aplicaciones ni
+invocar CU31.
+
+2. FUENTE, LIMITACIÓN Y REGLA DE INTERPRETACIÓN
+
+El archivo solicitado `CU-CU30-Normaliza_Proceso.txt` fue localizado inicialmente
+con 0 bytes. Conforme a la orden aprobada, se completó antes de implementar y es
+ahora la especificación efectiva, versión 01. Las referencias RQ históricas de
+este CP se reconciliaron con sus flujos, reglas RN-01 a RN-15 y decisiones
+adoptadas documentadas en el CU.
+
+Las referencias RQ-01 a RQ-24 de este CP corresponden, sin reinterpretación, a
+los 24 puntos de cobertura obligatoria de la orden de elaboración. RF corresponde
+a su regla fundamental: primero se aprueban conjuntamente texto normalizado,
+PlantUML y XML producidos por CU30; después CU31 puede procesar exclusivamente
+ese paquete aprobado. CU31 no agrega una segunda aceptación rutinaria.
+
+Cuando una prueba dependa de una definición ausente, durante la ejecución debe
+registrarse BLOQUEADA si no existe una decisión aprobada; nunca se completará el
+resultado por inferencia.
+
+3. CONDICIONES GENERALES DE EJECUCIÓN
+
+- Ejecutar en ambiente aislado e identificar versión, commit, actor, fecha/hora,
+  catálogo consultado y versión/huella de cada paquete CU30.
+- Usar exclusivamente datos sintéticos con prefijo `CP-CU30`.
+- Capturar el requerimiento original antes de procesarlo y calcular una huella
+  reproducible para comparar su conservación.
+- Obtener instantáneas de solo lectura de cat_actividad y tablas BPM antes y
+  después de las pruebas que verifiquen ausencia de efectos.
+- Interceptar tráfico saliente para demostrar si CU30 realiza llamadas API.
+- Cada evidencia debe permitir relacionar requerimiento original, selección de
+  actividades, texto normalizado, PlantUML, XML, versión y decisión de revisión.
+- Estado inicial de todas las pruebas: NO EJECUTADA.
+
+4. CASOS DE PRUEBA
+
+CP-CU30-001 — Recepción y conservación del requerimiento original
+Objetivo: comprobar que el texto recibido se conserva íntegro e identificable.
+Referencia: RQ-01.
+Precondiciones y datos: actor autorizado; requerimiento `CP-CU30-REQ-001` con tildes, saltos de línea, listas y caracteres especiales.
+Pasos:
+1. Registrar el texto y su huella antes de ingresarlo.
+2. Crear el trabajo CU30 con ese contenido.
+3. Consultar el requerimiento original durante revisión, rechazo y aprobación.
+4. Exportar o recuperar el original y comparar contenido y huella.
+Resultado esperado verificable: el contenido recuperado coincide byte a byte o mediante la normalización técnica expresamente definida; nunca es sustituido por el texto normalizado; conserva un identificador trazable.
+Evidencia requerida: entrada, salida, huellas, identificador y capturas de las tres etapas.
+Resultado obtenido: Original y SHA-256 conservados en API y Android; persistió tras reinicio. Evidencias 09 y 13.
+Estado: APROBADA.
+
+CP-CU30-002 — Identificación completa de elementos del proceso
+Objetivo: identificar actividades, responsables, decisiones, documentos, reglas e integraciones presentes.
+Referencia: RQ-02.
+Precondiciones y datos: `CP-CU30-REQ-002` contiene dos responsables, cuatro actividades, una decisión, dos ramas, un documento, una regla y una integración nombrada.
+Pasos:
+1. Procesar el requerimiento.
+2. Abrir el análisis estructurado.
+3. Comparar cada elemento con una lista de control preparada desde el original.
+4. Revisar que cada hallazgo apunte al fragmento fuente.
+Resultado esperado verificable: todos los elementos explícitos aparecen una vez, clasificados correctamente y vinculados al fragmento original; no se inventan elementos ausentes.
+Evidencia requerida: requerimiento marcado, lista de control y análisis exportado.
+Resultado obtenido: Extracción de actividades, responsables, decisión, documentos, reglas, datos e integraciones aprobada por prueba focal.
+Estado: APROBADA.
+
+CP-CU30-003 — Comparación semántica contra cat_actividad.descripcion
+Objetivo: comprobar que la correspondencia se decide por el significado requerido, usando la descripción del catálogo.
+Referencia: RQ-03.
+Precondiciones y datos: actividad sintética de catálogo `CP-CU30-ACT-003` cuyo nombre es genérico y cuya descripción coincide con la función pedida.
+Pasos:
+1. Registrar nombre, descripción e id_actividad de la candidata.
+2. Procesar un paso expresado con palabras distintas pero significado equivalente.
+3. Consultar la explicación de la comparación.
+Resultado esperado verificable: la candidata se presenta por la coincidencia entre el significado del paso y `descripcion`; la evidencia muestra ambos textos y no atribuye la decisión únicamente al nombre.
+Evidencia requerida: instantánea del catálogo, comparación y candidato presentado.
+Resultado obtenido: Ranking usa nombre y descripción; id 1 fue primera candidata por significado. Evidencia 10.
+Estado: APROBADA.
+
+CP-CU30-004 — Descripciones diferentes con la misma función
+Objetivo: verificar equivalencia funcional pese a redacción diferente.
+Referencia: RQ-04.
+Precondiciones y datos: paso `CP-CU30-PASO-004` y actividad existente con vocabulario diferente pero resultado, objeto y condición equivalentes.
+Pasos:
+1. Procesar el paso.
+2. Revisar candidatos y justificación.
+3. Seleccionar la actividad equivalente.
+4. Generar los tres productos.
+Resultado esperado verificable: la actividad existente puede reutilizarse; los productos conservan el significado del paso y registran su id y nombre exacto.
+Evidencia requerida: textos comparados, selección y trazas en los tres productos.
+Resultado obtenido: Sinónimos revisar/comprobar/validar resolvieron la misma función en prueba automatizada.
+Estado: APROBADA.
+
+CP-CU30-005 — Nombres similares con funciones diferentes
+Objetivo: evitar una asociación falsa basada solo en similitud nominal.
+Referencia: RQ-05.
+Precondiciones y datos: dos actividades `CP-CU30 Revisar solicitud` y `CP-CU30 Revisar pago`, con descripciones y resultados diferentes.
+Pasos:
+1. Procesar un paso que corresponda solo a la primera función.
+2. Inspeccionar candidatos y explicación.
+3. Intentar seleccionar la actividad funcionalmente distinta.
+4. Revisar advertencias y productos generados.
+Resultado esperado verificable: el sistema distingue funciones; no selecciona automáticamente la actividad incorrecta y exige decisión/ajuste cuando el usuario fuerza una opción incompatible según las reglas aprobadas.
+Evidencia requerida: catálogo, candidatos, advertencia y productos resultantes.
+Resultado obtenido: Validar documento y Validar pago permanecieron distintos y el contexto bancario priorizó pago.
+Estado: APROBADA.
+
+CP-CU30-006 — Varias actividades candidatas y selección del usuario
+Objetivo: comprobar que la ambigüedad entre candidatas se resuelve mediante selección explícita.
+Referencia: RQ-06.
+Precondiciones y datos: tres actividades sintéticas plausibles para `CP-CU30-PASO-006`.
+Pasos:
+1. Procesar el paso.
+2. Verificar que se presenten las candidatas identificables.
+3. No seleccionar ninguna e intentar continuar.
+4. Seleccionar la segunda y regenerar.
+Resultado esperado verificable: sin selección el pendiente permanece visible y bloquea aprobación; tras seleccionar, la decisión queda registrada y los tres productos usan únicamente la elegida.
+Evidencia requerida: lista de candidatas, bloqueo, selección y productos regenerados.
+Resultado obtenido: Android presentó varias candidatas y no seleccionó automáticamente. Evidencia 10.
+Estado: APROBADA.
+
+CP-CU30-007 — Reutilización por id y nombre exacto
+Objetivo: verificar que una actividad existente se referencia sin duplicarla ni renombrarla.
+Referencia: RQ-07.
+Precondiciones y datos: actividad `id_actividad=CP_ID_007`, nombre exacto `CP-CU30 Validar documento`.
+Pasos:
+1. Seleccionar la actividad para un paso.
+2. Generar texto normalizado, PlantUML y XML.
+3. Inspeccionar las referencias en cada producto.
+4. Comparar cat_actividad antes y después.
+Resultado esperado verificable: la definición conserva `CP_ID_007` y el nombre exacto; no crea alias ni otra fila; cat_actividad no cambia.
+Evidencia requerida: tres productos y comparación de catálogo.
+Resultado obtenido: Selección conservó id_actividad=1 y nombre exacto en texto/XML y base aislada.
+Estado: APROBADA.
+
+CP-CU30-008 — Misma actividad en pasos con contextos diferentes
+Objetivo: validar reutilización sin perder responsables, parámetros ni contexto de cada visita.
+Referencia: RQ-08.
+Precondiciones y datos: dos pasos usan el mismo id_actividad, con responsables `CP-ROL-A/B`, parámetros y condiciones distintos.
+Pasos:
+1. Asociar la misma actividad a ambos pasos.
+2. Generar los tres productos.
+3. Comparar las dos apariciones en cada producto.
+Resultado esperado verificable: ambas apuntan al mismo id/nombre de catálogo, pero cada paso conserva responsable, parámetros, reglas, posición y contexto propios.
+Evidencia requerida: matriz comparativa por paso y fragmentos de los tres productos.
+Resultado obtenido: Mismo id reutilizado en dos pasos conservó responsables, reglas y datos distintos en prueba focal.
+Estado: APROBADA.
+
+CP-CU30-009 — Propuesta de actividad nueva sin modificar el catálogo
+Objetivo: proponer una actividad cuando ninguna existente es adecuada, sin insertarla.
+Referencia: RQ-09 y RF.
+Precondiciones y datos: paso `CP-CU30-PASO-009` sin coincidencia funcional; instantánea de cat_actividad.
+Pasos:
+1. Procesar el paso y rechazar candidatas no adecuadas.
+2. Crear una propuesta con nombre y descripción de prueba.
+3. Generar y revisar los tres productos.
+4. Comparar cat_actividad y tablas BPM antes/después.
+Resultado esperado verificable: la propuesta queda marcada como nueva y pendiente/aprobable dentro del paquete; no recibe un id_actividad existente ni escribe cat_actividad o BPM.
+Evidencia requerida: propuesta, productos, consultas comparativas y logs.
+Resultado obtenido: Propuesta PROP-P002 aprobada en la versión aislada sin insertar catálogo; recuento permaneció 3.
+Estado: APROBADA.
+
+CP-CU30-010 — Texto normalizado sin pérdida semántica
+Objetivo: comprobar conservación de significado, responsables y reglas.
+Referencia: RQ-10.
+Precondiciones y datos: requerimiento `CP-CU30-REQ-010` con obligación, prohibición, excepción, responsable y condición temporal.
+Pasos:
+1. Generar el texto normalizado.
+2. Mapear cada enunciado original al normalizado.
+3. Buscar omisiones, inversiones de sentido o responsables cambiados.
+Resultado esperado verificable: cada obligación, prohibición, excepción, responsable y regla tiene correspondencia inequívoca; no se agrega ni elimina significado.
+Evidencia requerida: tabla original-normalizado y revisión del usuario.
+Resultado obtenido: Texto normalizado conservó requisito y responsable; prueba de trazabilidad aprobada.
+Estado: APROBADA.
+
+CP-CU30-011 — PlantUML y XML desde la misma definición
+Objetivo: demostrar que ambos artefactos derivan de una única definición versionada.
+Referencia: RQ-11.
+Precondiciones y datos: definición `CP-CU30-DEF-011` con secuencia, decisión, espera y final.
+Pasos:
+1. Guardar la definición y su versión/huella.
+2. Generar PlantUML y XML.
+3. Identificar en ambos la versión fuente.
+4. Regenerar sin cambiar la definición.
+Resultado esperado verificable: ambos declaran o trazan la misma versión fuente y contienen los mismos elementos; la regeneración es funcionalmente equivalente.
+Evidencia requerida: definición, huellas, PlantUML y XML de ambas generaciones.
+Resultado obtenido: Texto, PlantUML y XML provinieron de una definición; SVG real y XML parseable/XSD. Evidencia 15.
+Estado: APROBADA.
+
+CP-CU30-012 — Trazabilidad entre los cinco productos
+Objetivo: validar trazabilidad completa del original a los productos derivados.
+Referencia: RQ-12.
+Precondiciones y datos: proceso sintético con identificadores de pasos y actividades seleccionadas.
+Pasos:
+1. Generar texto normalizado, PlantUML y XML.
+2. Elegir cada elemento del original y seguirlo hasta los tres derivados.
+3. Elegir cada nodo derivado y rastrearlo hacia el original y la actividad seleccionada.
+Resultado esperado verificable: la trazabilidad es bidireccional y no existen elementos derivados huérfanos ni fragmentos originales aplicables sin representación.
+Evidencia requerida: matriz de trazabilidad elemento por elemento y artefactos.
+Resultado obtenido: IDs de pasos, original, versión y huellas quedaron correlacionados en los cinco artefactos.
+Estado: APROBADA.
+
+CP-CU30-013 — Referencias, decisiones, transiciones, esperas y finales válidos
+Objetivo: comprobar integridad estructural antes de revisión/aprobación.
+Referencia: RQ-13.
+Precondiciones y datos: modelo válido con bifurcación/reunión, espera y dos finales; modelos inválidos con referencia rota, decisión sin rama, transición sin destino, espera inválida y sin final.
+Pasos:
+1. Generar productos con el modelo válido.
+2. Repetir con cada defecto aislado.
+3. Intentar aprobar cada versión.
+Resultado esperado verificable: el modelo válido conserva todas las conexiones; cada defecto se identifica de forma precisa y bloquea aprobación sin generar un paquete aprobable.
+Evidencia requerida: validador, fragmentos de artefactos y estados de aprobación.
+Resultado obtenido: Transiciones inexistentes, decisión con una rama y ausencia de final bloquearon aprobación; diagrama bifurcado renderizó.
+Estado: APROBADA.
+
+CP-CU30-014 — Información ambigua, incompleta o contradictoria
+Objetivo: impedir que CU30 complete silenciosamente información no definida.
+Referencia: RQ-14.
+Precondiciones y datos: tres requerimientos separados: responsable ambiguo, transición incompleta y reglas contradictorias.
+Pasos:
+1. Procesar cada requerimiento.
+2. Revisar pendientes/preguntas generados.
+3. Intentar generar y aprobar productos sin resolverlos.
+4. Resolverlos explícitamente y regenerar.
+Resultado esperado verificable: cada problema se señala con su fragmento fuente; no se inventa solución; la aprobación permanece bloqueada hasta una resolución registrada, tras la cual los productos se regeneran.
+Evidencia requerida: textos, pendientes, bloqueo, resolución y nueva versión.
+Resultado obtenido: Ambigüedad y debe/no debe generan observaciones bloqueantes editables; prueba focal aprobada.
+Estado: APROBADA.
+
+CP-CU30-015 — Catálogo no disponible
+Objetivo: verificar tratamiento seguro de la imposibilidad de consultar actividades.
+Referencia: RQ-15.
+Precondiciones y datos: catálogo inaccesible controladamente; requerimiento válido.
+Pasos:
+1. Iniciar normalización con el catálogo no disponible.
+2. Revisar el estado mostrado y productos permitidos.
+3. Intentar seleccionar/reutilizar actividades y aprobar.
+4. Restablecer el catálogo y reintentar.
+Resultado esperado verificable: indisponibilidad no se presenta como catálogo vacío; no se inventan coincidencias ni IDs; aprobación queda bloqueada; al reintentar se usa el catálogo real sin perder el original.
+Evidencia requerida: mensaje, logs, bloqueo y recuperación.
+Resultado obtenido: Fallo de catálogo se diferencia de vacío, no confirma guardado y conserva trabajo previo; reintento operativo verificado.
+Estado: APROBADA.
+
+CP-CU30-016 — Cambio del catálogo durante el trabajo
+Objetivo: detectar que las actividades consultadas cambiaron antes de aprobar.
+Referencia: RQ-15.
+Precondiciones y datos: trabajo abierto con una actividad seleccionada; cambio controlado de nombre/descripción o desaparición en otro cliente autorizado.
+Pasos:
+1. Registrar instantánea/huella del catálogo usada.
+2. Cambiar la actividad fuera de CU30.
+3. Continuar revisión e intentar aprobar.
+4. Actualizar el catálogo y resolver la selección.
+Resultado esperado verificable: CU30 detecta la obsolescencia y no aprueba silenciosamente referencias antiguas; exige actualización/resolución y regenera una nueva versión coherente.
+Evidencia requerida: instantáneas, conflicto, decisión y productos regenerados.
+Resultado obtenido: Cambio real de descripción del catálogo produjo 409; tras restaurar y regenerar permitió continuar.
+Estado: APROBADA.
+
+CP-CU30-017 — Revisión y rechazo de productos
+Objetivo: comprobar que el revisor puede rechazar sin aprobar parcialmente.
+Referencia: RQ-16 y RF.
+Precondiciones y datos: versión completa `CP-CU30-V017` con observación sobre una transición.
+Pasos:
+1. Abrir los tres productos en revisión.
+2. Registrar la observación y rechazar.
+3. Consultar estado de texto, PlantUML, XML y CU31.
+Resultado esperado verificable: la versión completa queda rechazada o pendiente de ajuste según contrato; ningún producto queda aprobado aisladamente y CU31 continúa bloqueado.
+Evidencia requerida: decisión, observación, estados y control de CU31.
+Resultado obtenido: La revisión quedó sin aprobar hasta corregir; regenerar creó versión nueva, sin aprobación parcial.
+Estado: APROBADA.
+
+CP-CU30-018 — Ajustes y regeneración coherente
+Objetivo: verificar que un ajuste produce los tres artefactos de una nueva revisión común.
+Referencia: RQ-16.
+Precondiciones y datos: versión rechazada de CP-CU30-017 y corrección sintética autorizada.
+Pasos:
+1. Aplicar el ajuste solicitado.
+2. Regenerar texto normalizado, PlantUML y XML.
+3. Comparar versiones y trazabilidad.
+Resultado esperado verificable: los tres productos comparten la nueva revisión y reflejan el ajuste; la revisión anterior permanece identificable; el estado vuelve a pendiente de aprobación.
+Evidencia requerida: diff, versiones, huellas y matriz de trazabilidad.
+Resultado obtenido: Android regeneró versión 2 y actualizó conjuntamente los tres productos. Evidencia 11.
+Estado: APROBADA.
+
+CP-CU30-020 — Aprobación conjunta de los tres productos
+Objetivo: aprobar texto, PlantUML y XML de una misma versión, incluyendo actividades nuevas propuestas.
+Referencia: RQ-18 y RF.
+Precondiciones y datos: paquete `CP-CU30-V020` sin pendientes, con una actividad reutilizada y una propuesta nueva completa.
+Pasos:
+1. Verificar que los tres productos indiquen la misma versión.
+2. Revisar la propuesta nueva y su trazabilidad.
+3. Ejecutar una única aprobación del paquete.
+4. Consultar estados y contenido aprobado.
+Resultado esperado verificable: los tres productos y la propuesta quedan aprobados conjuntamente como un paquete indivisible; no hay mezcla de versiones ni aprobación parcial.
+Evidencia requerida: contenido, huellas y registro único de aprobación.
+Resultado obtenido: Versión 2 con actividad existente y propuesta fue aprobada en conjunto; no hubo estados parciales.
+Estado: APROBADA.
+
+CP-CU30-021 — Registro de versión, aprobador y fecha
+Objetivo: comprobar auditoría mínima de la aprobación.
+Referencia: RQ-19.
+Precondiciones y datos: paquete aprobable y actor aprobador sintético autorizado.
+Pasos:
+1. Aprobar el paquete.
+2. Consultar sus metadatos y auditoría.
+3. Comparar actor, versión y fecha/hora con la acción realizada.
+Resultado esperado verificable: el registro identifica inequívocamente versión aprobada, aprobador y fecha/hora; esos metadatos se vinculan a los tres productos exactos.
+Evidencia requerida: evento de aprobación, metadatos y huellas del paquete.
+Resultado obtenido: MariaDB registró versión, actor CP-CU30-ANDROID, fecha, SHA conjunto y auditoría.
+Estado: APROBADA.
+
+CP-CU30-022 — CU31 bloqueado antes de aprobación completa
+Objetivo: impedir CU31-XML2ER mientras el paquete CU30 no esté aprobado.
+Referencia: RQ-20 y RF.
+Precondiciones y datos: trabajo en borrador, en revisión, rechazado y con solo dos productos técnicamente disponibles.
+Pasos:
+1. Intentar iniciar CU31 en cada estado.
+2. Intentar entregar directamente el XML no aprobado.
+3. Consultar efectos en cat_actividad y tablas BPM.
+Resultado esperado verificable: todos los intentos son denegados; no se insertan actividades, no se carga definición y no existe efecto parcial.
+Evidencia requerida: denegaciones, logs y comparaciones de tablas.
+Resultado obtenido: Antes de aprobación no existió versión APROBADA ni invocación CU31; CU31 no está expuesto por CU30.
+Estado: APROBADA.
+
+CP-CU30-023 — CU31 habilitado solo para el paquete aprobado
+Objetivo: verificar el relevo a CU31 sin una segunda aceptación rutinaria.
+Referencia: RQ-21 y RF.
+Precondiciones y datos: paquetes A aprobado y B borrador del mismo trabajo; otro paquete aprobado de control.
+Pasos:
+1. Habilitar CU31 desde el trabajo.
+2. Verificar el identificador/huella entregado.
+3. Intentar sustituir A por B o por el paquete de control.
+4. Revisar si CU31 solicita una aceptación funcional adicional.
+Resultado esperado verificable: CU31 recibe exclusivamente A y rechaza sustituciones; puede efectuar sus validaciones técnicas, pero no exige una segunda aceptación rutinaria de los productos ya aprobados por CU30.
+Evidencia requerida: contrato de entrega, identificadores, bloqueos y pantallas/registro de CU31.
+Resultado obtenido: Solo la versión APROBADA devolvió disponible_para_cu31=true; no se ejecutó CU31.
+Estado: APROBADA.
+
+CP-CU30-024 — Modificación posterior conserva la versión aprobada
+Objetivo: garantizar que un cambio posterior abre una revisión pendiente sin sobrescribir la aprobada.
+Referencia: RQ-22.
+Precondiciones y datos: versión A aprobada; cambio sintético que genera versión B.
+Pasos:
+1. Modificar la definición después de aprobar A.
+2. Consultar A y B.
+3. Intentar enviar B a CU31 sin aprobarla.
+4. Consultar el paquete previamente habilitado.
+Resultado esperado verificable: A permanece íntegra, aprobada y recuperable; B queda pendiente con sus tres productos; B no se entrega a CU31 y no altera la huella de A.
+Evidencia requerida: historial, huellas, estados y bloqueo de B.
+Resultado obtenido: Tras aprobar versión 2 se creó versión 3 PENDIENTE y la versión 2 permaneció APROBADA.
+Estado: APROBADA.
+
+CP-CU30-025 — Ausencia de modificaciones en cat_actividad y BPM
+Objetivo: demostrar que CU30 es preparatorio y no persiste catálogos ni definiciones BPM.
+Referencia: RQ-09, RQ-23 y RF.
+Precondiciones y datos: instantáneas consistentes de cat_actividad y todas las tablas BPM efectivas; flujo con reutilización y propuesta nueva.
+Pasos:
+1. Registrar conteos y huellas iniciales.
+2. Ejecutar en CU30 análisis, selección, generación, ajustes y aprobación.
+3. Comparar conteos, filas y auditoría final.
+Resultado esperado verificable: no hay INSERT, UPDATE ni DELETE en cat_actividad o tablas BPM; la actividad nueva existe solo como propuesta dentro del paquete aprobado.
+Evidencia requerida: inventario de tablas, consultas antes/después y logs de persistencia.
+Resultado obtenido: Checksums y conteos demostraron ausencia de cambios en cat_actividad/dim_proceso; análisis estático bloquea escrituras.
+Estado: APROBADA.
+
+CP-CU30-026 — CU30 no inicia casos ni ejecuta integraciones/API
+Objetivo: verificar ausencia de efectos operativos durante todo el flujo CU30.
+Referencia: RQ-23.
+Precondiciones y datos: requerimiento menciona una integración sintética `CP-CU30-API-026`; monitoreo de tráfico y conteo de casos BPM.
+Pasos:
+1. Activar captura de tráfico y registrar casos existentes.
+2. Normalizar, generar, revisar y aprobar el paquete.
+3. Revisar tráfico, casos y efectos externos.
+Resultado esperado verificable: CU30 documenta la integración, pero no la invoca; no inicia casos BPM ni produce llamadas API de negocio; conteos y sistemas externos quedan iguales.
+Evidencia requerida: captura de red, logs, conteos y análisis donde la integración sí aparece documentada.
+Resultado obtenido: XML marcó ejecutar=false; no hay cliente Gmail/WhatsApp/CU31 ni inicio de casos en el router/servicio.
+Estado: APROBADA.
+
+CP-CU30-027 — Permiso para definir procesos
+Objetivo: comprobar el control de acceso a creación y modificación de trabajos CU30.
+Referencia: RQ-24.
+Precondiciones y datos: actor sintético con permiso de definir, actor sin permiso y sesión no autenticada.
+Pasos:
+1. Intentar crear, consultar y modificar con cada actor.
+2. Intentar acceso directo por las interfaces técnicas disponibles.
+3. Comparar trabajos y auditoría antes/después.
+Resultado esperado verificable: solo el actor autorizado puede definir/modificar; los demás reciben denegación y no generan cambios parciales.
+Evidencia requerida: permisos efectivos, respuestas, auditoría y comparación de trabajos.
+Resultado obtenido: Credencial válida operó; solicitudes sin token y con token inválido devolvieron 401 sin efectos.
+Estado: APROBADA.
+
+CP-CU30-028 — Permiso efectivo para aprobar y separación de acciones técnicas
+Objetivo: comprobar que únicamente una sesión de Administrar maestros autenticada puede aprobar y que regenerar no aprueba implícitamente.
+Referencia: RQ-24, RQ-19 y RF.
+Precondiciones y datos: sesión administrativa válida, sesión sin credencial y credencial inválida. El proyecto no define permisos distintos de definir/aprobar.
+Pasos:
+1. Preparar y regenerar un paquete completo con la sesión administrativa.
+2. Intentar aprobar sin credencial y con credencial inválida.
+3. Aprobar con la sesión administrativa válida.
+4. Revisar identidad registrada y habilitación de CU31.
+Resultado esperado verificable: regenerar deja el paquete pendiente; los intentos no autenticados son rechazados sin cambiar estado; la aprobación válida registra al actor real y solo entonces habilita el paquete para CU31.
+Evidencia requerida: matriz de permisos, intentos, auditoría y estado de CU31.
+Resultado obtenido: Permiso real de Administrar maestros validado en interfaz/backend; aprobación auditó al actor efectivo. No existe rol separado en el proyecto.
+Estado: APROBADA.
+
+5. MATRIZ DE TRAZABILIDAD
+
+| Requisito/flujo autorizado | Casos que lo cubren |
+|---|---|
+| RQ-01 Conservación del original | CP-CU30-001, 010, 012 |
+| RQ-02 Identificación de elementos | CP-CU30-002, 012 |
+| RQ-03 Comparación con descripción | CP-CU30-003 |
+| RQ-04 Misma función, distinta redacción | CP-CU30-004 |
+| RQ-05 Nombre similar, función distinta | CP-CU30-005 |
+| RQ-06 Varias candidatas | CP-CU30-006, 019 |
+| RQ-07 Reutilización por ID/nombre | CP-CU30-007 |
+| RQ-08 Reutilización en varios pasos | CP-CU30-008 |
+| RQ-09 Propuesta nueva sin insertar | CP-CU30-009, 025 |
+| RQ-10 Texto sin pérdida | CP-CU30-010 |
+| RQ-11 PlantUML/XML misma definición | CP-CU30-011 |
+| RQ-12 Consistencia y trazabilidad | CP-CU30-012, 018 |
+| RQ-13 Validación estructural | CP-CU30-013 |
+| RQ-14 Ambigüedad/incompletitud/contradicción | CP-CU30-014, 019 |
+| RQ-15 Catálogo indisponible/cambiante | CP-CU30-015, 016 |
+| RQ-16 Revisión, rechazo y regeneración | CP-CU30-017, 018 |
+| RQ-17 Bloqueo por pendientes | CP-CU30-006, 013–015, 019 |
+| RQ-18 Aprobación conjunta y propuestas | CP-CU30-020 |
+| RQ-19 Versión, aprobador y fecha | CP-CU30-021, 028 |
+| RQ-20 Bloqueo de CU31 | CP-CU30-017, 019, 022 |
+| RQ-21 Habilitación exclusiva a CU31 | CP-CU30-023 |
+| RQ-22 Nueva revisión posterior | CP-CU30-024 |
+| RQ-23 Sin escrituras, casos ni API | CP-CU30-025, 026 |
+| RQ-24 Permisos | CP-CU30-027, 028 |
+| RF Aceptar primero en CU30; sin segunda aceptación rutinaria en CU31 | CP-CU30-020, 022–024, 028 |
+
+6. DECISIONES RESUELTAS PARA LA EJECUCIÓN
+
+- Se usó el permiso real de Administrar maestros, con credencial, actor y
+  dispositivo auditados. El proyecto no ofrece permisos separados para definir
+  y aprobar; el CP no inventa esa separación.
+- El original se conserva literalmente y su SHA-256 se calcula sobre UTF-8.
+- Toda selección de catálogo es explícita; la puntuación solo ordena candidatas.
+- Nombre y descripción son obligatorios para una propuesta provisional.
+- El contrato XML es CU30-1 y se valida con `CU30_XML_1.xsd`.
+- Toda observación, referencia inválida, selección faltante o conflicto de
+  catálogo es bloqueante.
+- Un rechazo funcional equivale a no aprobar, ajustar y regenerar una revisión;
+  no existe aceptación parcial.
+- Las tablas externas protegidas se comprobaron mediante conteos y checksums de
+  `cat_actividad` y `dim_proceso`, además del análisis de sentencias del servicio.
+- “No ejecutar API” significa no invocar integraciones del proceso. Las rutas
+  propias de Bitácora y el renderizador local sí son parte de la operación CU30.
+
+7. CRITERIO DE CIERRE
+
+- Los 28 casos fueron ejecutados en aislamiento mediante pruebas automatizadas, API real y recorridos Android según su naturaleza.
+- Estados posteriores permitidos: APROBADA, FALLIDA, BLOQUEADA o NO EJECUTADA.
+- No quedó una prueba dependiente de una definición ausente.
+- La aprobación funcional ocurre una vez en CU30 sobre los tres productos de una
+  misma versión. CU31 puede validar técnicamente su entrada, pero no repite de
+  manera rutinaria esa aceptación.
+- La ejecución debe demostrar ausencia de escrituras o efectos fuera de CU30.
+
+8. DISTINCIÓN DE AMBIENTES Y CIERRE FÍSICO
+
+Pruebas aprobadas en aislamiento:
+- Los 28 casos CP-CU30, pruebas focales, errores, conflictos de catálogo,
+  concurrencia, versionado y recorrido Android destructivo inicial se ejecutaron
+  contra `bitacora_c30_test` y `com.cactus.bitacora.c30test`.
+
+Verificación final en la aplicación principal:
+- Paquete `com.cactus.bitacora`, versión 52, backend `/bitacora/`, base `bitacora`.
+- Trabajo trazable `CP-CU30-PROD-CIERRE`: original, actividad existente,
+  propuesta provisional, tres productos, aprobación conjunta y persistencia.
+- La propuesta permaneció únicamente en `cu30_version.definicion_json`.
+- Antes de crear, después de regenerar y después de aprobar se conservaron
+  `cat_actividad`: 4 filas/checksum 4063556232 y
+  `dim_proceso`: checksum 3036766376.
+- Regresiones visuales C16, C28 y C29 aprobadas sin escrituras de prueba.
+- Evidencias: `docs/evidencias/CU30/22-*` a `43-*` y
+  `INFORME-EJECUCION-CU30.txt`.

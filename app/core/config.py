@@ -38,5 +38,6 @@ class Settings(BaseSettings):
     WHISPER_MODEL_PATH: str = "/srv/bitacora/tools/whisper.cpp/models/ggml-small.bin"
     TRANSCRIPTION_LANGUAGE: str = "es"
     TRANSCRIPTION_ENGINE: str = "whisper.cpp/small"
+    PLANTUML_JAR_PATH: str = "/srv/bitacora/tools/plantuml.jar"
 
 settings = Settings()

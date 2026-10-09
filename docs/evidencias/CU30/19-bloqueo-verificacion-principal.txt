@@ -1,0 +1,19 @@
+Fecha: 2026-10-09 America/Bogota
+Dispositivo: vivo V2035, serial 3065397347006YM
+Paquete instalado: com.cactus.bitacora
+
+Comprobación ADB:
+- mCurrentFocus: com.android.systemui / NotificationShade
+- mDreamingLockscreen: true
+- mWakefulness: Asleep
+- Mensaje visible al despertar: “Utilice su huella digital, rostro o dibuje su
+  patrón de desbloqueo”.
+
+Acciones intentadas dentro del alcance:
+1. `cmd statusbar collapse`.
+2. Inicio explícito de `com.cactus.bitacora/.MainActivity`.
+3. `KEYCODE_WAKEUP` y gesto normal de desbloqueo.
+
+Resultado: la actividad de Bitácora queda como mFocusedApp, pero el bloqueo del
+sistema conserva el foco y exige autenticación física. No se intentó eludir ni
+alterar la seguridad del dispositivo.

@@ -38,6 +38,9 @@ import com.cactus.bitacora.model.ParticipantTypeStatusIn
 import com.cactus.bitacora.model.ActivityCatalogIn
 import com.cactus.bitacora.model.ProcessAdminIn
 import com.cactus.bitacora.model.ProcessAdminOut
+import com.cactus.bitacora.model.Cu30Definition
+import com.cactus.bitacora.model.Cu30VersionUpdate
+import com.cactus.bitacora.model.Cu30WorkCreate
 import com.cactus.bitacora.model.AdministrativeAreaIn
 import com.cactus.bitacora.model.CalendarHolidayUpdateIn
 import com.cactus.bitacora.model.CalendarTreeNodeOut
@@ -378,6 +381,24 @@ class BitacoraRepository(
 
     suspend fun deleteAdminProcess(actor: String, id: Int) =
         api.deleteAdminProcess(adminAuthorization(), actor.trim(), Build.MODEL, id)
+
+    suspend fun cu30Works(actor: String) =
+        api.getCu30Works(adminAuthorization(), actor.trim(), Build.MODEL)
+
+    suspend fun createCu30Work(actor: String, title: String, original: String) =
+        api.createCu30Work(adminAuthorization(), actor.trim(), Build.MODEL, Cu30WorkCreate(title.trim(), original))
+
+    suspend fun cu30Work(actor: String, id: String) =
+        api.getCu30Work(adminAuthorization(), actor.trim(), Build.MODEL, id)
+
+    suspend fun regenerateCu30Work(actor: String, id: String, definition: Cu30Definition, version: Int) =
+        api.regenerateCu30Work(adminAuthorization(), actor.trim(), Build.MODEL, id, Cu30VersionUpdate(definition, version))
+
+    suspend fun approveCu30Work(actor: String, id: String, version: Int) =
+        api.approveCu30Work(adminAuthorization(), actor.trim(), Build.MODEL, id, version)
+
+    suspend fun cu30DiagramSvg(actor: String, id: String): String =
+        api.getCu30Diagram(adminAuthorization(), actor.trim(), Build.MODEL, id).string()
 
     suspend fun createAdminParticipantType(
         actor: String,

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="proceso">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="pasos">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="paso" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="requerimiento" type="xs:string"/>
+                    <xs:element name="transicion" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType><xs:attribute name="destino" type="xs:string" use="required"/></xs:complexType>
+                    </xs:element>
+                    <xs:element name="documento" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    <xs:element name="regla" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    <xs:element name="dato" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                    <xs:element name="integracion" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="nombre" type="xs:string" use="required"/>
+                        <xs:attribute name="ejecutar" use="required"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="false"/></xs:restriction></xs:simpleType></xs:attribute>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="id" type="xs:string" use="required"/>
+                  <xs:attribute name="tipo" use="required"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="actividad"/><xs:enumeration value="decision"/><xs:enumeration value="espera"/><xs:enumeration value="final"/></xs:restriction></xs:simpleType></xs:attribute>
+                  <xs:attribute name="responsable" type="xs:string" use="required"/>
+                  <xs:attribute name="actividad_tipo" type="xs:string" use="optional"/>
+                  <xs:attribute name="id_actividad" type="xs:unsignedInt" use="optional"/>
+                  <xs:attribute name="codigo_provisional" type="xs:string" use="optional"/>
+                  <xs:attribute name="actividad_nombre" type="xs:string" use="optional"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="version_gramatica" use="required" fixed="cu30-1"/>
+      <xs:attribute name="nombre" type="xs:string" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

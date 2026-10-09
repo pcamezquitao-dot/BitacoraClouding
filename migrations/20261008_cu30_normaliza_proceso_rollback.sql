@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS cu30_auditoria;
+DROP TABLE IF EXISTS cu30_version;
+DROP TABLE IF EXISTS cu30_trabajo;

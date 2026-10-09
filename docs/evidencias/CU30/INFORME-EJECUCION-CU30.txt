@@ -1,0 +1,128 @@
+INFORME DE EJECUCIÓN — CU30 NORMALIZA PROCESO
+Fecha: 2026-10-09 (America/Bogota)
+Célula: CU30
+Rama: CU30-normaliza-proceso
+Base funcional: 9d99ffd (C29 final)
+
+1. AMBIENTES EFECTIVOS
+
+- Aislado: https://161-22-47-89.sslip.io/bitacora-c30-test/
+  Base: bitacora_c30_test. Servicio: bitacora-c30-test.service, puerto 8013.
+  Paquete Android: com.cactus.bitacora.c30test.
+- Principal: https://161-22-47-89.sslip.io/bitacora/
+  Base: bitacora. Servicio público: bitacora-api.service, puerto 8001.
+  Paquete Android: com.cactus.bitacora.
+- Dispositivo: vivo V2035, serial 3065397347006YM.
+
+2. RESPALDOS Y CAMBIOS DE ESQUEMA
+
+- MariaDB: /srv/backups/bitacora-before-cu30-20261009-003826.sql.gz
+  SHA-256: 52e54be153510ebbc392d3d6807369acc449ba580b0ad27d9136e8f09015194e.
+- Datos recuperables de la aplicación y APK anterior (fuera de Git):
+  C:\Bitacora\backups\backups-20261009-003826\.
+- Migración aplicada: 20261008_cu30_normaliza_proceso.sql.
+- Tablas nuevas: cu30_trabajo, cu30_version y cu30_auditoria. No se alteró
+  cat_actividad ni una tabla BPM.
+- CHECKSUM antes/después: cat_actividad=4063556232;
+  dim_proceso=3036766376. cat_actividad conservó 4 filas en producción.
+
+3. IMPLEMENTACIÓN VERIFICADA
+
+- Original inmutable con SHA-256, trabajos retomables, revisiones y auditoría.
+- Correspondencia local explicable por nombre, descripción, conceptos y contexto;
+  nunca selecciona automáticamente.
+- Selección exacta por id_actividad/nombre o propuesta provisional estable.
+- Edición de responsable, tipo, transiciones, documentos, reglas, datos,
+  integraciones y observaciones bloqueantes.
+- Texto, PlantUML y XML CU30-1 generados desde una definición única.
+- PlantUML real mediante plantuml.jar y Graphviz; XML con XSD versionado.
+- Revalidación de catálogo, concurrencia optimista y aprobación conjunta exacta.
+- CU30 no ejecuta integraciones, no llama CU31 y no escribe catálogo/BPM.
+
+4. RESULTADOS TÉCNICOS
+
+- Backend completo final: 220 aprobadas, 2 omitidas preexistentes y 17
+  subpruebas aprobadas.
+- Backend focal final: 16 aprobadas (servicio y contrato CU30).
+- Android focal: Cu30NormalizaProcesoPolicyTest aprobada.
+- Android completa c30test: BUILD SUCCESSFUL.
+- Android completa productionDebug: BUILD SUCCESSFUL.
+- PlantUML de decisión con dos ramas: SVG real producido; Graphviz 14.1.2.
+
+5. RECORRIDO FÍSICO AISLADO
+
+- Se creó desde Android CP-CU30-ANDROID-001.
+- Original SHA-256: 6f14d19af8911fd2c4a30f9b0dda681dccaced7ed427121ce8f074c0ebd2baa2.
+- Se eligió explícitamente id_actividad=1, nombre exacto
+  “CP-CU30 Validar documento”.
+- Se regeneró versión 2 sin pendientes y se aprobó conjuntamente.
+- MariaDB confirmó estado APROBADA, aprobador CP-CU30-ANDROID y fecha
+  2026-10-09 07:25:36.478432.
+- Tras cerrar/reabrir, Android recuperó versión 2 APROBADA.
+- Se comprobó el diagrama renderizado y los cuatro tipos de paso visibles.
+- Defectos detectados y repetidos: credencial omitida en una compilación de
+  prueba, responsable falso en paso final y chip “final” oculto. Todos fueron
+  corregidos antes de preparar la principal.
+
+6. APLICACIÓN PRINCIPAL
+
+- Actualización instalada con `adb install -r`; no hubo desinstalación ni
+  borrado de almacenamiento.
+- versionCode=52; versionName=maria52-cu30-normaliza-proceso.
+- SHA-256 APK: 3596F533E743076D02DE79A3E5B264A994926E3C57E0FDBE8B475E4204282262.
+- Firma anterior/nueva idéntica:
+  81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0.
+- firstInstallTime conservado: 2026-10-06 13:50:35.
+- Room y preferencias permanecen presentes después de actualizar.
+
+7. VERIFICACIÓN FINAL EN LA APLICACIÓN PRINCIPAL
+
+El 2026-10-09 se retomó el V2035 desbloqueado y se completó el recorrido sobre
+`com.cactus.bitacora`, versión 52:
+
+- Acceso a CU30 y creación física de `CP-CU30-PROD-CIERRE`.
+- Conservación del original y SHA-256
+  `2b53c18f47fba43d62d63e75ef8e2aeb9ebf382d405a1859b3b95795270a0680`.
+- Selección explícita de la actividad existente id 1,
+  `C28-VALIDACION-V2035-20261008`.
+- Propuesta controlada `PROP-P002`, nombre
+  `CP-CU30-Clasificar-muestra`, sin inserción en `cat_actividad`.
+- Regeneración y consulta de texto, PlantUML renderizado y XML de la versión 2.
+- Aprobación conjunta: actor `CP-CU30-PROD-20261009`, contenido SHA-256
+  `ee35ba6126feab22526d2f2532ad29a8fd71970193fd388f214c5b68f75db46b`.
+- Persistencia comprobada después de forzar cierre y volver a abrir la app.
+- C16: resumen de solo lectura, árbol interactivo, alta raíz, `+` por área,
+  acciones y repliegue por nombre comprobados.
+- C28: nota, listado, detalle y apertura/cancelación del formulario comprobados.
+- C29: catálogo, resumen, árbol, expansión y formulario raíz comprobados;
+  `tipo_proceso=1` no aceptó entrada y permaneció de solo lectura.
+
+Durante el recorrido se detectó que el analizador encontraba `por` dentro de
+`soporte` y producía un responsable incorrecto. Se corrigió con límites de
+palabra, se agregó una regresión automatizada, se desplegó solo el backend y se
+repitió el flujo afectado. No fue necesario reinstalar la APK.
+
+Integridad final: `cat_actividad` conservó 4 filas y checksum 4063556232;
+`dim_proceso` conservó checksum 3036766376. CU31 no se ejecutó.
+
+8. EVIDENCIAS PRINCIPALES
+
+- 09-creacion-android-original.png
+- 10-candidatos-android.png
+- 11-regeneracion-android.png
+- 12-aprobacion-conjunta-android.png
+- 13-persistencia-tras-reinicio.png
+- 14-tipos-completos.png
+- 15-plantuml-renderizado.png
+- 16-produccion-antes-esquema.txt
+- 18-produccion-despues-despliegue.txt
+- 22-principal-original-conservado.png
+- 24-principal-propuesta-nueva.png
+- 27-principal-plantuml-svg.png
+- 28-principal-xml-v2.png
+- 30-principal-propuesta-sin-escritura.txt
+- 32-principal-aprobado-integridad.txt
+- 33-principal-persistencia-reinicio.png
+- 35-regresion-c16-areas.png y 36-regresion-c16-arbol-interactivo.png
+- 38-regresion-c28-catalogo.png y 39-regresion-c28-formulario.png
+- 40-regresion-c29-arbol.png a 43-regresion-c29-tipo-proceso.png

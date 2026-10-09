@@ -48,6 +48,11 @@ import com.cactus.bitacora.model.ActivityCatalogOut
 import com.cactus.bitacora.model.ProcessAdminIn
 import com.cactus.bitacora.model.ProcessAdminOut
 import com.cactus.bitacora.model.ProcessDeleteOut
+import com.cactus.bitacora.model.Cu30ApprovalOut
+import com.cactus.bitacora.model.Cu30VersionUpdate
+import com.cactus.bitacora.model.Cu30WorkCreate
+import com.cactus.bitacora.model.Cu30WorkOut
+import com.cactus.bitacora.model.Cu30WorkSummary
 import com.cactus.bitacora.model.ReservoirSatelliteImageOut
 import com.cactus.bitacora.model.ReservoirSatelliteOut
 import okhttp3.ResponseBody
@@ -64,6 +69,24 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("admin/normaliza-proceso")
+    suspend fun getCu30Works(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String): List<Cu30WorkSummary>
+
+    @POST("admin/normaliza-proceso")
+    suspend fun createCu30Work(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Body payload: Cu30WorkCreate): Cu30WorkOut
+
+    @GET("admin/normaliza-proceso/{id}")
+    suspend fun getCu30Work(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: String): Cu30WorkOut
+
+    @PUT("admin/normaliza-proceso/{id}/regenerar")
+    suspend fun regenerateCu30Work(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: String, @Body payload: Cu30VersionUpdate): Cu30WorkOut
+
+    @POST("admin/normaliza-proceso/{id}/aprobar")
+    suspend fun approveCu30Work(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: String, @Query("version") version: Int): Cu30ApprovalOut
+
+    @GET("admin/normaliza-proceso/{id}/diagrama.svg")
+    suspend fun getCu30Diagram(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: String): ResponseBody
+
     @GET("admin/procesos")
     suspend fun getAdminProcesses(
         @Header("Authorization") authorization: String,
