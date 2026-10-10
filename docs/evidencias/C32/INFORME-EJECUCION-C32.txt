@@ -1,0 +1,172 @@
+INFORME DE EJECUCIÓN — C32 MOTOR BPM ONLINE/OFFLINE
+Fecha de trabajo: 2026-10-09/10 (America/Bogota)
+Estado: TERMINADA; validación aislada y verificación productiva completadas.
+
+1. BASE DE TRABAJO
+
+- Rama: C32-motor-bpm.
+- Base funcional: commit 0bbd04bedc8fc4f29e236e28e7a43151191e7a4b,
+  última integración comprobada de C31.
+- Worktree aislado: C:\Bitacora\BitacoraClouding-C32.
+- Aplicación de pruebas: com.cactus.bitacora.c32test, versionCode 54,
+  versionName maria54-c32-motor-bpm.
+- Dispositivo: vivo V2035, serie USB 3065397347006YM.
+- Backend aislado: https://161-22-47-89.sslip.io/bitacora-c32-test/.
+- Servicio: bitacora-c32-test.service, 127.0.0.1:8015.
+- Base efectiva aislada: bitacora_c32_test.
+
+2. CAMBIOS COMPROBADOS
+
+- Motor transaccional para apertura manual/des­de Novedades, inicio,
+  finalización, transición, corrección, cierre y Bitácora.
+- Validación y snapshot inmutable de definiciones.
+- UUID local↔servidor, idempotencia por contenido, revisión optimista,
+  dependencia causal y conflictos explícitos.
+- Evidencias múltiples con SHA-256, historial y fechas capturada/servidor.
+- Suspensión, reanudación, reasignación y cancelación autorizadas.
+- Bandejas con definición, caso, tarea, vencimiento, instrucciones y estado.
+- Métricas básicas administrativas por estado y etapa.
+- Room v21 con definiciones, casos, tareas, cola durable y evidencias.
+- Sincronización WorkManager y acción visible; estados técnicos separados.
+- Selector múltiple real de Android para soportes.
+
+3. DEFECTOS ENCONTRADOS Y CORREGIDOS
+
+- El router no importaba IntegrityError: un conflicto tardío devolvía 500.
+  Corregido y repetidos rollback/concurrencia.
+- El cliente enviaba dependencias solo en Room. Se añadió dependency_uuid al
+  contrato y dependencia_uuid a bpm_operacion; cliente y servidor la validan.
+- Una dependencia rechazada podía dejar avanzar sucesoras en otro ciclo.
+  Ahora la cola espera o bloquea causalmente y conserva la operación.
+- bpm_caso_control guardaba el UUID de operación como UUID de caso. Corregido
+  para conservar case_client_uuid.
+- La bandeja descargaba tareas sin materializar su caso en Room; iniciar una
+  tarea remota fallaba. El contrato incluye metadatos del caso y refresh los
+  persiste antes de las tareas.
+- La interfaz solo fabricaba un soporte de texto. Se sustituyó por selector
+  real de múltiples archivos y persistencia íntegra hasta confirmación.
+
+4. EVIDENCIAS AUTOMÁTICAS E INTEGRACIÓN
+
+- Pytest completo del repositorio: 249 aprobadas, 2 omitidas por condición
+  declarada y 17 subpruebas aprobadas; 0 fallidas. La selección focal C32 y
+  regresiones C28-C31 contiene 37 aprobadas.
+- Gradle c32test unit + assemble: BUILD SUCCESSFUL (compilación limpia).
+- integration_c32_isolated.py: aprobado; recorrido completo con 5 tareas,
+  4 enlaces, 2 evidencias, 11 hechos de historial y caso CERRADO. Incluye
+  apertura desde supervisor_novedad 932001, doble envío idempotente, bandeja,
+  métricas y rechazo de acceso a métricas.
+- integration_c32_resilience.py: aprobados permisos, soporte obligatorio,
+  rollback tardío, concurrencia, administración, revisión obsoleta y
+  dependencia causal.
+- Repetición del recorrido aislado: aprobada sin duplicar la apertura ligada
+  a Novedades.
+
+5. INSTALACIÓN AISLADA
+
+- APK instalada mediante adb install -r; almacenamiento conservado.
+- APK aislada final:
+  SHA-256 76ACA86C50EA32ABC8DAE49D34722F7C8E103A265E7C4A4C3CB335DD1498DC1A.
+- firstInstallTime conservado: 2026-10-09 20:27:45.
+- Soportes físicos preparados en Download: CP_C32_SOPORTE_A.txt y
+  CP_C32_SOPORTE_B.txt.
+
+6. RESPALDOS Y REVERSIÓN DEL ENTORNO AISLADO
+
+- Copias sucesivas del backend antes de cada actualización:
+  /root/bitacora_backups/c32/backend/app_<fecha_hora>.
+- Configuración nginx anterior:
+  /etc/nginx/sites-available/bitacora-dev-https.before-c32-20261010_032710.
+- Migración: migrations/20261009_c32_motor_bpm.sql.
+- Reversión documental: migrations/20261009_c32_motor_bpm_rollback.sql.
+- La base bitacora_c32_test deriva de bitacora_c31_test; la base de origen no
+  se modificó. Ningún fixture CP_C32 fue copiado a producción.
+
+7. PENDIENTES REALES
+
+- Ninguna prueba obligatoria queda fallida, bloqueada o sin ejecutar.
+- CP-C32-037/038 son condicionales no aplicables: las extensiones no están
+  habilitadas y su rechazo quedó cubierto por CP-C32-005.
+
+8. VALIDACIÓN FÍSICA AISLADA — RESULTADO REAL
+
+- V2035 USB 3065397347006YM accesible y desbloqueado al iniciar.
+- `com.cactus.bitacora.c32test` abrió Motor BPM y cargó desde
+  `bitacora_c32_test` la definición CP_C32_INASISTENCIA v1.
+- Se deshabilitaron Wi-Fi y datos móviles antes de crear el caso
+  CP_C32_FISICO_OFFLINE_20261009.
+- Sin red, la pantalla informó explícitamente “guardado localmente, pendiente
+  de sincronización”; MariaDB conservó conteo cero para ese asunto.
+- Room conservó UUID local de caso y tarea, OPEN_CASE LOCAL_PENDING y error de
+  DNS sin mostrar falso éxito.
+- Tras actualizar la APK con `adb install -r`, el mismo pendiente reapareció.
+  Se corrigió el orden de bandeja para priorizar pendientes/conflictos.
+- Se inició y completó la tarea offline. El selector real de Android permitió
+  elegir simultáneamente CP_C32_SOPORTE_A.txt y CP_C32_SOPORTE_B.txt.
+- Room comprobado antes del reinicio: 1 caso local, 2 tareas (original
+  completada y sucesora provisional), 3 operaciones encadenadas y 2 evidencias
+  LOCAL_PENDING con SHA-256 e integridad de contenido.
+- Se reinició físicamente el V2035. El arranque terminó (`sys.boot_completed=1`)
+  y Android volvió a proteger el almacenamiento hasta introducir el desbloqueo.
+- Evidencias: 00-*.png/xml a 14-*.png/xml y copias Room de antes del reinicio.
+
+9. CIERRE DEL RECORRIDO FÍSICO AISLADO
+
+- Tras el reinicio, Room conservó los mismos UUID, tres operaciones causales y
+  dos evidencias con los mismos hashes. MariaDB seguía sin el caso mientras no
+  había red.
+- Al recuperar conectividad, WorkManager confirmó OPEN_CASE, START_TASK y
+  COMPLETE_TASK en orden. El caso servidor fue 29 y no hubo duplicados.
+- Se corrigieron dos defectos hallados físicamente: las evidencias confirmadas
+  permanecían LOCAL_PENDING en Room y START_TASK no asignaba id_ejecutor. La
+  reconciliación no reenvía operaciones; START_TASK ahora registra al actor de
+  forma atómica. Las tareas 74, 75 y 76 comprobaron la corrección.
+- Recorrido integral: actividades 72 soporte, 73 revisión/corrección, 74 nuevo
+  soporte, 75 revisión/aceptación y 76 final/cierre. Resultado: caso CERRADO,
+  cero tareas activas, cinco filas de Bitácora, cuatro enlaces y tres
+  evidencias. Una sincronización adicional conservó 1 caso, 5 tareas,
+  4 enlaces, 3 evidencias y 11 operaciones con 11 UUID únicos.
+- Evidencia Room: room-after-device-reboot, room-after-sync,
+  room-after-evidence-fix y room-worker-second-complete-pending2.
+- Evidencia visual: archivos 15 a 45 en docs/evidencias/C32.
+
+10. PRUEBAS Y REGRESIONES
+
+- Pytest completo: 249 aprobadas, 2 omisiones condicionales y 17 subpruebas;
+  cero fallidas.
+- integration_c32_isolated.py: APROBADA (caso 30, 5 tareas, 4 enlaces,
+  2 evidencias, 11 hechos de historial).
+- integration_c32_resilience.py: APROBADAS permisos, soporte obligatorio,
+  rollback tardío, concurrencia, administración, revisión obsoleta y causalidad.
+- Regresiones visuales aisladas: C16, C28, C29, C30 y C31 accesibles; evidencias
+  46 a 54. Regresiones principales: C16, C28, C29, C30 y acceso C08; evidencias
+  57 a 63.
+
+11. PRODUCCIÓN E INSTALACIÓN FINAL
+
+- Respaldo servidor: /root/bitacora_backups/c32/production_20261009_222322/.
+  Incluye bitacora.sql, backend_app.tar.gz y unidad systemd, con SHA-256.
+- Respaldo recuperable del V2035:
+  C:\Bitacora\backups\C32_20261009_222322. Incluye APK v53 y datos de la app.
+- Migración aditiva aplicada a bitacora: columnas revision y siete tablas C32.
+  Fixtures CP_C32 copiados a producción: cero.
+- Backend principal desplegado en /srv/bitacora/app; bitacora-api.service activo;
+  base efectiva bitacora.
+- APK instalada con adb install -r, sin desinstalar ni limpiar:
+  com.cactus.bitacora, versionCode 54, maria54-c32-motor-bpm,
+  SHA-256 CC53965EC4EB6EE22C6F24672B1C4A85300AD24891298BB59C2B9C0AFFCA6596.
+  Firma SHA-256 igual a v53:
+  81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0.
+  firstInstallTime 2026-10-06 13:50:35 conservado.
+- La aplicación principal abrió Motor BPM contra
+  https://161-22-47-89.sslip.io/bitacora/. El catálogo productivo vacío se
+  mostró correctamente y no se creó ningún caso ni fixture en producción.
+
+12. RESULTADO FINAL
+
+- CP-C32: 54 pruebas aplicables APROBADAS; CP-C32-037/038 NO APLICAN porque
+  las extensiones no están habilitadas y CP-C32-005 verificó su rechazo.
+- Cero pruebas obligatorias fallidas, bloqueadas o no ejecutadas.
+- C32 MOTOR BPM: TERMINADA.
+
+FIN — DOCUMENTO CERRADO

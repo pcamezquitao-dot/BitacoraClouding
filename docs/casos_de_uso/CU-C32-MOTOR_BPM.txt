@@ -1,0 +1,444 @@
+CASO DE USO CU-C32-MOTOR_BPM
+Nombre: Ejecutar y controlar procesos mediante el motor BPM.
+Proyecto: BPM y Bitácora.
+Versión: 1.0 — 9 de octubre de 2026.
+Estado: especificación funcional para desarrollo; no acredita implementación.
+
+1. OBJETIVO
+
+Poner en operación procesos definidos sobre cat_actividad, dim_proceso,
+bpm_proceso, bpm_etapa y bpm_transicion. Abrir ejecuciones concretas,
+asignar tareas, presentar el trabajo de cada participante, determinar el
+siguiente paso y conservar la trazabilidad en bpm_caso, bpm_actividad,
+bpm_enlace_actividad y Bitácora.
+
+El BPM determina y controla el trabajo que debe ocurrir. Bitácora registra
+los hechos ocurridos. Una tarea pendiente no constituye un hecho ejecutado.
+
+2. ALCANCE Y ENTREGA
+
+Primera versión obligatoria:
+- Validar una definición ejecutable y fijar su versión para cada caso.
+- Abrir un caso manualmente o mediante un evento autorizado de Novedades.
+- Asignar cada tarea a un participante concreto según el rol de la etapa.
+- Mostrar pendientes, en curso y ejecutadas con sus documentos.
+- Iniciar y completar tareas; evaluar resultados y transiciones.
+- Registrar actividades, enlaces, decisiones y hechos en Bitácora.
+- Cerrar casos, consultar su historial y calcular métricas básicas.
+- Proteger las operaciones contra duplicados y ejecución concurrente.
+
+Extensiones previstas, sin declararlas terminadas en la primera entrega:
+recordatorios, escalamiento automático e invocación de APIs externas.
+Se especifican sus contratos en el apartado 14. Si una definición requiere
+una función aún no implementada, no podrá habilitarse para ejecución.
+
+La primera versión admite flujo secuencial, decisiones exclusivas y retornos
+para corrección. Paralelismo, uniones, subprocesos y ejecución automática de
+ciclos quedan fuera de esta entrega. El validador debe rechazarlos cuando
+su semántica no esté implementada.
+
+3. ACTORES
+
+- Participante: consulta y ejecuta sus tareas.
+- Supervisor: registra el evento de origen cuando tiene autorización.
+- Empleado afectado: aporta información y soportes solicitados.
+- Supervisor RH: ejecuta revisiones y decisiones según su ámbito autorizado.
+- Gerente u otro responsable: atiende las etapas que le correspondan.
+- Administrador BPM: habilita definiciones válidas y resuelve asignaciones
+  o errores operativos dentro de permisos explícitos.
+- Motor BPM: evalúa reglas, crea tareas y registra cambios transaccionales.
+- Sistema externo: origina eventos o recibe solicitudes mediante contrato.
+
+La autenticación y el rol determinan acceso, pero el rol por sí solo no
+autoriza a consultar todos los casos. Debe comprobarse el ámbito del actor.
+
+4. BASE DOCUMENTAL Y LÍMITES DE LO VERIFICADO
+
+Fuente: Texto pegado(9).txt, con SHOW CREATE TABLE de:
+dim_proceso, dim_proceso_copia, cat_actividad, cat_actividad_copia,
+bpm_caso, bpm_actividad y bpm_enlace_actividad.
+
+El adjunto no contiene el DDL completo de bpm_proceso, bpm_etapa,
+bpm_transicion, participante ni bitacora_diaria. Sus campos y relaciones
+deben verificarse antes de desarrollar las consultas y migraciones.
+Las referencias a versión, etapas iniciales/finales, rol y reglas son
+requisitos funcionales; no certifican columnas existentes.
+
+Las tablas terminadas en _copia son respaldos y no se usan en la operación.
+Este documento no ordena borrar, recrear ni modificar tablas productivas.
+
+5. RESPONSABILIDAD DE CADA TABLA
+
+cat_actividad:
+Catálogo reutilizable. id_actividad es INT UNSIGNED; nombre VARCHAR(100)
+único, no vacío y sin espacios extremos; descripcion TEXT opcional.
+Una misma actividad de catálogo puede intervenir en varios procesos.
+
+dim_proceso:
+Jerarquía de definición. id_proceso INT identifica el nodo y no se confunde
+con id_bpm_proceso. Incluye id_proceso_padre e id_actividad, con FK al catálogo.
+nombre VARCHAR(50) y nombre_corto VARCHAR(100) tienen restricciones de
+unicidad. tiempo_estimado y costo_estimado son estimaciones.
+La unidad de tiempo_estimado debe declararse; no se presume que son minutos.
+No se interpreta tipo_proceso sin verificar su contrato.
+
+bpm_proceso:
+Definición ejecutable y versionada del proceso. Cada caso debe conservar la
+definición utilizada. El vínculo con dim_proceso debe ser inequívoco.
+
+bpm_etapa:
+Define los pasos, el carácter inicial/final, el rol responsable y el vínculo
+con la actividad de catálogo/nodo correspondiente. Verificar el DDL.
+
+bpm_transicion:
+Define los cambios permitidos entre etapas de una misma versión, sus
+resultados y reglas. Verificar el DDL y el lenguaje de codigo_regla.
+
+bpm_caso:
+Una ejecución concreta. id_caso BIGINT UNSIGNED; id_bpm_proceso obligatorio;
+asunto VARCHAR(200); participantes afectado/creador VARCHAR(50) opcionales;
+fecha_apertura y fecha_cierre; estados ABIERTO, SUSPENDIDO, CERRADO, CANCELADO.
+ABIERTO/SUSPENDIDO exigen fecha_cierre NULL.
+CERRADO/CANCELADO exigen fecha_cierre no NULL y no anterior a apertura.
+
+bpm_actividad:
+Una tarea instanciada dentro del caso; no es la actividad de catálogo.
+id_actividad BIGINT UNSIGNED es el identificador de ejecución.
+Contiene id_caso, id_bpm_proceso, id_etapa, id_bitacora, id_responsable,
+id_ejecutor, estado, fechas, resultado, observaciones y clave_idempotencia.
+Responsable y ejecutor son INT con FK a participante(id_participante).
+La FK compuesta exige que caso y etapa pertenezcan al mismo proceso.
+Estados permitidos: PENDIENTE, EN_EJECUCION, COMPLETADA, CANCELADA.
+resultado admite 100 caracteres; clave_idempotencia 100 y es única global.
+COMPLETADA exige fecha_ejecucion; los demás estados la exigen NULL.
+fecha_ejecucion >= fecha_inicio cuando ambas existan.
+fecha_vencimiento >= fecha_programada cuando ambas existan.
+
+bpm_enlace_actividad:
+Registra el paso realmente ejecutado entre dos tareas instanciadas,
+con id_caso, id_bpm_proceso, origen, destino e id_transicion.
+La PK es (id_actividad_origen, id_actividad_destino).
+Las FKs compuestas impiden enlaces entre casos o procesos distintos.
+Origen y destino deben ser distintos, incluso en retornos a la misma etapa.
+La aplicación también debe validar que la transición conecta las etapas
+efectivas de esas tareas; las FKs existentes no garantizan esa correspondencia.
+
+6. REQUISITOS DE DATOS ANTES DE PROGRAMAR
+
+RD01. Comprobar el DDL faltante y documentar el mapa completo:
+dim_proceso -> bpm_proceso -> bpm_etapa -> cat_actividad,
+y etapas de origen/destino de bpm_transicion. No inventar equivalencias
+entre identificadores ni vincular registros solo por coincidencia de nombres.
+
+RD02. Resolver la diferencia de identidades: bpm_caso usa VARCHAR(50)
+para creador/afectado; bpm_actividad usa INT con FK a participante.
+Establecer un mapeo único y comprobable del código de negocio al ID interno.
+No convertir códigos como P0002 directamente a un entero.
+
+RD03. Asegurar una versión inmutable de la definición y del significado de
+las actividades usadas por casos abiertos. Puede hacerse mediante versiones
+o una instantánea persistente; no basta con conservar nombres editables.
+
+RD04. Persistir relación con el evento de origen y su clave de apertura.
+El DDL adjunto no muestra un campo de idempotencia en bpm_caso ni un
+vínculo explícito a Novedades. La apertura automática necesita una restricción
+única o registro equivalente que impida casos duplicados.
+
+RD05. Persistir soportes múltiples por caso/tarea, con tipo, ubicación,
+autor, fecha y permisos. observaciones TEXT no reemplaza una relación de
+evidencias. Reutilizar un mecanismo existente solo tras verificar su contrato.
+
+RD06. Persistir el historial de aperturas, inicios, asignaciones,
+reasignaciones, decisiones, suspensión, reanudación y cancelación.
+id_bitacora en bpm_actividad puede enlazar el hecho principal de ejecución,
+pero no permite por sí solo enlazar todos esos hechos. Definir relación
+adicional o mecanismo existente de auditoría, sin sobrescribir el historial.
+
+RD07. Definir dónde viven las reglas de asignación, calendario, plazos y
+requisitos de documentos/resultados de cada etapa.
+
+RD08. Las ampliaciones necesarias deben proponerse en una migración separada,
+con respaldo y verificación de compatibilidad. No tratar campos propuestos
+como si ya existieran. Estos requisitos bloquean la puesta en operación de
+las funciones que dependen de ellos, no la elaboración de esta especificación.
+
+7. PRECONDICIONES
+
+P01. Participante autenticado y autorizado.
+P02. Definición habilitada, completa y soportada por el motor.
+P03. Exactamente una etapa inicial para el flujo secuencial y al menos una
+final alcanzable. Sin nodos inaccesibles ni destinos inexistentes.
+P04. Etapas, catálogo, nodos y transiciones coherentes con la misma versión.
+P05. Reglas validadas y responsables resolubles.
+P06. Persistencia y contrato con Bitácora disponibles.
+P07. Para abrir desde Novedades, la novedad debe existir y estar confirmada.
+P08. El backend es la autoridad del avance. En primera versión se requiere
+conexión para confirmar decisiones; una captura local no confirma el avance.
+
+8. DISPARADORES Y ACCESO
+
+D01. Un actor autorizado selecciona "Abrir caso" y un proceso habilitado.
+D02. Un evento confirmado de Novedades solicita abrir el proceso asociado.
+D03. El participante identificado accede a "Mis tareas BPM".
+
+Pantalla propuesta después de identificar al participante y su rol:
+lista desplegable de estados: Pendientes, En curso, Ejecutadas y Canceladas.
+Mostrar cantidad, caso, tarea, responsable, fecha programada, vencimiento
+y señal de vencida calculada. Orden inicial: vencidas y próximo vencimiento.
+Tareas sin vencimiento se muestran después, por antigüedad.
+
+Al seleccionar una tarea: asunto, afectado, instrucciones, documentos,
+observaciones, historial permitido y acciones habilitadas.
+Los resultados se eligen entre opciones configuradas; no se escriben
+libremente para decidir la ruta. Los filtros de ejecutadas distinguen tareas
+completadas por el actor de las actualmente asignadas a él.
+
+9. FLUJO PRINCIPAL: ABRIR CASO
+
+F01. Recibir proceso, asunto, afectado, origen y clave de solicitud.
+Obtener creador de la sesión, nunca de un valor libre enviado por el cliente.
+F02. Validar permisos, campos, identidad del afectado y definición.
+F03. Resolver la etapa inicial y un responsable elegible.
+Si el rol tiene varios candidatos, aplicar una regla determinista configurada
+o exigir selección autorizada. No escoger arbitrariamente al primero.
+F04. Iniciar transacción y verificar la clave de apertura.
+Una repetición idéntica devuelve el caso existente; contenido distinto bajo
+la misma clave se rechaza como conflicto.
+F05. Crear bpm_caso ABIERTO con fecha del servidor y fecha_cierre NULL.
+F06. Crear la tarea inicial en bpm_actividad PENDIENTE, vinculada al caso,
+proceso y etapa; establecer responsable, programación y clave única.
+F07. Registrar hecho de apertura/asignación mediante el contrato de Bitácora
+y conservar su vínculo de auditoría.
+F08. Confirmar todo conjuntamente y devolver caso y tarea.
+La tarea inicial no tiene enlace de origen: el esquema exige dos tareas reales.
+
+10. FLUJO PRINCIPAL: EJECUTAR Y AVANZAR
+
+F09. Consultar tareas con permisos verificados en servidor.
+F10. El participante abre el detalle y consulta documentos autorizados.
+F11. Selecciona "Iniciar". El motor valida propiedad, caso ABIERTO,
+programación y estado PENDIENTE; cambia a EN_EJECUCION, registra
+fecha_inicio e historial. Repetir "Iniciar" no altera la primera fecha.
+F12. El actor aporta soportes, observaciones y un resultado permitido.
+Para completar se requiere EN_EJECUCION y requisitos satisfechos.
+F13. El backend inicia transacción, bloquea el caso y la tarea, y vuelve a
+comprobar estado, permisos, versión e idempotencia.
+F14. Evaluar las transiciones salientes con el resultado y datos validados.
+Si la etapa no es final debe resultar exactamente una transición aplicable.
+Cero o varias rutas válidas producen error de definición y no consumen la tarea.
+F15. Si existe siguiente etapa, resolver su responsable antes de confirmar.
+F16. Registrar el hecho de ejecución en bitacora_diaria por su contrato real.
+Actualizar tarea a COMPLETADA con ejecutor real, fecha_ejecucion del servidor,
+resultado y observaciones; guardar id_bitacora del hecho de ejecución.
+F17. Crear tarea destino PENDIENTE y su clave idempotente, y registrar
+bpm_enlace_actividad con origen, destino y transición efectiva.
+F18. Si la tarea corresponde a etapa final, verificar condición de cierre
+y ausencia de tareas activas; cerrar bpm_caso con fecha_cierre.
+No crear una tarea ficticia ni un enlace sin destino para representar el cierre.
+F19. Registrar decisiones/asignación o cierre en el historial y confirmar.
+F20. Actualizar la bandeja y mostrar el siguiente responsable o cierre.
+
+La ejecución, Bitácora, tarea sucesora, enlace e historial obligatorio forman
+una unidad transaccional. Una falla revierte los cambios de base.
+Si Bitácora reside fuera de la misma transacción local, deberá definirse un
+protocolo de eventos persistentes y reconciliación antes de habilitar la función;
+no declarar atomicidad mediante dos llamadas independientes.
+
+11. ALTERNATIVAS Y EXCEPCIONES
+
+A01. Sin definición válida: rechazar apertura e informar el defecto.
+A02. Sin responsable: no confirmar apertura ni finalización que genere una
+tarea sin dueño; conservar la tarea previa y habilitar resolución administrativa.
+A03. Soporte obligatorio faltante: conservar tarea EN_EJECUCION.
+A04. Rechazo o corrección: ejecutar la transición definida, sin suponer que
+"rechazado" significa cerrar el caso.
+A05. Retorno a etapa anterior: crear otra bpm_actividad con nuevo ID.
+La tarea anterior queda COMPLETADA; el enlace une dos ejecuciones distintas.
+A06. Reintento por doble pulsación o pérdida de respuesta: devolver el
+resultado confirmado de la misma solicitud, sin repetir Bitácora ni tareas.
+A07. Dos actores completan simultáneamente: solo una operación confirma;
+la otra recibe el estado vigente o conflicto. No crear sucesores duplicados.
+A08. Caso SUSPENDIDO: bloquear inicio/avance. Reanudar exige autorización,
+motivo e historial; fecha_cierre sigue NULL. Primera versión conserva plazos
+originales; cualquier reprogramación debe ser explícita y auditada.
+A09. Cancelar caso: autorización y motivo obligatorios; cancelar tareas
+activas y caso en una transacción, establecer fecha_cierre y conservar hechos.
+En tareas CANCELADA, fecha_ejecucion sigue NULL; el momento de cancelación
+se registra en historial, no en fecha_ejecucion.
+A10. Reasignar: validar nuevo responsable, registrar anterior/nuevo y motivo,
+sin modificar el ejecutor ni hechos de tareas ya completadas.
+A11. Definición modificada: casos existentes conservan su versión.
+No migrar automáticamente ejecuciones abiertas.
+A12. Sin conexión: mostrar datos locales con aviso de desactualización.
+No marcar como ejecutada ni avanzar una tarea sin confirmación del servidor.
+A13. Tarea vencida: mantener estado PENDIENTE/EN_EJECUCION y mostrar alerta.
+"VENCIDA" es una condición calculada, no un valor del ENUM actual.
+A14. Fallo de persistencia o Bitácora: revertir y permitir reintento seguro.
+
+12. REGLAS DEL MOTOR
+
+R01. Diferenciar id_actividad de catálogo de id_actividad de ejecución en
+DTOs, código y mensajes; usar alias claros, sin renombrar la base implícitamente.
+R02. Jerarquía dim_proceso no equivale al orden de ejecución; este proviene
+de etapas y transiciones.
+R03. Ejecutar solo reglas de un lenguaje limitado, validado y documentado.
+No interpretar codigo_regla como SQL, Python o código arbitrario.
+R04. Resultados y requisitos forman parte de la definición versionada.
+R05. Una corrección crea una nueva ejecución, nunca borra la anterior.
+R06. Caso final solo si se satisface la condición final y no hay tareas activas.
+R07. No eliminar casos, tareas, enlaces ni Bitácoras para corregir decisiones.
+R08. Cada actuación conserva actor real, fecha, resultado y correlación.
+R09. La clave de bpm_actividad evita duplicar la creación de tarea; no basta
+para idempotencia de apertura, inicio, decisión o cancelación. Esas operaciones
+requieren claves persistentes y comparación de contenido.
+R10. Validar longitudes, FKs y CHECKs existentes antes de escribir.
+R11. Registrar tiempos con convención única y mostrar zona del usuario.
+R12. Responsable es quien debe actuar; ejecutor es quien efectivamente actuó.
+Delegación o sustitución requiere permiso explícito e historial.
+R13. Las decisiones no alteran automáticamente nómina, remuneración ni derechos
+laborales. Cualquier efecto de negocio debe ser una actividad definida aparte.
+
+13. POSTCONDICIONES Y MEDICIÓN
+
+- Caso conserva proceso/version, origen y participantes identificables.
+- Cada tarea tiene etapa, responsable y estado coherentes.
+- Cada avance no inicial queda acreditado por un enlace válido.
+- Cada ejecución tiene hecho de Bitácora y ejecutor comprobable.
+- Cierre/cancelación conserva fecha y condición/motivo, sin tareas activas.
+- Ningún reintento repite efectos confirmados.
+
+Consultas mínimas autorizadas:
+casos por estado, tareas pendientes por responsable y etapa, tareas vencidas,
+duración del caso (cierre-apertura), espera (inicio-registro), ejecución
+(ejecución-inicio) y volumen por etapa. Aclarar si una medición incluye
+suspensiones y programación futura; no confundir tiempo transcurrido con
+horas trabajadas. Mostrar concentración de pendientes para detectar cuellos
+de botella. Estos datos no representan costos reales ni liquidación laboral.
+
+14. CONTRATOS PARA EXTENSIONES
+
+Tiempos:
+Configurar plazo, unidad, calendario, zona, destinatarios y escalamiento.
+Un servicio periódico detecta vencimientos y registra envíos/reintentos.
+Recordatorios deben deduplicarse por tarea y regla. Escalar no completa
+automáticamente una tarea; reasignaciones quedan auditadas.
+
+APIs:
+La definición identifica un conector permitido, operación, datos de entrada,
+respuesta esperada, resultado de negocio, timeout y política de reintentos.
+Credenciales se resuelven en servidor y no se guardan en observaciones.
+La tarea automática necesita una identidad técnica válida y trazable.
+No mantener una transacción MariaDB abierta durante la llamada externa.
+Persistir intención de envío, intentos, correlación y resultado; usar cola
+durable o patrón equivalente y clave idempotente aceptada por el proveedor.
+Timeout no significa que el proveedor no ejecutó: consultar o reconciliar
+antes de repetir un efecto. Error temporal admite reintentos limitados;
+error definitivo requiere intervención o transición de fallo configurada.
+No marcar COMPLETADA por haber enviado la solicitud: validar la respuesta.
+Si el proveedor no permite idempotencia/reconciliación, impedir reintentos
+ciegos de efectos y derivar a revisión manual.
+WhatsApp, TensorFlow y Gmail se incorporan como conectores separados.
+Su configuración y estados técnicos requieren persistencia adicional;
+no agregar estados inexistentes al ENUM de bpm_actividad.
+
+15. EJEMPLO FUNCIONAL: INASISTENCIA POR ENFERMEDAD
+
+Es un ejemplo de configuración; no se fijan IDs ni decisiones laborales.
+
+E01. Supervisor confirma una novedad y se abre un caso para el empleado.
+E02. Etapa inicial: empleado presenta soporte; tarea PENDIENTE asignada.
+E03. Empleado inicia y completa con resultado SOPORTE_PRESENTADO.
+E04. Se crea tarea de revisión para un responsable RH elegible y su enlace.
+E05. RH decide:
+  ACEPTADO -> etapa configurada de cierre o validación posterior.
+  REQUIERE_CORRECCION -> nueva tarea de aportar/corregir soporte.
+  RECHAZADO -> etapa definida de revisión por otro responsable.
+E06. Cada corrección y revisión crea nuevas ejecuciones y enlaces.
+E07. Un responsable completa la etapa final y el motor cierra el caso.
+
+Las transiciones de este ejemplo deben existir en la definición habilitada.
+Si se requiere validación del empleado, gerente o abogado, debe definirse
+como etapa explícita, con resultado y responsable; no quedar implícita.
+
+16. CRITERIOS DE ACEPTACIÓN PARA CP-C32-MOTOR_BPM
+
+CA01. Apertura válida crea un caso, tarea inicial e historial; repetir la
+misma solicitud devuelve los mismos IDs y no duplica hechos.
+CA02. Definición incompleta/no soportada impide apertura sin escritura parcial.
+CA03. Bandeja muestra solo tareas/casos autorizados y sus documentos.
+CA04. Inicio conserva la primera fecha y el actor; repetición es segura.
+CA05. Completar crea Bitácora, sucesor y enlace con transición correcta.
+CA06. Falta de soporte, responsable o ruta única conserva el estado previo.
+CA07. Corrección crea otra ejecución de la etapa y preserva la anterior.
+CA08. Concurrencia y pérdida de respuesta no duplican efectos.
+CA09. Fallo inyectado entre escrituras revierte toda la operación local.
+CA10. Finalización cierra solo con condición final y sin tareas activas.
+CA11. Suspensión, reanudación, cancelación y reasignación respetan permisos,
+CHECKs e historial.
+CA12. Alterar IDs de caso, proceso, etapa, responsable o documentos en una
+petición no permite saltar permisos ni cruzar relaciones.
+CA13. Casos abiertos mantienen su definición al publicarse otra versión.
+CA14. Duración, vencimientos y fechas coinciden con registros comprobables.
+CA15. Se recorre en celular el ejemplo: apertura, soporte, revisión,
+corrección, nueva revisión y cierre, verificando también la base.
+CA16. Extensiones habilitadas prueban deduplicación, fallos/reintentos y
+reconciliación de APIs; las no implementadas se rechazan al validar definición.
+
+17. DEPENDENCIAS Y ORDEN DE DESARROLLO
+
+1) Confirmar DDL y resolver requisitos RD01–RD08.
+2) Validar definiciones generadas por CU-C31-XML2ER y su versionado.
+   La importación define el proceso; no abre casos ni ejecuta tareas.
+3) Implementar apertura/asignación e idempotencia de casos.
+4) Implementar bandeja, detalle, documentos e inicio de tareas.
+5) Implementar decisiones, reglas, Bitácora, sucesores y enlaces atómicos.
+6) Implementar cierre, historial, permisos y métricas.
+7) Probar con datos aislados y completar CP-C32 antes del despliegue.
+8) Incorporar recordatorios, escalamiento y conectores por entregas verificadas.
+
+Dependencias funcionales: catálogo C28, administración de procesos C29,
+normalización C30 e importación C31, según sus contratos efectivos.
+Integración C08/Novedades: verificar nombre real de tabla, endpoint,
+transacción y relación con Bitácora; no asumir que la tabla funcional se llama
+novedades ni sustituir supervisor_novedad sin una migración definida.
+
+18. AMPLIACIÓN AUTORIZADA: OPERACIÓN ONLINE Y OFFLINE
+
+El dispositivo conserva en Room las definiciones versionadas descargadas,
+casos y tareas autorizados, actuaciones, observaciones, evidencias y una cola
+durable. Cada operación usa UUID estable, actor, dispositivo, versión de la
+definición, revisión base, fecha capturada y dependencia causal. Los IDs
+numéricos los asigna exclusivamente el servidor y se conserva el mapeo con los
+UUID locales.
+
+Una actuación capturada sin conexión se muestra como PENDIENTE LOCAL y nunca
+como confirmada. Puede persistir tras cerrar la aplicación o reiniciar el
+teléfono. Si la definición y todos los datos requeridos están disponibles, el
+cliente calcula una ruta provisional; la tarea sucesora no se presenta como
+entregada a otro participante hasta la confirmación del servidor. Si falta una
+regla, documento o definición, se conserva la captura posible y se impide el
+avance que dependa de esa información.
+
+La sincronización se ejecuta al recuperar conectividad, al abrir la aplicación,
+en segundo plano y mediante una acción visible. Respeta dependencias y el
+servidor vuelve a validar permisos, definición, revisión y estado. La
+deduplicación compara UUID y contenido; el mismo UUID con contenido distinto es
+conflicto. Se conservan separadas la fecha capturada y la fecha confirmada.
+
+Los estados técnicos LOCAL_PENDING, SENDING, CONFIRMED, CONFLICT, REJECTED y
+STALE no modifican los ENUM funcionales de casos o tareas. Una dependencia
+rechazada o en conflicto bloquea sus sucesoras, que permanecen identificadas.
+No se aplica última escritura gana. Las evidencias se conservan localmente
+hasta confirmar contenido e integridad y no se duplican al reintentar.
+
+CA17. Apertura, inicio y finalización offline persisten y se confirman una sola
+vez al recuperar conexión, sin falso éxito.
+CA18. Reinicios, cortes de red y pérdida de respuesta no pierden ni duplican
+operaciones o evidencias.
+CA19. Conflictos por concurrencia, permisos, reasignación, suspensión,
+cancelación o datos desactualizados conservan la captura y requieren resolución
+explícita.
+CA20. Las dependencias se procesan causalmente; una operación dependiente de
+otra rechazada no se confirma ni desaparece.
+
+FIN DEL CASO DE USO CU-C32-MOTOR_BPM.

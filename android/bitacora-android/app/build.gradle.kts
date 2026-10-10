@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 53
-        versionName = "maria53-c31-xml2er"
+        versionCode = 54
+        versionName = "maria54-c32-motor-bpm"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -75,6 +75,12 @@ android {
             applicationId = "com.cactus.bitacora.c31test"
             manifestPlaceholders["appLabel"] = "Bitacora C31 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c31-test/\"")
+        }
+        create("c32test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c32test"
+            manifestPlaceholders["appLabel"] = "Bitacora C32 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c32-test/\"")
         }
         create("facial1") {
             dimension = "edition"

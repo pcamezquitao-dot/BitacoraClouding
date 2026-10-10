@@ -1,0 +1,1294 @@
+CP-C32 — PLAN DE PRUEBAS DEL MOTOR BPM
+Código documental: CP-C32-MOTOR_BPM
+Versión: 01 — propuesta para ejecución
+Fecha de elaboración: 2026-10-09
+Trazabilidad: CU-C32-MOTOR_BPM, versión 1.0 de 2026-10-09
+Estado general inicial: NO EJECUTADA
+
+1. OBJETIVO, ALCANCE Y FUENTES
+
+Definir un plan completo y reproducible para verificar la validación de
+definiciones, apertura, asignación, bandejas, ejecución, correcciones,
+integridad, concurrencia, idempotencia, atomicidad, administración, cierre,
+medición, versionado y conectividad del motor BPM descrito por CU-C32.
+
+Este documento no acredita ejecución ni implementación. Todas las pruebas
+comienzan en NO EJECUTADA. Solo podrán ejecutarse con datos sintéticos y en un
+ambiente aislado expresamente identificado; nunca sobre producción.
+
+Fuentes leídas:
+- docs/casos_de_uso/CU-C32-MOTOR_BPM.txt, copia normalizada y ampliada para
+  operación online/offline a partir del archivo efectivo original
+  CU-C2-MOTOR_BPM.txt.
+- CP-C27-BPM.txt, CP-C29-Administracion-Proceso.txt y
+  PLAN_C16_Pruebas_Administracion_Areas_rev02.txt, consultados solo para
+  conservar la convención documental y el nivel de evidencia.
+- SHOW CREATE TABLE y KEY_COLUMN_USAGE de la base aislada bitacora_bpm para
+  cat_actividad, dim_proceso, bpm_proceso, bpm_etapa, bpm_transicion,
+  bpm_caso, bpm_actividad, bpm_enlace_actividad, participante,
+  bitacora_diaria, novedades y supervisor_novedad, comprobados el 2026-10-09.
+
+2. CONTRATO EFECTIVO COMPROBADO Y DEPENDENCIAS
+
+2.1 Relaciones y restricciones comprobadas
+
+- bpm_proceso: PK id_bpm_proceso BIGINT UNSIGNED AUTO_INCREMENT; UNIQUE
+  (nombre, version); version INT UNSIGNED >= 1; activo TINYINT; fecha_creacion.
+- bpm_etapa: PK (id_bpm_proceso, id_etapa); FK a bpm_proceso y FK id_etapa a
+  dim_proceso.id_proceso; plazo_horas DECIMAL(10,2) no negativo; banderas
+  es_inicial y es_final.
+- bpm_transicion: PK id_transicion; UNIQUE (id_bpm_proceso, id_transicion);
+  FKs compuestas de origen y destino a bpm_etapa; codigo_regla VARCHAR(300),
+  resultado VARCHAR(100), activo.
+- bpm_caso: PK id_caso; UNIQUE (id_caso, id_bpm_proceso); FK a bpm_proceso;
+  asunto VARCHAR(200); afectado/creador VARCHAR(50); estados ABIERTO,
+  SUSPENDIDO, CERRADO y CANCELADO; CHECK coherente de estado/fecha_cierre.
+- bpm_actividad: PK de ejecución id_actividad; FK compuesta caso/proceso; FK
+  compuesta proceso/etapa; FKs de responsable/ejecutor a participante; FK
+  id_bitacora a bitacora_diaria; clave_idempotencia VARCHAR(100) UNIQUE;
+  estados PENDIENTE, EN_EJECUCION, COMPLETADA y CANCELADA; CHECKs de fechas.
+- bpm_enlace_actividad: PK (origen, destino); FKs compuestas de ambas tareas al
+  mismo caso/proceso; FK compuesta a transición; origen distinto de destino.
+- dim_proceso enlaza opcionalmente cat_actividad y forma la jerarquía mediante
+  id_proceso_padre. bpm_etapa.id_etapa corresponde a dim_proceso.id_proceso.
+- participante usa id_participante INT como clave única técnica, mientras
+  bpm_caso conserva afectado/creador como VARCHAR(50). El mapeo no está
+  materializado por FK en bpm_caso.
+- bitacora_diaria tiene id_bitacora BIGINT UNSIGNED, client_uuid UNIQUE y FKs
+  a participante y dim_proceso; su contrato exige datos adicionales que deben
+  resolverse antes de registrar un hecho BPM.
+- novedades y supervisor_novedad coexisten. No se comprobó una FK de ellas a
+  bpm_caso ni una clave de apertura de caso.
+
+2.2 Dependencias que pueden bloquear pruebas
+
+D01. No hay en las tablas comprobadas persistencia explícita de origen y clave
+de apertura de bpm_caso (RD04). Debe identificarse el contrato/migración real.
+D02. No se comprobó tabla o relación para soportes múltiples de caso/tarea
+(RD05). observaciones no satisface esta dependencia.
+D03. No se comprobó historial persistente para todos los eventos operativos
+(RD06); id_bitacora de la tarea solo enlaza un hecho de ejecución.
+D04. No se comprobó persistencia versionada de reglas de asignación,
+calendario, documentos/resultados requeridos y plazos (RD03/RD07).
+D05. Debe documentarse el mapeo único entre código de negocio VARCHAR(50) e
+id_participante INT (RD02).
+D06. Deben identificarse rutas API, autorización efectiva, almacenamiento
+local y estrategia transaccional de Bitácora antes de ejecutar. Este plan no
+inventa endpoints ni tablas.
+D07. Debe fijarse la unidad/convención temporal y zona para las métricas.
+D08. Recordatorios, escalamiento y conectores son extensiones. Si no están
+implementados, solo procede probar el rechazo de definiciones que los exigen.
+
+Las pruebas que dependan de D01-D08 quedan marcadas como bloqueables hasta que
+el contrato exista y sea comprobado; nunca se aprobarán por inferencia.
+
+3. ENTORNO, ACTORES Y DATOS SINTÉTICOS
+
+Antes de ejecutar se registrará: base aislada, URL/backend, commit, versión y
+hash APK, paquete aislado, dispositivo, zona horaria, actor, fecha/hora y DDL.
+El V2035 se usará únicamente contra el ambiente aislado. Un segundo cliente
+controlado (otro dispositivo o cliente HTTP equivalente) se usará en
+concurrencia. Las credenciales no se incorporarán a evidencias.
+
+Prefijo exclusivo: PU_C32_<ejecución>. Actores sintéticos: ADM32 (administrador
+BPM), EMP32 (empleado afectado), SUP32 (supervisor autorizado), RH32
+(supervisor RH), GER32 (gerente) y SIN32 (actor sin ámbito). Antes de usarlos
+se registrarán sus id_participante, identificacion_participante, roles y
+alcances efectivos; no se fijan IDs en este documento.
+
+Definición DEF32-V1: proceso secuencial de inasistencia, una etapa inicial,
+etapa de soporte EMP32, revisión RH32, retorno de corrección, nueva revisión y
+etapa final; resultados configurados SOPORTE_PRESENTADO, ACEPTADO,
+REQUIERE_CORRECCION y CERRAR. DEF32-V2 cambia una regla sin alterar V1.
+Cada definición se importará por el mecanismo aprobado de C31 y sus IDs reales
+se registrarán después de la importación. No se presuponen IDs.
+
+Soportes sintéticos SOP32-A y SOP32-B: archivos inocuos con hash, tamaño,
+autor y tipo registrados. Claves de solicitud: UUID generados para cada prueba,
+nunca reutilizados fuera del caso que lo exige.
+
+4. CONSULTAS DE VERIFICACIÓN COMUNES
+
+Sustituir parámetros nombrados por IDs obtenidos durante la preparación. Son
+consultas de solo lectura compatibles con el esquema comprobado.
+
+Q01 — definición y grafo:
+SELECT p.id_bpm_proceso,p.nombre,p.version,p.activo,e.id_etapa,
+       e.rol_responsable,e.plazo_horas,e.es_inicial,e.es_final,
+       t.id_transicion,t.id_etapa_origen,t.id_etapa_destino,
+       t.codigo_regla,t.resultado,t.activo
+FROM bpm_proceso p
+LEFT JOIN bpm_etapa e ON e.id_bpm_proceso=p.id_bpm_proceso
+LEFT JOIN bpm_transicion t ON t.id_bpm_proceso=p.id_bpm_proceso
+WHERE p.id_bpm_proceso=:id_bpm_proceso
+ORDER BY e.id_etapa,t.id_transicion;
+
+Q02 — caso:
+SELECT id_caso,id_bpm_proceso,asunto,id_participante_afectado,
+       id_participante_creador,fecha_apertura,fecha_cierre,estado
+FROM bpm_caso WHERE id_caso=:id_caso;
+
+Q03 — tareas:
+SELECT id_actividad,id_caso,id_bpm_proceso,id_etapa,id_bitacora,
+       id_responsable,id_ejecutor,estado,fecha_registro,fecha_programada,
+       fecha_vencimiento,fecha_inicio,fecha_ejecucion,resultado,
+       observaciones,clave_idempotencia
+FROM bpm_actividad WHERE id_caso=:id_caso ORDER BY id_actividad;
+
+Q04 — enlaces y correspondencia de etapas:
+SELECT l.id_caso,l.id_bpm_proceso,l.id_actividad_origen,
+       ao.id_etapa AS etapa_origen_real,l.id_actividad_destino,
+       ad.id_etapa AS etapa_destino_real,l.id_transicion,
+       t.id_etapa_origen,t.id_etapa_destino,l.fecha_creacion
+FROM bpm_enlace_actividad l
+JOIN bpm_actividad ao ON ao.id_caso=l.id_caso
+ AND ao.id_bpm_proceso=l.id_bpm_proceso
+ AND ao.id_actividad=l.id_actividad_origen
+JOIN bpm_actividad ad ON ad.id_caso=l.id_caso
+ AND ad.id_bpm_proceso=l.id_bpm_proceso
+ AND ad.id_actividad=l.id_actividad_destino
+JOIN bpm_transicion t ON t.id_bpm_proceso=l.id_bpm_proceso
+ AND t.id_transicion=l.id_transicion
+WHERE l.id_caso=:id_caso ORDER BY l.fecha_creacion,l.id_actividad_origen;
+
+Q05 — hechos de Bitácora enlazados:
+SELECT a.id_actividad,a.id_etapa,a.id_ejecutor,a.id_bitacora,
+       b.id_empleado,b.id_supervisor,b.id_proceso,b.tipo_anotacion,
+       b.origen_bitacora,b.fecha_in,b.hora_in,b.client_uuid
+FROM bpm_actividad a
+LEFT JOIN bitacora_diaria b ON b.id_bitacora=a.id_bitacora
+WHERE a.id_caso=:id_caso ORDER BY a.id_actividad;
+
+Q06 — responsables:
+SELECT a.id_actividad,a.id_responsable,r.identificacion_participante,
+       a.id_ejecutor,x.identificacion_participante AS ejecutor
+FROM bpm_actividad a
+LEFT JOIN participante r ON r.id_participante=a.id_responsable
+LEFT JOIN participante x ON x.id_participante=a.id_ejecutor
+WHERE a.id_caso=:id_caso ORDER BY a.id_actividad;
+
+Q07 — conteos para atomicidad/idempotencia:
+SELECT
+ (SELECT COUNT(*) FROM bpm_caso WHERE id_caso=:id_caso) AS casos,
+ (SELECT COUNT(*) FROM bpm_actividad WHERE id_caso=:id_caso) AS tareas,
+ (SELECT COUNT(*) FROM bpm_enlace_actividad WHERE id_caso=:id_caso) AS enlaces,
+ (SELECT COUNT(*) FROM bpm_actividad WHERE id_caso=:id_caso
+   AND id_bitacora IS NOT NULL) AS tareas_con_bitacora;
+
+Q08 — restricciones reales antes de ejecutar:
+SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=:base AND TABLE_NAME IN
+('bpm_proceso','bpm_etapa','bpm_transicion','bpm_caso','bpm_actividad',
+ 'bpm_enlace_actividad','participante','bitacora_diaria')
+ORDER BY TABLE_NAME,ORDINAL_POSITION;
+
+Q09 — contrato de dependencias aún no comprobadas:
+SELECT TABLE_NAME,COLUMN_NAME,CONSTRAINT_NAME,REFERENCED_TABLE_NAME,
+       REFERENCED_COLUMN_NAME
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA=:base AND
+ (TABLE_NAME LIKE 'bpm_%' OR REFERENCED_TABLE_NAME LIKE 'bpm_%')
+ORDER BY TABLE_NAME,CONSTRAINT_NAME,ORDINAL_POSITION;
+
+La evidencia de soportes, origen, historial e idempotencia de operaciones se
+consultará con el SQL derivado del contrato que se compruebe al ejecutar. Si
+ese contrato no existe, no se reemplazará con una consulta inventada: la
+prueba afectada quedará BLOQUEADA con referencia D01, D02, D03 o D04.
+
+5. REGLAS COMUNES DE EJECUCIÓN Y LIMPIEZA
+
+Para cada prueba: capturar estado inicial; usar una clave nueva; registrar UI,
+solicitud/respuesta sin secretos, log Android/backend y consultas antes/después;
+comparar conteos e IDs; registrar resultado real, fecha, ejecutor y observación.
+Una captura de pantalla no sustituye la comprobación de base.
+
+La limpieza se limita a datos PU_C32 creados por la prueba y se realiza solo
+después de comprobar relaciones. Orden cuando proceda: soportes/historial del
+fixture, bpm_enlace_actividad, bpm_actividad, relación de origen/idempotencia,
+bpm_caso y definición exclusiva. No borrar catálogos compartidos, hechos
+preexistentes ni filas dudosas. Las pruebas de conservación/versionado pueden
+retener fixtures hasta terminar su serie; se documentará el inventario.
+
+6. CASOS DE PRUEBA
+
+CP-C32-001 — Definición secuencial válida y habilitada
+Objetivo: comprobar que una definición soportada puede habilitarse.
+Referencias: RD01, RD03, RD07; P02-P05; A01; CA02.
+Actor/permisos: ADM32 con permiso de habilitar definiciones.
+Precondiciones/datos: DDL Q08/Q09; DEF32-V1 importada e inactiva; contratos
+D03-D05 resueltos.
+Pasos:
+1. Abrir el detalle de DEF32-V1 y solicitar Validar.
+2. Revisar etapas, responsables, reglas, rutas, requisitos y versión.
+3. Solicitar habilitación.
+4. Ejecutar Q01 y conservar el reporte del validador.
+Resultado esperado — pantalla: validación completa y estado habilitado, sin
+ocultar advertencias; API: respuesta única con versión e identificador reales;
+base: activo conforme al contrato, una inicial, al menos una final alcanzable y
+relaciones coherentes; Bitácora: ninguna tarea, caso o hecho de ejecución.
+Consultas: Q01 y conteos globales por prefijo/definición.
+Evidencia: capturas, reporte, HTTP, logs, Q01 y versión del validador.
+Limpieza: deshabilitar/retirar solo DEF32-V1 si es exclusiva y el contrato lo permite.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-002 — Etapa inicial/final inválida e inaccesibilidad
+Objetivo: rechazar cero o varias iniciales, final inexistente/inaccesible y nodos inaccesibles.
+Referencias: P02-P04; A01; CA02.
+Actor/permisos: ADM32.
+Precondiciones/datos: copias sintéticas de DEF32 con cada defecto por separado.
+Pasos:
+1. Validar definición sin inicial.
+2. Repetir con dos iniciales, sin final, final inaccesible y nodo inaccesible.
+3. Intentar habilitar y abrir un caso para cada variante.
+4. Consultar Q01 y conteos de ejecución.
+Resultado esperado — pantalla/API: defecto específico y habilitación/apertura
+rechazadas; base: definición no queda ejecutable y cero casos/tareas/enlaces;
+Bitácora: cero hechos.
+Consultas: Q01, conteos en bpm_caso/bpm_actividad/bpm_enlace_actividad.
+Evidencia: reporte por variante, HTTP, logs y consultas.
+Limpieza: retirar solo definiciones inválidas PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-003 — Referencias, relaciones y grafo inválidos
+Objetivo: impedir etapas/transiciones inexistentes, cruzadas, duplicadas o cíclicas no soportadas.
+Referencias: RD01; P03-P04; R02, R10; A01; CA02, CA12.
+Actor/permisos: ADM32.
+Precondiciones/datos: variantes con etapa sin dim_proceso, transición a etapa
+ausente, transición entre versiones, duplicado y ciclo automático.
+Pasos:
+1. Validar cada variante por separado.
+2. Intentar habilitarla y abrir un caso.
+3. Comparar Q01 y Q09 antes/después.
+Resultado esperado — pantalla/API: rechazo preciso; base: ninguna escritura
+parcial ni relación cruzada; Bitácora: sin efectos.
+Consultas: Q01, Q09 y conteos de ejecución.
+Evidencia: XML/huella o definición usada, reportes, logs y SQL.
+Limpieza: retirar variantes PU_C32 que hayan sido almacenadas como borrador.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-004 — Roles, asignación y reglas ejecutables
+Objetivo: validar rol conocido, candidato resoluble y lenguaje limitado de reglas.
+Referencias: RD02, RD07; P05; F03; R03-R04; A01-A02; CA02, CA06.
+Actor/permisos: ADM32; participantes de prueba consultables.
+Precondiciones/datos: DEF32 válida; variantes con rol inexistente, cero o varios
+candidatos sin regla, SQL/código arbitrario y regla >300 caracteres.
+Pasos:
+1. Validar DEF32 y cada variante.
+2. Revisar cómo se resuelve un único candidato y una selección autorizada.
+3. Intentar habilitar y abrir las variantes inválidas.
+Resultado esperado — pantalla/API: DEF32 válida; variantes rechazadas con causa;
+base: no se crean tareas sin dueño ni reglas truncadas; Bitácora: sin hechos de
+variantes rechazadas.
+Consultas: Q01, Q06 y Q07 cuando exista caso.
+Evidencia: reglas exactas, reporte, candidatos, HTTP, logs y SQL.
+Limpieza: retirar variantes y casos PU_C32 conforme a la regla común.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-005 — Funciones no soportadas y extensiones deshabilitadas
+Objetivo: impedir habilitar paralelismo, unión, subproceso, ciclo automático,
+recordatorio, escalamiento o API que el motor no implemente.
+Referencias: P02; A01; R03; CA02, CA16; sección 14.
+Actor/permisos: ADM32.
+Precondiciones/datos: una definición por función no soportada; inventario real de capacidades.
+Pasos:
+1. Confirmar capacidades habilitadas del motor.
+2. Validar cada definición incompatible.
+3. Intentar habilitarla y abrir un caso.
+Resultado esperado — pantalla/API: rechazo que nombra la capacidad ausente;
+base y Bitácora: cero casos, tareas, enlaces o hechos. No se marca la extensión
+como ejecutada ni aprobada.
+Consultas: Q01 y conteos de tablas de ejecución.
+Evidencia: inventario de capacidades, reportes, respuestas y conteos.
+Limpieza: retirar borradores PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-006 — Apertura manual válida
+Objetivo: crear atómicamente caso, tarea inicial, origen e historial.
+Referencias: P01-P06; F01-F08; R08-R10; CA01.
+Actor/permisos: SUP32 autorizado para abrir DEF32-V1.
+Precondiciones/datos: DEF32-V1 habilitada; EMP32; clave nueva; D01, D03-D05 resueltas.
+Pasos:
+1. Abrir “Abrir caso”, seleccionar DEF32-V1 e ingresar asunto/afectado.
+2. Confirmar una vez.
+3. Registrar IDs devueltos y consultar Q02-Q07.
+Resultado esperado — pantalla: muestra caso y tarea/responsable confirmados;
+API: creador tomado de sesión y fecha del servidor; base: un caso ABIERTO, una
+tarea inicial PENDIENTE sin enlace de origen, versión/origen/clave/historial
+persistidos; Bitácora: hecho de apertura/asignación según contrato, sin fingir
+ejecución de la tarea.
+Consultas: Q02-Q07 y consulta del contrato D01/D03.
+Evidencia: video/capturas, HTTP, logs, SQL e identidad de sesión.
+Limpieza: cancelar y retirar exclusivamente el caso PU_C32 según regla común.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D01/D03-D05.
+
+CP-C32-007 — Apertura desde Novedades
+Objetivo: abrir una vez desde una novedad confirmada y conservar el evento de origen.
+Referencias: RD04; P07; D02; F01-F08; CA01.
+Actor/permisos: SUP32 con alcance sobre EMP32.
+Precondiciones/datos: novedad sintética confirmada; contrato efectivo de tabla
+y vínculo a caso comprobado; clave nueva.
+Pasos:
+1. Registrar la novedad de inasistencia en el flujo autorizado.
+2. Confirmarla y observar la solicitud de apertura BPM.
+3. Abrir el caso resultante y consultar novedad, Q02-Q07 y vínculo de origen.
+Resultado esperado — pantalla: un caso asociado visible; API: usa evento
+confirmado y actor de sesión; base: una novedad, un caso y una tarea inicial,
+con vínculo persistente inequívoco; Bitácora: origen e historial sin duplicados.
+Consultas: Q02-Q07 más consulta del contrato D01 a la fila real de novedad.
+Evidencia: recorrido Android, IDs, HTTP, logs y SQL correlacionado.
+Limpieza: retirar solo la novedad/caso PU_C32 respetando FKs.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D01.
+
+CP-C32-008 — Apertura idempotente y doble pulsación
+Objetivo: comprobar que una repetición idéntica devuelve los mismos IDs.
+Referencias: F04, F08; R09; A06; CA01, CA08.
+Actor/permisos: SUP32 autorizado.
+Precondiciones/datos: DEF32-V1; clave nueva; latencia controlada; D01 resuelta.
+Pasos:
+1. Pulsar Confirmar dos veces y capturar solicitudes.
+2. Reenviar la misma solicitud con la misma clave.
+3. Comparar respuestas e IDs; ejecutar Q02-Q07 y consultar historial/origen.
+Resultado esperado — pantalla: un éxito y un caso; API: misma respuesta lógica;
+base: un caso, una tarea inicial y un efecto por tipo; Bitácora: ningún hecho duplicado.
+Consultas: Q02-Q07 y consulta D01/D03 por clave.
+Evidencia: video, tráfico, logs, claves, respuestas y conteos.
+Limpieza: caso PU_C32 y relaciones exclusivas.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D01/D03.
+
+CP-C32-009 — Reutilización de clave con contenido diferente
+Objetivo: rechazar conflicto de idempotencia sin alterar el caso original.
+Referencias: F04; R09; A06; CA08.
+Actor/permisos: SUP32.
+Precondiciones/datos: apertura CP-C32-008 confirmada; mismo UUID, asunto o afectado distinto.
+Pasos:
+1. Reenviar la clave original cambiando un dato significativo.
+2. Recargar el caso original.
+3. Ejecutar Q02-Q07 y consulta por clave.
+Resultado esperado — pantalla/API: conflicto explícito, no éxito; base y
+Bitácora: caso original intacto, ningún caso/tarea/hecho adicional.
+Consultas: Q02-Q07 y contrato D01.
+Evidencia: payloads comparados, respuesta, logs y SQL.
+Limpieza: junto con CP-C32-008.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D01.
+
+CP-C32-010 — Rechazo de aperturas inconsistentes
+Objetivo: rechazar proceso inactivo, afectado inexistente, actor fuera de ámbito y campos inválidos.
+Referencias: F01-F03; A01-A02; R10; CA02, CA12.
+Actor/permisos: SUP32 y SIN32.
+Precondiciones/datos: variantes por defecto; asunto vacío y de 201 caracteres.
+Pasos:
+1. Intentar una apertura por cada variante.
+2. Alterar creador, proceso o afectado en la solicitud directa.
+3. Comparar conteos antes/después.
+Resultado esperado — pantalla/API: rechazo específico y sin fuga de datos;
+base/Bitácora: cero escrituras parciales.
+Consultas: Q01, Q07 adaptada a conteos por definición y participante.
+Evidencia: capturas, solicitudes/respuestas, logs y conteos.
+Limpieza: ninguna, salvo borradores locales PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-011 — Bandeja por estados, orden y filtros
+Objetivo: mostrar pendientes, en curso, ejecutadas y canceladas con filtros correctos.
+Referencias: D03; F09-F10; A13; CA03, CA14.
+Actor/permisos: EMP32 y RH32, cada uno con ámbito limitado.
+Precondiciones/datos: tareas sintéticas en los cuatro estados, con/sin vencimiento.
+Pasos:
+1. Abrir “Mis tareas BPM”.
+2. Recorrer cada estado y aplicar filtros disponibles.
+3. Comparar cantidad, orden, responsable, fechas y condición vencida con Q03/Q06.
+Resultado esperado — pantalla: vencidas primero, luego próximo vencimiento,
+sin vencimiento al final por antigüedad; ejecutadas por el actor se distinguen
+de asignadas; API: filtros validados en servidor; base: sin cambios; Bitácora: sin cambios.
+Consultas: Q03, Q06 y cálculo de vencimiento con fecha del servidor.
+Evidencia: capturas por filtro, respuestas y SQL ordenado.
+Limpieza: conservar fixtures para la serie o retirarlos al finalizar.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-012 — Restricción de acceso a casos, tareas y documentos
+Objetivo: impedir consulta o alteración fuera del ámbito.
+Referencias: P01; F09-F10; R12; CA03, CA12.
+Actor/permisos: EMP32, RH32 y SIN32.
+Precondiciones/datos: casos propios y ajenos; SOP32-A; D02 resuelta.
+Pasos:
+1. Consultar bandeja propia y abrir su detalle/documento.
+2. Manipular IDs para solicitar caso, tarea y soporte ajenos.
+3. Intentar iniciar/completar la tarea ajena.
+Resultado esperado — pantalla/API: solo datos autorizados; intentos directos
+rechazados 401/403/404 según contrato, sin revelar contenido; base y Bitácora sin cambios.
+Consultas: Q02-Q06 de ambos casos y consulta D02.
+Evidencia: capturas, respuestas, logs de autorización y SQL.
+Limpieza: retirar casos/soportes PU_C32 al terminar la serie.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D02.
+
+CP-C32-013 — Inicio válido e idempotente de tarea
+Objetivo: iniciar una tarea una vez y conservar primera fecha/actor.
+Referencias: F11; R08-R09, R12; CA04.
+Actor/permisos: EMP32 responsable.
+Precondiciones/datos: tarea PENDIENTE programada y caso ABIERTO; clave de inicio.
+Pasos:
+1. Pulsar Iniciar dos veces.
+2. Reenviar idéntica solicitud.
+3. Cerrar/abrir detalle y ejecutar Q03/Q06 más historial.
+Resultado esperado — pantalla: EN_EJECUCION; API: reintentos seguros; base:
+una transición de estado, primera fecha_inicio inmutable, responsable conservado
+y ejecutor según contrato; Bitácora/historial: un evento de inicio, no ejecución final.
+Consultas: Q03, Q06 y contrato D03.
+Evidencia: video, tráfico, logs, fechas y SQL.
+Limpieza: cancelar caso PU_C32 al cerrar la prueba.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-014 — Inicio rechazado por estado, programación o actor
+Objetivo: impedir iniciar tarea no pendiente, caso suspendido/cerrado, antes de programación o por actor ajeno.
+Referencias: F11; A08; R12; CA11-CA12.
+Actor/permisos: EMP32 y SIN32.
+Precondiciones/datos: una variante de tarea/caso por condición.
+Pasos:
+1. Intentar iniciar cada variante desde UI o cliente autorizado.
+2. Repetir alterando actor/ID.
+3. Consultar estado y fechas.
+Resultado esperado — pantalla/API: rechazo específico; base: estado y
+fecha_inicio intactos; Bitácora/historial sin nuevo hecho.
+Consultas: Q02, Q03, Q05, Q06 y contrato D03.
+Evidencia: respuestas, logs, capturas y SQL.
+Limpieza: casos PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-015 — Soportes múltiples obligatorios y permisos
+Objetivo: exigir soportes configurados, conservar varios y proteger su acceso.
+Referencias: RD05, RD07; F10, F12; A03; CA03, CA06.
+Actor/permisos: EMP32 responsable; RH32 revisor; SIN32 sin acceso.
+Precondiciones/datos: tarea EN_EJECUCION exige soporte; SOP32-A/B; D02/D04 resueltas.
+Pasos:
+1. Intentar completar sin soporte.
+2. Adjuntar A y B; verificar metadatos e integridad.
+3. Reintentar la carga y completar.
+4. Consultar como RH32 y como SIN32.
+Resultado esperado — pantalla: falta de soporte bloquea y conserva tarea en
+curso; dos soportes visibles una vez; API valida requisito/permiso/hash; base:
+dos vínculos sin duplicado; Bitácora solo se crea al completar válidamente.
+Consultas: Q03-Q05 más SQL del contrato D02.
+Evidencia: archivos/hash, capturas, tráfico, logs y filas.
+Limpieza: soportes y caso PU_C32, sin tocar almacenes compartidos.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D02/D04.
+
+CP-C32-016 — Resultado permitido y transición única
+Objetivo: completar con un resultado configurado y elegir exactamente una ruta.
+Referencias: F12-F17; R03-R04, R08; CA05.
+Actor/permisos: EMP32 responsable.
+Precondiciones/datos: tarea en curso, soportes satisfechos, resultado SOPORTE_PRESENTADO.
+Pasos:
+1. Abrir opciones de resultado y confirmar que no son texto libre.
+2. Seleccionar el resultado permitido y completar una vez.
+3. Consultar Q02-Q06 y el historial.
+Resultado esperado — pantalla: tarea completada y siguiente responsable;
+API: decisión evaluada en la versión fijada; base: tarea COMPLETADA con
+ejecutor/fecha/resultado, una sucesora PENDIENTE y un enlace cuya transición
+coincide con etapas reales; Bitácora: un hecho enlazado y comprobable.
+Consultas: Q02-Q06.
+Evidencia: video, respuesta, reglas evaluadas, logs y SQL.
+Limpieza: caso PU_C32 al concluir su serie.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-017 — Resultado no permitido, cero o varias rutas
+Objetivo: no consumir una tarea ante resultado inválido o definición ambigua.
+Referencias: F12-F15; A04; CA06.
+Actor/permisos: responsable de prueba.
+Precondiciones/datos: tres variantes: resultado no permitido, cero transición y dos aplicables.
+Pasos:
+1. Enviar cada variante por separado.
+2. Recargar tarea/caso.
+3. Comparar Q02-Q07 e historial.
+Resultado esperado — pantalla/API: error verificable; base: tarea conserva
+estado previo, sin sucesor/enlace; Bitácora/historial sin ejecución nueva.
+Consultas: Q02-Q07.
+Evidencia: definición, respuesta, logs y conteos.
+Limpieza: variantes y casos PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-018 — Responsable sucesor inexistente
+Objetivo: impedir completar si la siguiente tarea no tiene dueño resoluble.
+Referencias: F15; A02; CA06.
+Actor/permisos: responsable actual.
+Precondiciones/datos: transición válida hacia etapa sin candidato elegible.
+Pasos:
+1. Iniciar y completar la tarea actual.
+2. Observar el rechazo y la opción de resolución administrativa.
+3. Ejecutar Q02-Q07.
+Resultado esperado — pantalla/API: informa ausencia de responsable; base:
+tarea actual y caso conservan estado previo, sin tarea huérfana ni enlace;
+Bitácora: sin hecho de ejecución confirmado.
+Consultas: Q02-Q07, Q06.
+Evidencia: candidatos, respuesta, logs y SQL.
+Limpieza: caso/definición PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-019 — Retorno para corrección
+Objetivo: crear una nueva ejecución de etapa y preservar tarea/hechos anteriores.
+Referencias: F14-F19; A04-A05; R05, R07; CA07.
+Actor/permisos: RH32 decide; EMP32 recibe corrección.
+Precondiciones/datos: revisión en curso y transición REQUIERE_CORRECCION.
+Pasos:
+1. RH32 completa con REQUIERE_CORRECCION y motivo.
+2. EMP32 consulta la nueva tarea de soporte.
+3. Comparar IDs y ejecutar Q02-Q06.
+Resultado esperado — pantalla: nueva tarea visible; API: ruta configurada;
+base: revisión anterior COMPLETADA, nueva bpm_actividad con ID/clave distintos,
+enlace de retorno válido; Bitácora e historial anteriores intactos y nuevo hecho separado.
+Consultas: Q02-Q06.
+Evidencia: capturas de ambas bandejas, respuestas, logs y SQL.
+Limpieza: retener para CP-C32-042 o retirar todo el caso después.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-020 — Integridad contra manipulación de relaciones
+Objetivo: impedir cruzar caso, proceso, etapa, transición, responsable, ejecutor o documento.
+Referencias: RD01-RD02; R01-R02, R10, R12; CA12.
+Actor/permisos: actor autorizado para su propia tarea, no para la ajena.
+Precondiciones/datos: dos casos y dos versiones con IDs registrados.
+Pasos:
+1. Alterar individualmente cada identificador en solicitudes controladas.
+2. Intentar enlazar tareas de casos/versiones distintos.
+3. Intentar usar transición incompatible con etapas reales.
+4. Ejecutar Q02-Q07 en ambos casos.
+Resultado esperado — pantalla/API: cada manipulación rechazada; base: FKs,
+CHECKs y validación de negocio conservan ambos casos; Bitácora sin hechos indebidos.
+Consultas: Q02-Q09.
+Evidencia: matriz de payloads/respuestas, logs de validación y SQL.
+Limpieza: casos PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-021 — Límites, tipos, NULL, fechas, FKs y CHECKs
+Objetivo: verificar restricciones reales sin truncamiento ni coerción silenciosa.
+Referencias: R01, R08, R10-R11; CA12, CA14.
+Actor/permisos: ADM32 y responsable autorizado.
+Precondiciones/datos: límites -1/0/máximo/máximo+1 donde aplique; asunto
+200/201; resultado 100/101; clave 100/101; fechas iguales/invertidas; NULL.
+Pasos:
+1. Confirmar DDL con Q08/Q09.
+2. Probar cada frontera mediante flujo/API de pruebas.
+3. Consultar datos aceptados y rechazos.
+Resultado esperado — pantalla/API: límites válidos aceptados e inválidos
+rechazados con mensaje; base: sin truncamiento, fecha_ejecucion y estado,
+fecha_cierre y estado, programación/vencimiento coherentes; Bitácora sin parcialidad.
+Consultas: Q02-Q09.
+Evidencia: tabla de entradas/resultados, respuestas, logs y SQL.
+Limpieza: registros PU_C32 válidos creados para fronteras.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-022 — Doble finalización y solicitudes simultáneas
+Objetivo: permitir una sola finalización y un solo sucesor.
+Referencias: F13-F19; A07; R09; CA08.
+Actor/permisos: dos clientes con el mismo actor o actores autorizados según contrato.
+Precondiciones/datos: misma tarea EN_EJECUCION, revisión registrada, barrera simultánea.
+Pasos:
+1. Enviar dos finalizaciones idénticas simultáneamente.
+2. Repetir con resultados diferentes.
+3. Comparar respuestas y ejecutar Q02-Q07.
+Resultado esperado — pantalla/API: una confirma; repetición idéntica recupera
+resultado o la otra recibe estado vigente; contenido diferente entra en
+conflicto; base: una ejecución, sucesora, enlace y Bitácora.
+Consultas: Q02-Q07 y contrato de idempotencia operativa.
+Evidencia: método de concurrencia, cronología, respuestas, locks/logs y SQL.
+Limpieza: casos PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03/D04 si falta clave operativa.
+
+CP-C32-023 — Pérdida de respuesta después del commit
+Objetivo: recuperar el resultado confirmado sin repetir efectos.
+Referencias: A06; R09; CA08.
+Actor/permisos: responsable autorizado.
+Precondiciones/datos: proxy/fault injector aislado; tarea lista; clave original.
+Pasos:
+1. Permitir commit y cortar la respuesta.
+2. Confirmar incertidumbre en UI, no falso fracaso/éxito definitivo.
+3. Reconectar y reenviar la misma clave/contenido.
+4. Ejecutar Q02-Q07.
+Resultado esperado — pantalla: converge al estado confirmado; API: devuelve
+resultado original; base y Bitácora: efectos únicos, mismas IDs/fechas.
+Consultas: Q02-Q07 y contrato de clave operativa.
+Evidencia: captura de red, cronología, logs y SQL.
+Limpieza: caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por contrato idempotente faltante.
+
+CP-C32-024 — Atomicidad al abrir caso
+Objetivo: revertir fallos entre caso, tarea, origen e historial.
+Referencias: F04-F08; A14; CA09.
+Actor/permisos: SUP32.
+Precondiciones/datos: inyección controlada en cada punto de escritura; claves distintas.
+Pasos:
+1. Registrar conteos iniciales.
+2. Inyectar fallo después de cada escritura posible y antes del commit.
+3. Consultar todas las tablas/contratos y reintentar una variante.
+Resultado esperado — pantalla/API: error sin éxito; base: cero unidades
+parciales; Bitácora: cero hechos huérfanos; reintento crea exactamente una unidad completa.
+Consultas: Q02-Q07 más D01/D03.
+Evidencia: punto de fallo, logs transaccionales, conteos antes/después y reintento.
+Limpieza: unidad PU_C32 creada por el reintento.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable hasta definir transacción/protocolo de Bitácora.
+
+CP-C32-025 — Atomicidad al ejecutar y avanzar
+Objetivo: revertir fallos entre Bitácora, tarea, sucesora, enlace e historial.
+Referencias: F13-F19; A14; CA09.
+Actor/permisos: responsable autorizado.
+Precondiciones/datos: tarea lista; inyección después de cada escritura; claves nuevas.
+Pasos:
+1. Registrar Q02-Q07 inicial.
+2. Inyectar un fallo por punto antes del commit.
+3. Verificar estado después de cada fallo.
+4. Reintentar una operación completa.
+Resultado esperado — pantalla/API: error reintentable sin falso éxito; base:
+tarea previa intacta, sin sucesor/enlace/historial parcial; Bitácora sin hecho
+huérfano; reintento produce una sola unidad.
+Consultas: Q02-Q07 más D03.
+Evidencia: matriz punto/resultado, logs y SQL.
+Limpieza: caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable hasta definir transacción/protocolo de Bitácora.
+
+CP-C32-026 — Suspensión y bloqueo de avance
+Objetivo: suspender con permiso/motivo y bloquear inicio o avance.
+Referencias: A08; R06-R08; CA11.
+Actor/permisos: ADM32 autorizado; EMP32 responsable; SIN32 sin permiso.
+Precondiciones/datos: caso ABIERTO con tarea activa.
+Pasos:
+1. SIN32 intenta suspender.
+2. ADM32 suspende sin motivo y luego con motivo.
+3. EMP32 intenta iniciar/completar.
+4. Ejecutar Q02-Q06 e historial.
+Resultado esperado — pantalla/API: intentos inválidos rechazados; suspensión
+autorizada deja caso SUSPENDIDO, fecha_cierre NULL y bloquea trabajo; base:
+tareas/hechos conservados; Bitácora/historial registra actor, fecha y motivo una vez.
+Consultas: Q02-Q06 y contrato D03.
+Evidencia: permisos, respuestas, capturas, logs y SQL.
+Limpieza: reanudar/cancelar caso PU_C32 al terminar.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-027 — Reanudación y conservación de plazos
+Objetivo: reanudar autorizadamente sin reprogramar implícitamente.
+Referencias: A08; R08, R11; CA11, CA14.
+Actor/permisos: ADM32 autorizado.
+Precondiciones/datos: caso suspendido; fechas/plazos registrados.
+Pasos:
+1. Intentar reanudar sin motivo o sin permiso.
+2. Reanudar con permiso y motivo.
+3. Comparar fechas programadas/vencimiento y continuar la tarea.
+Resultado esperado — pantalla/API: solo reanudación válida confirma; base:
+caso ABIERTO, fecha_cierre NULL y plazos originales salvo reprogramación
+explícita separada; Bitácora/historial conserva suspensión/reanudación.
+Consultas: Q02-Q06 y contrato D03.
+Evidencia: antes/después, respuestas, logs y SQL.
+Limpieza: caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-028 — Reasignación
+Objetivo: cambiar responsable con autorización y preservar ejecutor/historia.
+Referencias: A10; R08, R12; CA11.
+Actor/permisos: ADM32 autorizado; responsables anterior/nuevo; SIN32.
+Precondiciones/datos: tarea PENDIENTE y otra COMPLETADA.
+Pasos:
+1. Intentar reasignar sin permiso, sin motivo y a participante no elegible.
+2. Reasignar válidamente la tarea pendiente.
+3. Intentar alterar la completada.
+4. Consultar bandejas, Q03/Q06 e historial.
+Resultado esperado — pantalla/API: solo operación válida confirma; base:
+responsable nuevo en pendiente, ejecutor NULL; completada intacta; Bitácora/
+historial conserva anterior, nuevo, actor, fecha y motivo.
+Consultas: Q03, Q05, Q06 y contrato D03.
+Evidencia: bandejas, respuestas, logs y SQL.
+Limpieza: caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-029 — Cancelación de caso
+Objetivo: cancelar atómicamente caso y tareas activas sin borrar historia.
+Referencias: A09; R07-R08; CA11.
+Actor/permisos: ADM32 autorizado; SIN32.
+Precondiciones/datos: caso abierto con tareas PENDIENTE/EN_EJECUCION y tareas históricas completadas.
+Pasos:
+1. Intentar cancelar sin permiso y sin motivo.
+2. Cancelar con permiso/motivo.
+3. Reintentar la misma cancelación.
+4. Ejecutar Q02-Q07 e historial.
+Resultado esperado — pantalla/API: una cancelación válida; base: caso
+CANCELADO con fecha_cierre, activas CANCELADA con fecha_ejecucion NULL,
+completadas/enlaces/hechos previos intactos; historial registra cancelación.
+Consultas: Q02-Q07 y contrato D03.
+Evidencia: capturas, respuestas, logs, fechas y SQL.
+Limpieza: retirar caso PU_C32 solo tras conservar evidencia.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-030 — Cierre válido en etapa final
+Objetivo: cerrar únicamente al ejecutar final y no quedar tareas activas.
+Referencias: F18-F20; R06; CA10.
+Actor/permisos: responsable de etapa final.
+Precondiciones/datos: caso en tarea final EN_EJECUCION, sin otras activas.
+Pasos:
+1. Confirmar que llegar a la etapa final no cerró el caso.
+2. Completar la tarea final con resultado permitido.
+3. Reenviar la misma solicitud.
+4. Ejecutar Q02-Q07.
+Resultado esperado — pantalla: caso cerrado; API: respuesta idempotente; base:
+tarea final COMPLETADA, caso CERRADO con fecha válida, cero tareas activas y
+sin tarea/enlace ficticio de cierre; Bitácora/historial registra ejecución/cierre una vez.
+Consultas: Q02-Q07.
+Evidencia: antes/después, tráfico, logs y SQL.
+Limpieza: retener como caso histórico hasta terminar métricas/versionado.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-031 — Cierre prematuro bloqueado
+Objetivo: impedir cierre sin condición final o con tareas activas.
+Referencias: F18; R06; CA10.
+Actor/permisos: responsable final y ADM32.
+Precondiciones/datos: una variante no final y otra con tarea activa adicional.
+Pasos:
+1. Intentar cerrar cada variante.
+2. Manipular estado/ID mediante solicitud directa.
+3. Ejecutar Q02-Q07.
+Resultado esperado — pantalla/API: cierre rechazado; base: caso ABIERTO,
+fecha_cierre NULL y tareas intactas; Bitácora sin cierre falso.
+Consultas: Q02-Q07.
+Evidencia: respuestas, logs y SQL.
+Limpieza: casos PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-032 — Vencimientos y métricas comprobables
+Objetivo: validar condición vencida, duración, espera, ejecución y pendientes por etapa.
+Referencias: A13; R11; postcondiciones/medición; CA14.
+Actor/permisos: ADM32/RH32 con permiso de consulta.
+Precondiciones/datos: reloj controlado; casos/tareas con fechas conocidas; D07 resuelta.
+Pasos:
+1. Consultar antes, en y después del vencimiento.
+2. Comparar bandeja y reporte con Q02/Q03.
+3. Calcular manualmente duración, espera, ejecución y volumen.
+4. Revisar tratamiento documentado de suspensión/programación futura.
+Resultado esperado — pantalla: VENCIDA como condición calculada, no estado;
+API: métricas con zona/unidad declaradas; base: estado no cambia por vencer;
+Bitácora: fechas fuente coinciden y no se presentan como horas trabajadas/costos.
+Consultas: Q02, Q03, Q05 y cálculos TIMESTAMPDIFF sobre fechas comprobadas.
+Evidencia: reloj/zona, fórmulas, reporte, SQL y comparación numérica.
+Limpieza: casos PU_C32 de medición.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D07.
+
+CP-C32-033 — Conservación de versión en casos existentes
+Objetivo: mantener la definición usada aunque se publique otra versión.
+Referencias: RD03; A11; R04; CA13.
+Actor/permisos: ADM32 publica; actores de V1 ejecutan.
+Precondiciones/datos: caso K1 abierto con DEF32-V1; DEF32-V2 válida; D04 resuelta.
+Pasos:
+1. Registrar Q01-Q04 de K1/V1.
+2. Publicar/habilitar V2 según contrato.
+3. Avanzar K1 y abrir K2 nuevo.
+4. Comparar reglas, etapas, resultados e IDs de ambos casos.
+Resultado esperado — pantalla/API: K1 sigue V1 y K2 usa versión vigente;
+base: ninguna migración automática de K1 ni mutación de V1; Bitácora/enlaces
+de cada caso corresponden a su definición fijada.
+Consultas: Q01-Q05 para V1/K1 y V2/K2 más contrato de instantánea/versionado.
+Evidencia: versiones antes/después, respuestas, logs y SQL.
+Limpieza: retirar K1/K2 y V2 solo si son exclusivos; conservar V1 hasta terminar serie.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D04.
+
+CP-C32-034 — Consulta sin conexión
+Objetivo: mostrar datos locales identificados como desactualizados sin falso avance.
+Referencias: P08; A12; CA03.
+Actor/permisos: EMP32 con sesión/caché válida.
+Precondiciones/datos: bandeja sincronizada; almacenamiento local identificado.
+Pasos:
+1. Registrar última sincronización y bandeja online.
+2. Activar modo avión y reiniciar la aplicación.
+3. Abrir bandeja y detalle/documentos disponibles.
+Resultado esperado — pantalla: datos locales permitidos con aviso y fecha de
+última sincronización; API: no llamada exitosa ficticia; base servidor y
+Bitácora: sin cambios; almacenamiento local conserva la última copia válida.
+Consultas: Q02-Q06 antes/después y consulta Room derivada de entidades reales.
+Evidencia: video, red desconectada, logcat, Room y SQL servidor.
+Limpieza: restablecer red; no borrar almacenamiento.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable hasta identificar contrato Room.
+
+CP-C32-035 — Intento de avance sin conexión
+Objetivo: impedir que una captura local confirme inicio/decisión/avance.
+Referencias: P08; A12; CA06, CA08.
+Actor/permisos: EMP32 responsable.
+Precondiciones/datos: tarea local visible; modo avión.
+Pasos:
+1. Intentar Iniciar y luego completar/decidir sin red.
+2. Cerrar y abrir la aplicación.
+3. Consultar Room y Q02-Q07 en servidor.
+Resultado esperado — pantalla: no muestra éxito ni estado ejecutado confirmado;
+si conserva borrador, lo identifica como pendiente/no confirmado; servidor y
+Bitácora sin cambios ni duplicados.
+Consultas: Q02-Q07 y Room según contrato efectivo.
+Evidencia: video, logcat, estado de red, Room y SQL.
+Limpieza: descartar únicamente borrador PU_C32 por el mecanismo de la app tras documentarlo.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable hasta identificar contrato Room.
+
+CP-C32-036 — Recuperación de conectividad y reintento seguro
+Objetivo: recuperar una operación no confirmada sin duplicar efectos.
+Referencias: A06, A12, A14; R09; CA08.
+Actor/permisos: responsable autorizado.
+Precondiciones/datos: resultado de CP-C32-035; clave original preservada.
+Pasos:
+1. Restablecer red.
+2. Revisar el estado servidor antes de reenviar.
+3. Confirmar explícitamente la operación con la misma clave/contenido.
+4. Repetir actualización y ejecutar Q02-Q07.
+Resultado esperado — pantalla: converge a confirmado o conflicto explícito;
+API: reintento seguro; base y Bitácora: una sola unidad de efectos.
+Consultas: Q02-Q07 y Room/cola si existe según contrato real.
+Evidencia: cronología, claves, tráfico, logcat/backend, Room y SQL.
+Limpieza: caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-037 — Recordatorios y escalamiento habilitados
+Objetivo: probar deduplicación, permisos y auditoría solo si la extensión existe.
+Referencias: sección 14; CA16.
+Actor/permisos: ADM32 configura; destinatarios autorizados.
+Precondiciones/datos: contrato y persistencia comprobados; tarea/plazo controlados.
+Pasos:
+1. Verificar que la capacidad figura habilitada.
+2. Ejecutar el servicio antes/después del límite y repetirlo.
+3. Provocar fallo/reintento; revisar eventual reasignación.
+Resultado esperado — pantalla/API: avisos/estado comprensibles; base: un envío
+por tarea/regla, intentos correlacionados y reasignación explícita; Bitácora/
+historial audita sin completar automáticamente la tarea.
+Consultas: Q02-Q06 más SQL del contrato de extensión comprobado.
+Evidencia: configuración, ejecuciones, mensajes, logs y SQL.
+Limpieza: retirar reglas/envíos PU_C32 según contrato.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: BLOQUEABLE; si no existe, ejecutar CP-C32-005 y dejar esta NO EJECUTADA, nunca aprobada.
+
+CP-C32-038 — Conector API habilitado, timeout y reconciliación
+Objetivo: probar un conector solo si está implementado, sin reintentos ciegos.
+Referencias: sección 14; R03, R08-R09; CA16.
+Actor/permisos: identidad técnica y ADM32 autorizados.
+Precondiciones/datos: conector ficticio aislado idempotente; contrato/persistencia comprobados.
+Pasos:
+1. Ejecutar respuesta válida y validar resultado antes de completar.
+2. Simular timeout después de recepción externa.
+3. Consultar/reconciliar y reintentar.
+4. Probar error temporal y definitivo.
+Resultado esperado — pantalla/API: estados técnicos claros; base: intención,
+intentos, correlación y resultado durables, sin transacción abierta durante la
+llamada; tarea solo se completa tras respuesta válida; Bitácora una vez.
+Consultas: Q02-Q07 más SQL del contrato del conector comprobado.
+Evidencia: mock, correlaciones, tráfico sin secretos, logs y SQL.
+Limpieza: datos del mock y caso PU_C32.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: BLOQUEABLE; si no existe, ejecutar CP-C32-005 y dejar esta NO EJECUTADA.
+
+CP-C32-039 — Mapeo de identidad, responsable y ejecutor
+Objetivo: comprobar el mapeo VARCHAR de caso a INT de tareas sin conversiones arbitrarias.
+Referencias: RD02; F02-F03, F16; R08, R12; CA12.
+Actor/permisos: EMP32, homónimo/control negativo y ADM32.
+Precondiciones/datos: códigos sintéticos alfanuméricos y mapeo D05 aprobado.
+Pasos:
+1. Abrir caso con EMP32 afectado.
+2. Verificar responsable técnico y ejecutar como EMP32.
+3. Intentar usar código alfanumérico convertido a entero o participante homónimo.
+4. Ejecutar Q02, Q03, Q05 y Q06.
+Resultado esperado — pantalla/API: identidad inequívoca; base: caso conserva
+código de negocio, tarea usa id_participante correcto y ejecutor real;
+Bitácora coincide con el actor, sin sustitución silenciosa.
+Consultas: Q02, Q03, Q05, Q06 y contrato D05.
+Evidencia: mapa aprobado, sesión, respuestas, logs y SQL.
+Limpieza: caso/participantes PU_C32 si fueron creados exclusivamente.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D05.
+
+CP-C32-040 — Historial completo e inmutabilidad
+Objetivo: conservar actor, fecha, motivo y correlación de todos los eventos sin borrar anteriores.
+Referencias: RD06; R05, R07-R08; postcondiciones; CA07, CA11.
+Actor/permisos: todos los actores de la ruta.
+Precondiciones/datos: caso que atraviesa apertura, asignación, inicio,
+reasignación, decisión, suspensión, reanudación, corrección y cierre/cancelación.
+Pasos:
+1. Ejecutar los eventos con claves/motivos distintos.
+2. Consultar historial después de cada uno.
+3. Intentar editar o borrar un hecho previo.
+4. Comparar con Q02-Q06.
+Resultado esperado — pantalla: cronología autorizada; API: no permite mutar
+hechos; base: un evento correlacionado por actuación y anteriores íntegros;
+Bitácora enlaza ejecuciones sin pretender contener por sí sola todo el historial.
+Consultas: Q02-Q06 más SQL del contrato D03.
+Evidencia: cronología, respuestas, logs y SQL.
+Limpieza: caso/historial PU_C32 según reglas de retención del entorno.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable por D03.
+
+CP-C32-041 — Permisos administrativos y ámbito
+Objetivo: proteger habilitación, suspensión, reasignación, cancelación y métricas.
+Referencias: P01; A08-A10; R12; CA11-CA12.
+Actor/permisos: ADM32 con permisos separados y SIN32.
+Precondiciones/datos: definición/caso/tarea PU_C32.
+Pasos:
+1. Ejecutar cada operación con SIN32 y con ADM32 sin la capacidad específica.
+2. Repetir con ADM32 autorizado y dentro de su ámbito.
+3. Intentar repetir fuera de ámbito.
+Resultado esperado — pantalla/API: controles y servidor aplican permiso y
+ámbito; base/Bitácora: solo operaciones autorizadas generan cambios/historial.
+Consultas: Q01-Q07 y contrato real de autorización.
+Evidencia: matriz actor/operación, capturas, respuestas, logs y SQL.
+Limpieza: restaurar solo estado de fixtures PU_C32 mediante operaciones auditadas.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: PENDIENTE.
+
+CP-C32-042 — Recorrido integral físico en V2035
+Objetivo: verificar de extremo a extremo el ejemplo obligatorio de inasistencia.
+Referencias: RD01-RD08; P01-P08; F01-F20; A03-A06; R01-R13; CA01, CA03-CA10, CA12, CA14-CA15.
+Actor/permisos: SUP32, EMP32, RH32 y responsable final, con roles/ámbitos comprobados.
+Precondiciones/datos: V2035, APK/paquete aislados y base aislada identificados;
+DEF32-V1 habilitada; SOP32-A/B; dependencias D01-D07 resueltas; respaldo del fixture.
+Pasos:
+1. En V2035, SUP32 registra/confirma novedad de inasistencia y abre el caso.
+2. Comprobar pantalla, bandeja de EMP32, Q02-Q07 y vínculo de origen.
+3. EMP32 inicia, adjunta SOP32-A y completa SOPORTE_PRESENTADO; comprobar su
+   bandeja, la de RH32, Q02-Q07, soporte, historial y Bitácora.
+4. RH32 inicia la revisión y decide REQUIERE_CORRECCION; comprobar ambas
+   bandejas, nueva tarea, enlace de retorno, Q02-Q07 e historial.
+5. EMP32 inicia la nueva tarea, adjunta SOP32-B y completa; repetir todas las comprobaciones.
+6. RH32 realiza la nueva revisión y acepta; comprobar sucesor y relaciones.
+7. El responsable final inicia/completa la etapa final; comprobar cierre.
+8. Salir, forzar cierre, reabrir la app y consultar caso/historial completo.
+Resultado esperado — pantalla: cada actor ve solo su tarea en el estado y
+orden correctos; soportes y cronología persisten; caso se cierra solo tras la
+etapa final. API: todas las respuestas quedan correlacionadas y sin duplicados.
+Base: un caso, una bpm_actividad nueva por cada visita, enlaces compatibles,
+responsables/ejecutores correctos, cero tareas activas al cierre y versión
+fijada. Bitácora: un hecho verificable por ejecución, anteriores intactos.
+Consultas: Q01-Q09 y SQL de origen, soportes e historial comprobados; ejecutar
+Q02-Q07 después de cada paso, no únicamente al final.
+Evidencia: video continuo o capturas fechadas por paso, paquete/versión/hash,
+logcat, tráfico sin secretos, logs backend, consultas y hashes de soportes.
+Limpieza: inventariar IDs; retirar únicamente todo el conjunto PU_C32 en orden
+referencial después de aprobar evidencias, o conservarlo como fixture documentado.
+Estado inicial: NO EJECUTADA.
+Resultado real: PENDIENTE. Fecha: PENDIENTE. Ejecutor: PENDIENTE. Observaciones: bloqueable hasta resolver D01-D07; esta prueba no puede aprobarse con API únicamente.
+
+7. MATRIZ DE TRAZABILIDAD
+
+Requisitos de datos:
+- RD01: 001, 003, 020, 042.
+- RD02: 004, 039, 042.
+- RD03: 001, 033, 042.
+- RD04: 006-009, 024, 042.
+- RD05: 012, 015, 042.
+- RD06: 006, 013, 019, 022-030, 040, 042.
+- RD07: 001, 004, 015-018, 032, 042.
+- RD08: 001-005, 024-025, 037-038, 042.
+
+Precondiciones:
+- P01: 006-015, 020-023, 026-030, 034-036, 039-042.
+- P02: 001-006, 010, 042.
+- P03: 001-003, 042.
+- P04: 001-004, 020, 033, 042.
+- P05: 001, 004, 006, 018, 042.
+- P06: 006, 016, 024-025, 030, 042.
+- P07: 007, 042.
+- P08: 034-036, 042.
+
+Flujos:
+- F01: 006-010, 042.  F02: 006, 010, 039, 042.
+- F03: 004, 006, 018, 042.  F04: 006, 008-009, 024, 042.
+- F05: 006, 024, 042.  F06: 006, 024, 042.
+- F07: 006-008, 024, 042.  F08: 006, 008, 024, 042.
+- F09: 011-012, 034, 042.  F10: 012, 015, 042.
+- F11: 013-014, 042.  F12: 015-017, 042.
+- F13: 016-017, 022-025, 042.  F14: 016-019, 042.
+- F15: 016, 018-019, 042.  F16: 016, 019, 025, 039, 042.
+- F17: 016, 019, 022-025, 042.  F18: 030-031, 042.
+- F19: 016, 019, 025-030, 040, 042.  F20: 016, 030, 042.
+
+Alternativas:
+- A01: 002-005, 010.  A02: 004, 018.
+- A03: 015, 042.  A04: 017, 019, 042.
+- A05: 019, 042.  A06: 008-009, 023, 036.
+- A07: 022.  A08: 014, 026-027, 041.
+- A09: 029, 041.  A10: 028, 041.
+- A11: 033.  A12: 034-036.
+- A13: 011, 032.  A14: 024-025, 036.
+
+Reglas:
+- R01: 020-021, 042.  R02: 003, 020, 042.
+- R03: 004-005, 016, 038, 042.  R04: 004, 016, 033, 042.
+- R05: 019, 040, 042.  R06: 030-031, 042.
+- R07: 019, 029, 040, 042.  R08: 006, 013, 016, 026-029, 038-040, 042.
+- R09: 006, 008-009, 013, 022-023, 036, 038, 042.
+- R10: 003, 006, 020-021, 042.  R11: 027, 032, 042.
+- R12: 012-014, 020, 028, 039, 041-042.
+- R13: 016-019, 030, 042; se comprueba que el motor no aplica efectos laborales implícitos.
+
+Criterios de aceptación:
+- CA01: 006-009, 042.  CA02: 001-005, 010.
+- CA03: 011-012, 034, 042.  CA04: 013-014, 042.
+- CA05: 016, 019, 042.  CA06: 004, 015, 017-018, 035, 042.
+- CA07: 019, 040, 042.  CA08: 008-009, 022-023, 035-036, 042.
+- CA09: 024-025, 042.  CA10: 030-031, 042.
+- CA11: 026-029, 041.  CA12: 010, 012, 014, 020-021, 039, 041-042.
+- CA13: 033.  CA14: 011, 021, 027, 032, 042.
+- CA15: 042.  CA16: 005, 037-038.
+
+8. CLASIFICACIÓN POR NIVEL DE PRUEBA
+
+Automatizables unitarias/contrato: 002-005, 009-010, 014, 017-018,
+020-021, 031 y validaciones parciales de 032/039.
+
+Integración API y base aislada: 001, 006-010, 013-033, 036-041. Las pruebas
+022-025 requieren control de concurrencia o inyección de fallos. Las pruebas
+037-038 solo aplican cuando la extensión esté implementada.
+
+Dispositivo físico V2035: 006-016, 019, 026-036 y especialmente 042. La
+evidencia física complementa, pero no sustituye, las consultas de base.
+
+9. REQUISITOS PENDIENTES Y SU IMPACTO
+
+- D01 bloquea apertura desde Novedades, idempotencia de apertura y su
+  atomicidad integral: CP-C32-006 a 009, 024 y 042.
+- D02 bloquea soportes/documentos: CP-C32-012, 015 y 042.
+- D03 bloquea acreditación completa de historial/administración: CP-C32-006,
+  013, 019, 022-030, 040 y 042.
+- D04 bloquea versión inmutable de requisitos/resultados/asignación:
+  CP-C32-001, 004, 015-018, 022, 033 y 042.
+- D05 bloquea identidad inequívoca: CP-C32-004, 006-007, 039 y 042.
+- D06 debe resolverse para todas las pruebas de API/Android; no se ha nombrado
+  ningún endpoint supuesto en este plan.
+- D07 bloquea la aprobación de CP-C32-032 y la parte métrica de 042.
+- D08 determina si CP-C32-037/038 se ejecutan. Si una extensión no existe,
+  debe aprobarse su rechazo mediante CP-C32-005, mientras 037/038 permanecen
+  NO EJECUTADA por no aplicabilidad técnica; no se declara la extensión aprobada.
+- El CU no define valores concretos de calendarios, reasignación automática,
+  efectos de suspensión en métricas ni política de retención/limpieza. Deben
+  fijarse como configuración del fixture antes de las pruebas afectadas.
+- La ampliación autorizada exige captura y ejecución local offline, pero solo
+  el servidor confirma el avance. CP-C32-034-036 y 043-056 verifican la cola
+  durable, ausencia de falso éxito, causalidad y recuperación segura.
+
+10. CRITERIO DE CIERRE DEL PLAN
+
+Antes de ejecutar se resolverán o registrarán como bloqueo las dependencias de
+cada caso. Los únicos estados posteriores permitidos serán APROBADA, FALLIDA,
+BLOQUEADA o NO EJECUTADA, siempre con resultado real y evidencia. Ninguna
+prueba se aprobará por compilación, prueba de API aislada o ausencia aparente
+de error. C32 no puede declararse probada mientras falte el recorrido físico
+CP-C32-042 o exista una prueba obligatoria fallida/bloqueada/no ejecutada.
+
+11. PRUEBAS ADICIONALES ONLINE/OFFLINE
+
+Las pruebas 043-056 amplían el plan original por la autorización expresa de
+operación offline. Usan exclusivamente el paquete aislado C32, la base
+bitacora_c32_test y datos CP_C32. La limpieza se limita a esos datos y respeta
+la retención de evidencia.
+
+CP-C32-043 — Apertura e inicio offline
+Objetivo: abrir un caso e iniciar su tarea con la definición descargada, sin red.
+Referencias: ampliación 18; CA17, CA20. Actor/permisos: EMP32 autorizado.
+Precondiciones/datos: definición CP_C32 sincronizada; modo avión; UUID nuevos.
+Pasos: 1. Abrir caso. 2. Iniciar tarea. 3. Cerrar y abrir la app. 4. Consultar Room.
+Resultado esperado: pantalla indica PENDIENTE LOCAL; API/base sin altas; Room conserva caso, tarea y dos operaciones causales.
+Evidencia: capturas, exportación Room y ausencia en API/SQL. Limpieza: datos CP_C32 tras sincronizar.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-044 — Finalización offline y confirmación posterior
+Objetivo: completar con soporte offline y confirmar una sola vez al reconectar.
+Referencias: ampliación 18; CA17-CA18. Actor/permisos: EMP32.
+Precondiciones/datos: tarea local iniciada; soporte CP_C32_OFFLINE_A.
+Pasos: 1. Sin red, adjuntar y completar. 2. Verificar pendiente. 3. Reconectar y sincronizar. 4. Repetir sincronización.
+Resultado esperado: soporte permanece hasta confirmación; servidor crea una actuación, evidencia, Bitácora y sucesor; segundo envío SIN CAMBIOS.
+Evidencia: pantalla, Room, tráfico, Q02-Q07 y hash. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-045 — Reinicio con cola pendiente
+Objetivo: comprobar durabilidad tras cierre y reinicio del celular.
+Referencias: ampliación 18; CA17-CA18. Actor/permisos: EMP32.
+Precondiciones/datos: operaciones y evidencia pendientes.
+Pasos: 1. Forzar cierre. 2. Reiniciar V2035. 3. Abrir sin red. 4. Sincronizar al reconectar.
+Resultado esperado: contenido idéntico antes/después; sin falso éxito; confirmación única.
+Evidencia: video/capturas antes y después, Room, API y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-046 — Actuaciones encadenadas y orden causal
+Objetivo: impedir que una operación adelante a su dependencia.
+Referencias: ampliación 18; CA20. Actor/permisos: actores CP_C32.
+Precondiciones/datos: caso, inicio, finalización y sucesor locales encadenados.
+Pasos: 1. Capturar cadena offline. 2. Inspeccionar dependencyUuid. 3. Sincronizar. 4. Inyectar rechazo de la primera y repetir.
+Resultado esperado: orden causal; si la primera falla, dependientes quedan identificadas en conflicto y no llegan al servidor.
+Evidencia: Room, tráfico ordenado, API y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-047 — Corte durante sincronización y evidencia
+Objetivo: recuperar una transferencia interrumpida sin referencia rota o duplicada.
+Referencias: ampliación 18; CA18. Actor/permisos: EMP32.
+Precondiciones/datos: soporte CP_C32_CORTE con hash conocido.
+Pasos: 1. Iniciar sincronización. 2. Cortar red durante envío. 3. Comprobar pendiente. 4. Reconectar y reintentar.
+Resultado esperado: no hay éxito prematuro; archivo local se conserva; queda una evidencia íntegra.
+Evidencia: logcat, Room, tráfico, hash y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-048 — Respuesta perdida y reenvío idempotente
+Objetivo: recuperar cuando el commit ocurrió pero la respuesta no llegó.
+Referencias: R08-R09; CA08, CA18. Actor/permisos: EMP32.
+Precondiciones/datos: operación CP_C32 con UUID fijo.
+Pasos: 1. Confirmar y suprimir respuesta. 2. Reenviar el mismo contenido. 3. Reenviar UUID con contenido distinto.
+Resultado esperado: mismo contenido devuelve mismos IDs sin duplicar; contenido distinto produce conflicto.
+Evidencia: respuestas, logs y conteos SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-049 — Dos dispositivos sobre la misma tarea
+Objetivo: confirmar una decisión y preservar explícitamente la otra como conflicto.
+Referencias: R08; CA08, CA19. Actor/permisos: dos clientes equivalentes EMP32.
+Precondiciones/datos: misma revisión base, UUID y resultados distintos.
+Pasos: 1. Capturar en ambos. 2. Sincronizar simultáneamente. 3. Actualizar el perdedor.
+Resultado esperado: un solo avance; el perdedor conserva captura y conflicto; sin última escritura gana.
+Evidencia: pantallas/clientes, respuestas y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-050 — Cambio administrativo mientras el cliente está offline
+Objetivo: revalidar reasignación, suspensión y cancelación al sincronizar.
+Referencias: A08-A10; CA11, CA19. Actor/permisos: ADM32 y EMP32.
+Precondiciones/datos: tres casos con actuación local pendiente.
+Pasos: 1. Dejar cliente offline. 2. Aplicar cada cambio en servidor. 3. Reconectar y sincronizar.
+Resultado esperado: servidor rechaza/conflicta lo incompatible; captura local permanece; historial administrativo íntegro.
+Evidencia: Room, respuestas, historial y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-051 — Permiso revocado antes de sincronizar
+Objetivo: impedir confirmar con autorización local desactualizada.
+Referencias: P01; R12; CA12, CA19. Actor/permisos: EMP32 luego revocado.
+Precondiciones/datos: actuación pendiente válida al capturarse.
+Pasos: 1. Capturar offline. 2. Revocar permiso en servidor. 3. Sincronizar.
+Resultado esperado: rechazo explícito, cero efecto BPM/Bitácora y captura conservada.
+Evidencia: permisos antes/después, Room, respuesta y SQL. Limpieza: restaurar fixture auditado.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-052 — Definición o revisión local desactualizada
+Objetivo: detectar datos base obsoletos sin sobrescribir el servidor.
+Referencias: RD08; CA13, CA19. Actor/permisos: EMP32.
+Precondiciones/datos: snapshot/revisión anterior y nueva versión publicada.
+Pasos: 1. Capturar con snapshot del caso. 2. Cambiar revisión vigente. 3. Sincronizar.
+Resultado esperado: caso conserva snapshot; revisión incompatible produce conflicto; contenido local permanece.
+Evidencia: hashes, revisiones, Room, respuesta y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-053 — Reloj incorrecto
+Objetivo: conservar fecha capturada sin usarla para autorizar u ordenar commits.
+Referencias: ampliación 18; CA18. Actor/permisos: EMP32.
+Precondiciones/datos: reloj del cliente adelantado y atrasado.
+Pasos: 1. Capturar ambas operaciones. 2. Sincronizar. 3. Comparar captured_at y server_time.
+Resultado esperado: ambas fechas separadas; autorización y concurrencia usan estado/revisión del servidor.
+Evidencia: reloj, payloads, historial y SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-054 — Falta de definición, regla o documento local
+Objetivo: bloquear únicamente el avance que no puede calcularse con seguridad.
+Referencias: CA02, CA06, CA17. Actor/permisos: EMP32.
+Precondiciones/datos: tres copias locales incompletas controladas.
+Pasos: 1. Intentar abrir/completar en cada condición. 2. Registrar observación cuando sea posible. 3. Descargar faltante y reintentar.
+Resultado esperado: explicación precisa, cero avance inventado, captura permitida conservada y reintento correcto.
+Evidencia: pantallas, Room y ausencia/presencia controlada en API. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-055 — Fallo transaccional y recuperación de conflicto
+Objetivo: probar rollback total y resolución sin perder la captura original.
+Referencias: CA09, CA19-CA20. Actor/permisos: EMP32 y actor autorizado.
+Precondiciones/datos: punto de fallo tardío y conflicto previamente creado.
+Pasos: 1. Inyectar fallo antes del commit. 2. Verificar cero parciales. 3. Retirar fallo. 4. Actualizar/resolver y sincronizar.
+Resultado esperado: atomicidad completa; captura original auditable; resolución genera una sola actuación válida.
+Evidencia: logs, Room, respuestas y conteos SQL. Limpieza: conjunto CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+CP-C32-056 — Regresiones y ausencia de falso éxito
+Objetivo: comprobar C08, C16, C28-C31 y estados técnicos visibles tras C32.
+Referencias: CA17-CA20. Actor/permisos: usuarios de regresión autorizados.
+Precondiciones/datos: APK C32 aislada y fixtures existentes no productivos.
+Pasos: 1. Recorrer módulos afectados. 2. Provocar fallo de red. 3. Revisar etiquetas pendiente/confirmado/conflicto.
+Resultado esperado: regresiones sin defecto; ninguna captura local se muestra como confirmada por servidor.
+Evidencia: capturas, logcat y pruebas focales. Limpieza: solo datos CP_C32.
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha/ejecutor/observaciones: PENDIENTES.
+
+12. TRAZABILIDAD DE LA AMPLIACIÓN OFFLINE
+
+- CA17: 043-046, 054, 056.
+- CA18: 044-049, 053, 056.
+- CA19: 049-052, 055-056.
+- CA20: 043, 046, 050-051, 055.
+- Apertura/inicio/finalización offline: 043-044.
+- Persistencia tras reinicio: 045.
+- Causalidad: 046 y 055.
+- Cortes, respuesta perdida y reenvío: 047-048.
+- Concurrencia y cambios remotos: 049-052.
+- Reloj y recursos faltantes: 053-054.
+- Atomicidad, resolución y regresiones: 055-056.
+
+FIN DE CP-C32-MOTOR_BPM
+
+13. MATRIZ DE EJECUCIÓN FINAL — 2026-10-10
+
+Ejecutor: Codex. Ambientes: bitacora_c32_test y V2035 para datos sintéticos;
+bitacora/com.cactus.bitacora solo para verificación final sin fixtures.
+
+- CP-C32-001 a 005: APROBADAS. Evidencia: pytest, test_c32_contract.py y
+  rechazo de definiciones con funciones no habilitadas.
+- CP-C32-006 a 010: APROBADAS. Evidencia: integration_c32_isolated.py,
+  casos 29/30, operaciones e historial SQL.
+- CP-C32-011 a 021: APROBADAS. Evidencia: integraciones isolated/resilience,
+  recorrido físico 15-45, Room y actividades servidor 72-76.
+- CP-C32-022 a 036: APROBADAS. Evidencia: permisos, concurrencia,
+  administración, rollback, revisión obsoleta y causalidad en
+  integration_c32_resilience.py, más consultas SQL.
+- CP-C32-037 y 038: NO APLICAN. Recordatorios, escalamiento y API externa no
+  están habilitados; CP-C32-005 aprobó el rechazo de una definición que los
+  exige. No se atribuye implementación a esas extensiones.
+- CP-C32-039 a 042: APROBADAS. Evidencia: scripts de integración y caso físico
+  29 cerrado con cinco actividades, cuatro enlaces, tres evidencias y cinco
+  filas de Bitácora.
+- CP-C32-043: APROBADA. Apertura/inicio offline persistidos en Room y ausencia
+  comprobada en MariaDB antes de recuperar red.
+- CP-C32-044: APROBADA. Finalización offline con dos soportes, confirmación y
+  sucesor únicos.
+- CP-C32-045: APROBADA. Reinicio del V2035 con UUID, cola, dependencias,
+  contenido y hashes conservados.
+- CP-C32-046: APROBADA. OPEN_CASE → START_TASK → COMPLETE_TASK confirmadas en
+  orden causal.
+- CP-C32-047: APROBADA. El fallo de red mantuvo cola/evidencias y el reintento
+  confirmó sin falso éxito.
+- CP-C32-048: APROBADA. Reenvío conservó conteos e IDs; UUID con otro contenido
+  produjo conflicto en la prueba de resiliencia.
+- CP-C32-049 a 055: APROBADAS. Evidencia: integration_c32_resilience.py, Room
+  y consultas SQL de bitacora_c32_test.
+- CP-C32-056: APROBADA. Pytest y regresiones visuales C08, C16 y C28-C31;
+  evidencias 46-63.
+
+Resultado global: todas las pruebas obligatorias y aplicables están APROBADAS;
+cero FALLIDAS, BLOQUEADAS o NO EJECUTADAS obligatorias. Las dos pruebas
+condicionales no aplican conforme a su precondición.

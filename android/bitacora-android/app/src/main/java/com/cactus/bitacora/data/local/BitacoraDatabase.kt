@@ -21,9 +21,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SupervisorEventLocalEntity::class,
         WorkScheduleLocalEntity::class,
         WorkScheduleDetailLocalEntity::class,
-        CatalogPreparationStateEntity::class
+        CatalogPreparationStateEntity::class,
+        BpmDefinitionLocalEntity::class,
+        BpmCaseLocalEntity::class,
+        BpmTaskLocalEntity::class,
+        BpmOperationLocalEntity::class,
+        BpmEvidenceLocalEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class BitacoraDatabase : RoomDatabase() {
@@ -33,6 +38,7 @@ abstract class BitacoraDatabase : RoomDatabase() {
     abstract fun referenceCatalogDao(): ReferenceCatalogDao
     abstract fun supervisorEventDao(): SupervisorEventDao
     abstract fun workScheduleDao(): WorkScheduleDao
+    abstract fun bpmLocalDao(): BpmLocalDao
 
     companion object {
         @Volatile
@@ -63,7 +69,8 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     MIGRATION_16_17,
                     MIGRATION_17_18,
                     MIGRATION_18_19,
-                    MIGRATION_19_20
+                    MIGRATION_19_20,
+                    MIGRATION_20_21
                 ).build().also { instance = it }
             }
 
@@ -486,6 +493,50 @@ abstract class BitacoraDatabase : RoomDatabase() {
                     SET status='STALE', preparedAtMillis=NULL,
                         validationMessage='Maria47 requiere resincronizacion validada'
                     WHERE preparationKey='work_schedules_not_null'""".trimIndent())
+            }
+        }
+
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS bpm_definitions_local (
+                    processId INTEGER NOT NULL PRIMARY KEY,name TEXT NOT NULL,version INTEGER NOT NULL,
+                    description TEXT,sha256 TEXT NOT NULL,definitionJson TEXT NOT NULL,
+                    active INTEGER NOT NULL,syncedAtMillis INTEGER NOT NULL)""".trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_definitions_local_active ON bpm_definitions_local(active)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS bpm_cases_local (
+                    clientUuid TEXT NOT NULL PRIMARY KEY,remoteId INTEGER,processId INTEGER NOT NULL,
+                    definitionSha256 TEXT NOT NULL,subject TEXT NOT NULL,affectedCode TEXT NOT NULL,
+                    creatorCode TEXT NOT NULL,sourceType TEXT NOT NULL,sourceId TEXT,state TEXT NOT NULL,
+                    revision INTEGER NOT NULL,capturedAt TEXT NOT NULL,confirmedAt TEXT,
+                    syncState TEXT NOT NULL,lastError TEXT)""".trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_bpm_cases_local_remoteId ON bpm_cases_local(remoteId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_cases_local_syncState ON bpm_cases_local(syncState)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS bpm_tasks_local (
+                    clientUuid TEXT NOT NULL PRIMARY KEY,remoteId INTEGER,caseClientUuid TEXT NOT NULL,
+                    processId INTEGER NOT NULL,stageId INTEGER NOT NULL,stageName TEXT NOT NULL,
+                    responsibleCode TEXT NOT NULL,state TEXT NOT NULL,revision INTEGER NOT NULL,
+                    result TEXT,observations TEXT,dueAt TEXT,provisional INTEGER NOT NULL,
+                    syncState TEXT NOT NULL,lastError TEXT)""".trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_bpm_tasks_local_remoteId ON bpm_tasks_local(remoteId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_tasks_local_caseClientUuid ON bpm_tasks_local(caseClientUuid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_tasks_local_responsibleCode ON bpm_tasks_local(responsibleCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_tasks_local_syncState ON bpm_tasks_local(syncState)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS bpm_operations_local (
+                    operationUuid TEXT NOT NULL PRIMARY KEY,sequence INTEGER NOT NULL,dependencyUuid TEXT,
+                    operationType TEXT NOT NULL,actorCode TEXT NOT NULL,device TEXT NOT NULL,
+                    caseClientUuid TEXT,taskClientUuid TEXT,successorClientUuid TEXT,baseRevision INTEGER,
+                    definitionSha256 TEXT,capturedAt TEXT NOT NULL,payloadJson TEXT NOT NULL,
+                    syncState TEXT NOT NULL,serverResultJson TEXT,lastError TEXT,attempts INTEGER NOT NULL)""".trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_operations_local_sequence ON bpm_operations_local(sequence)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_operations_local_dependencyUuid ON bpm_operations_local(dependencyUuid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_operations_local_syncState ON bpm_operations_local(syncState)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS bpm_evidences_local (
+                    clientUuid TEXT NOT NULL PRIMARY KEY,caseClientUuid TEXT NOT NULL,
+                    taskClientUuid TEXT NOT NULL,filename TEXT NOT NULL,mimeType TEXT NOT NULL,
+                    sha256 TEXT NOT NULL,contentBase64 TEXT NOT NULL,capturedAt TEXT NOT NULL,
+                    syncState TEXT NOT NULL,lastError TEXT)""".trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_evidences_local_taskClientUuid ON bpm_evidences_local(taskClientUuid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_bpm_evidences_local_syncState ON bpm_evidences_local(syncState)")
             }
         }
     }

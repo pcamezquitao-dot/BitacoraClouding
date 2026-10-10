@@ -15,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.feature.supervisorevents.SupervisorEventRepository
+import com.cactus.bitacora.feature.bpm.BpmRepository
 import java.util.concurrent.TimeUnit
 
 class OfflineSyncWorker(
@@ -26,17 +27,18 @@ class OfflineSyncWorker(
             Log.i(SYNC_TAG, "worker start runAttemptCount=$runAttemptCount")
             val result = BitacoraRepository(applicationContext).sincronizarPendientes()
             val supervisorEvents = SupervisorEventRepository(applicationContext).syncPending()
+            val bpm = BpmRepository(applicationContext).syncPending()
             val output = Data.Builder()
-                .putInt("revisados", result.revisados + supervisorEvents.reviewed)
-                .putInt("sincronizados", result.sincronizados + supervisorEvents.synced)
-                .putInt("errores", result.errores + supervisorEvents.errors)
+                .putInt("revisados", result.revisados + supervisorEvents.reviewed + bpm.reviewed)
+                .putInt("sincronizados", result.sincronizados + supervisorEvents.synced + bpm.confirmed)
+                .putInt("errores", result.errores + supervisorEvents.errors + bpm.conflicts + bpm.rejected)
                 .build()
             Log.i(
                 SYNC_TAG,
                 "worker finish reviewed=${result.revisados} synced=${result.sincronizados} " +
                     "errors=${result.errores} retryable=${result.erroresReintentables}"
             )
-            when (workerDecision(result.erroresReintentables + supervisorEvents.retryableErrors)) {
+            when (workerDecision(result.erroresReintentables + supervisorEvents.retryableErrors + bpm.retryable)) {
                 WorkerDecision.RETRY -> Result.retry()
                 WorkerDecision.SUCCESS -> Result.success(output)
             }

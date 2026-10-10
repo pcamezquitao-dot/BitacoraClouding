@@ -1,0 +1,2 @@
+CP_C32 evidencia corregida del recorrido fisico aislado.
+Datos sinteticos exclusivos de prueba C32.

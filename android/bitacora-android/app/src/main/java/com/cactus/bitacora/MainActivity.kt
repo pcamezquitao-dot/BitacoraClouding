@@ -93,6 +93,7 @@ import com.cactus.bitacora.ui.evidence.EvidencePanel
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
 import com.cactus.bitacora.ui.admin.AdminCatalogScreen
 import com.cactus.bitacora.feature.testdata.TestBitacoraAdminScreen
+import com.cactus.bitacora.feature.bpm.BpmMotorScreen
 import com.cactus.bitacora.ui.home.BitacoraVisualTheme
 import com.cactus.bitacora.ui.home.MainBottomBar
 import com.cactus.bitacora.ui.home.MainHeader
@@ -150,6 +151,7 @@ internal enum class AppEnvironment(val label: String) {
     SUPERVISOR("Supervisor"),
     TRABAJADOR("Trabajador"),
     GERENCIA("Gerencia"),
+    MOTOR_BPM("Motor BPM"),
     SEGUIMIENTO_SATELITAL("Seguimiento satelital de embalses")
 }
 
@@ -283,6 +285,7 @@ fun BitacoraApp() {
             activeEnvironment == AppEnvironment.SUPERVISOR ||
             activeEnvironment == AppEnvironment.TRABAJADOR ||
             activeEnvironment == AppEnvironment.GERENCIA
+            || activeEnvironment == AppEnvironment.MOTOR_BPM
         ) {
             try {
                 repository.checkHealth()
@@ -394,6 +397,10 @@ fun BitacoraApp() {
             }
             if (environment == AppEnvironment.GERENCIA) {
                 ManagementModeScreen(repository = repository, onExit = ::changeEnvironment)
+                return@Column
+            }
+            if (environment == AppEnvironment.MOTOR_BPM) {
+                BpmMotorScreen(onExit = ::changeEnvironment)
                 return@Column
             }
 
@@ -678,6 +685,10 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.GERENCIA) }
         ) { Text("Gerencia") }
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.MOTOR_BPM) }
+        ) { Text("Motor BPM") }
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.SEGUIMIENTO_SATELITAL) }

@@ -1,0 +1,1 @@
+Soporte sintético CP_C32 para prueba física de corrección B.
