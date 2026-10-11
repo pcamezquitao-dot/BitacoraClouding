@@ -29,6 +29,22 @@ import org.junit.Test
 
 class ReferenceCatalogRepositoryTest {
     @Test
+    fun managementCanIdentifyOfflineFromSynchronizedCatalog() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participantTypes[3] = participantType(3, "gerente")
+            participants[1] = participant(1, "P0001")
+            areas[10] = area(10)
+            assignments[1 to 10] = assignment(1, 10, 3)
+        }
+
+        val session = repository(dao, FakeCatalogApi(failNetwork = true))
+            .localManagementSession("p0001")
+
+        assertEquals(1, session.id_directivo)
+        assertEquals("P0001", session.codigo)
+    }
+
+    @Test
     fun supervisorModeResolvesCargoTwoOnceAndIncludesOwnAndDescendantAreas() = runBlocking {
         val dao = FakeCatalogDao().apply {
             participantTypes[1] = participantType(1, "operario")

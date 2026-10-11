@@ -181,6 +181,16 @@ D01. Un actor autorizado selecciona "Abrir caso" y un proceso habilitado.
 D02. Un evento confirmado de Novedades solicita abrir el proceso asociado.
 D03. El participante identificado accede a "Mis tareas BPM".
 
+D04. Despues de identificar al participante, todos los roles muestran el boton
+"Tareas BPM". La presencia del boton no amplia permisos: la bandeja, el detalle
+y cada operacion se filtran y revalidan por identidad, rol y asignacion efectiva.
+D05. Si el participante no tiene tareas asignadas o ejecutadas, la bandeja se
+abre y muestra "No tiene tareas pendientes". ONLINE consulta al servidor y
+OFFLINE usa exclusivamente la ultima bandeja sincronizada de esa identidad.
+D06. Cambiar de participante cambia inmediatamente la clave de consulta local y
+remota. Tareas de otra identidad no se muestran ni pueden ejecutarse alterando
+una solicitud. Las funciones especializadas del Supervisor RH se conservan.
+
 Pantalla propuesta después de identificar al participante y su rol:
 lista desplegable de estados: Pendientes, En curso, Ejecutadas y Canceladas.
 Mostrar cantidad, caso, tarea, responsable, fecha programada, vencimiento

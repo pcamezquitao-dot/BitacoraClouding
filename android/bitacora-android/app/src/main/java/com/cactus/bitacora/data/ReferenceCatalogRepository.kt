@@ -522,6 +522,22 @@ class ReferenceCatalogRepository(
         )
     }
 
+    suspend fun localManagementSession(raw: String): com.cactus.bitacora.model.ManagementSessionOut {
+        val code = normalizeCatalogCode(raw)
+        val participant = dao.participantByCode(code)
+            ?: throw CatalogValidationException("El directivo no esta en el catalogo local")
+        if (!participant.activo) throw CatalogValidationException("El directivo esta inactivo")
+        val managerType = managerTypeCode()
+        if (dao.activeAssignmentsForParticipant(participant.idParticipante).none { it.cargo == managerType }) {
+            throw CatalogValidationException("El participante no tiene cargo de Gerencia vigente")
+        }
+        return com.cactus.bitacora.model.ManagementSessionOut(
+            participant.idParticipante,
+            participant.codigoQr,
+            listOfNotNull(participant.nombre, participant.apellido).joinToString(" ")
+        )
+    }
+
     suspend fun localWorkerCalendar(
         year: Int,
         month: Int

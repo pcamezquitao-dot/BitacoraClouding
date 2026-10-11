@@ -184,7 +184,7 @@ private fun BpmCaseAdminCard(
 }
 
 @Composable
-private fun BpmTaskCard(
+internal fun BpmTaskCard(
     task: BpmTaskLocalEntity,
     busy: Boolean,
     onStart: () -> Unit,

@@ -65,5 +65,7 @@ def test_android_exposes_c33_only_for_effective_supervisor_rh_role():
     ).read_text(encoding="utf-8")
     assert 'equals("supervisor_RH", ignoreCase = true)' in mode
     assert 'if (isSupervisorRh)' in mode
-    assert 'Text("Tareas BPM C33")' in mode
+    assert 'Text("Tareas BPM")' in mode
+    assert "ParticipantBpmTasksScreen" in mode
+    assert "SupervisorRhBpmScreen" in mode
     assert 'Text("SUPERVISOR / SUPERVISOR RH")' in main

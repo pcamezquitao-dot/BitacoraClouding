@@ -283,18 +283,24 @@ datos moviles apagados, se cerro/reabrio la app, se mostro 30/31 y se selecciono
 P0003 desde Room sin guardar una novedad.
 Estado: APROBADA.
 
-CP-C33-027 - Regresion de alcance del Supervisor ordinario
+CP-C33-027 - Regresion de alcance y bandeja BPM del Supervisor ordinario
 Reglas: A05; CA21.
 Objetivo: demostrar que un Supervisor ordinario mantiene solo sus areas y
-descendientes y no recibe el catalogo empresarial global ni acceso a C33.
+descendientes, puede abrir Tareas BPM y no recibe funciones especializadas C33.
 Pasos: 1) identificar un Supervisor ordinario vigente; 2) comparar su lista
-con su jerarquia; 3) comprobar que no aparece Tareas BPM C33.
-Esperado: lista jerarquica sin ampliacion y acceso C33 ausente.
+con su jerarquia; 3) abrir Tareas BPM; 4) comprobar bandeja propia o mensaje
+sin pendientes; 5) intentar consultar una tarea ajena mediante API controlada.
+Esperado: lista jerarquica sin ampliacion, bandeja disponible, tarea ajena 403 y
+ausencia de captura/decision especializada de Supervisor RH.
 Evidencia: respuesta API, consulta SQL y XML de UI.
-Resultado obtenido: prueba automatizada y API confirman que P0276 mantiene la
-CTE jerarquica y rol `supervisor`. Fisicamente P0276 mostro 29 empleados/29
-asignaciones bajo su alcance, el texto ordinario y ningun acceso Tareas BPM C33.
-Estado: APROBADA.
+Resultado obtenido: la comprobacion anterior de alcance jerarquico permanece
+vigente. La navegacion universal BPM reemplaza la expectativa de ocultamiento.
+Resultado obtenido: P0276 conservo su alcance jerarquico, mostro `Tareas BPM`
+y abrio la bandeja comun vinculada a P0276. ONLINE y OFFLINE mostro
+`No tiene tareas pendientes`. En el backend aislado obtuvo cero tareas; una
+consulta ajena del caso 35 fue rechazada HTTP 403. No aparecio la pantalla ni
+la decision especializada de Supervisor RH.
+Estado: APROBADA. Fecha/ejecutor: 2026-10-11 / Codex. Version 59.
 
 Trazabilidad adicional: A05 -> 025-027; A06 -> 025-026; CA20 -> 025-026;
 CA21 -> 027. Total tras reapertura: 27 pruebas.

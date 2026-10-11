@@ -1292,3 +1292,55 @@ bitacora/com.cactus.bitacora solo para verificación final sin fixtures.
 Resultado global: todas las pruebas obligatorias y aplicables están APROBADAS;
 cero FALLIDAS, BLOQUEADAS o NO EJECUTADAS obligatorias. Las dos pruebas
 condicionales no aplican conforme a su precondición.
+AMPLIACION DE ACCESO UNIVERSAL - 11 DE OCTUBRE DE 2026
+
+CP-C32-057 — Boton Tareas BPM despues de identificar cada rol
+Objetivo: comprobar acceso visible para trabajador, supervisor, Supervisor RH,
+Gerencia y cualquier participante que use la entrada general BPM.
+Referencias: D03-D04. Datos: participantes activos de cada rol, sin cambiar
+roles productivos. Pasos: identificar cada actor y comprobar el menu inmediato.
+Esperado: todos muestran "Tareas BPM"; la identidad visible coincide con la
+usada por la bandeja. Evidencia: XML/capturas y respuesta de identificacion.
+Resultado obtenido: en V2035 se identificaron P0276 (Supervisor ordinario),
+P0003 (Supervisor RH), P0039 (Trabajador) y P0001 (Gerencia). Todos mostraron
+`Tareas BPM`; cada bandeja rotulo el participante correcto. Version 59.
+Estado: APROBADA. Fecha/ejecutor: 2026-10-11 / Codex.
+
+CP-C32-058 — Bandeja vacia ONLINE/OFFLINE
+Objetivo: mantener el acceso cuando el actor no tiene tareas.
+Referencias: D04-D05, F09. Pasos: abrir online, actualizar, desconectar,
+cerrar/reabrir y consultar Room. Esperado: "No tiene tareas pendientes" en
+ambos recorridos, sin falso error ni escritura. Evidencia: UI, API y Room.
+Resultado obtenido: P0276 se comprobo ONLINE y OFFLINE; P0039 y P0001 se
+comprobaron OFFLINE despues de cierre y reapertura. Room permitio identificar
+y abrir la bandeja, que mostro exactamente `No tiene tareas pendientes` sin
+escrituras ni falso exito. Estado: APROBADA. Fecha/ejecutor: 2026-10-11 / Codex.
+
+CP-C32-059 — Cambio de participante y aislamiento de bandejas
+Objetivo: impedir mezcla local/remota al cambiar de identidad.
+Referencias: D04-D06, F09, A12. Pasos: sincronizar actor A, cambiar a B,
+comparar tareas, volver a A e intentar consultar/ejecutar por B una tarea de A.
+Esperado: cada bandeja contiene solo sus tareas; consulta/ejecucion ajena 403;
+Room filtra por `responsibleCode`. Evidencia: UI, API, Room y log backend.
+Resultado obtenido: el recorrido cambio P0276 -> P0003 -> P0039 -> P0001 sin
+mezclar identidad ni bandeja. En el backend aislado, P0276 obtuvo cero tareas y
+la consulta ajena del caso 35 fue rechazada HTTP 403. Los conjuntos de tareas
+CP_C33_RH (90,93,96,99,102,103) y CP_C33_EMP
+(89,91,92,94,95,97,98,100,101) tuvieron interseccion cero. La consulta Room
+continua filtrando por `responsibleCode`. Estado: APROBADA.
+Fecha/ejecutor: 2026-10-11 / Codex.
+
+CP-C32-060 — Supervisor RH conserva funciones C33
+Objetivo: comprobar que el acceso universal no elimina decision C33 ni el
+alcance empresarial 30 empleados/31 asignaciones de P0003.
+Referencias: D06 y CU-C33 A05-A06. Pasos: identificar P0003, abrir Tareas BPM,
+verificar pantalla especializada y regresar a Novedades.
+Esperado: C33 disponible solo para RH; catalogo empresarial intacto.
+Evidencia: UI, API y conteos Room/MariaDB.
+Resultado obtenido: P0003 abrio la pantalla especializada
+`Tareas BPM - Supervisor RH`. Permanecen aprobadas CP-C33-025 y 026: igualdad
+MariaDB/API/Room de 30 empleados y 31 asignaciones, incluido P0003, ONLINE y
+OFFLINE. Estado: APROBADA. Fecha/ejecutor: 2026-10-11 / Codex.
+
+Trazabilidad adicional: D04 -> 057-060; D05 -> 058; D06 -> 059-060;
+F09 -> 058-059. Total ampliado: 60 pruebas.

@@ -1,0 +1,41 @@
+INC-C32 - ACCESO BPM PARA TODOS LOS ROLES
+Fecha: 11 de octubre de 2026
+
+REGLA MODIFICADA
+El boton Tareas BPM aparece despues de identificar al participante en cada
+pantalla de rol. La visibilidad no concede tareas: backend y Room filtran por
+identidad/asignacion y el backend revalida toda ejecucion.
+
+IMPLEMENTACION
+- Bandeja comun `ParticipantBpmTasksScreen` para participantes no RH.
+- Supervisor, Trabajador y Gerencia muestran Tareas BPM despues de identificar.
+- Supervisor RH conserva `SupervisorRhBpmScreen` y las funciones C33.
+- La bandeja vacia informa "No tiene tareas pendientes".
+- Room consulta `bpm_tasks_local.responsibleCode` por actor.
+
+PRUEBAS Y CIERRE
+- CP-C32-057: APROBADA. Boton y actor correcto para P0276, P0003, P0039 y
+  P0001 en el V2035.
+- CP-C32-058: APROBADA. Bandeja vacia ONLINE/OFFLINE, cierre y reapertura,
+  con mensaje exacto y consulta local Room.
+- CP-C32-059: APROBADA. Cambio de participante sin mezcla; P0276 obtuvo cero
+  tareas y la consulta del caso ajeno 35 fue rechazada HTTP 403. Los conjuntos
+  de tareas RH/empleado del ambiente aislado tuvieron interseccion cero.
+- CP-C32-060: APROBADA. P0003 conservo la pantalla especializada C33 y el
+  catalogo ya validado de 30 empleados/31 asignaciones, incluido el mismo.
+- CP-C33-027: APROBADA con la nueva regla de acceso del Supervisor ordinario.
+
+VERIFICACION FISICA FINAL
+Dispositivo vivo V2035, serie 3065397347006YM. Paquete
+`com.cactus.bitacora`, versionCode 59, versionName
+`maria59-c32-tareas-bpm-roles-offline`. Instalacion por actualizacion; el
+`firstInstallTime` permanecio en 2026-10-06 13:50:35 y los hashes de la base
+Room, WAL y SHM permanecieron identicos antes/despues de instalar.
+
+Evidencia UI: archivos `c32_v58_*` para recorridos ONLINE y Supervisor RH, y
+`c32_v59_management_p0001_offline_*` / `c32_v59_worker_p0039_offline_*` para
+la correccion final de identificacion OFFLINE. Backend productivo y esquema no
+requirieron cambios; las comprobaciones de aislamiento se hicieron contra
+`bitacora_c33_test`. Produccion no recibio fixtures ni escrituras BPM.
+
+Resultado: INCIDENCIA CERRADA, sin pruebas obligatorias pendientes.

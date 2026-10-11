@@ -114,4 +114,6 @@ CA13-CA16: idempotencia, concurrencia, offline/reinicio y conflicto obsoleto.
 CA17-CA19: recuperacion de fallos, regresiones C08/C32 y recorrido fisico V2035.
 CA20: P0003 ve y puede seleccionar a P0003 y a todos los empleados activos con
 asignacion vigente; los conteos ONLINE/OFFLINE coinciden con el catalogo.
-CA21: el Supervisor ordinario no adquiere el alcance global de Supervisor RH.
+CA21: el Supervisor ordinario no adquiere el alcance global de empleados ni las
+funciones especializadas C33. Puede abrir Tareas BPM y solo consulta/ejecuta las
+tareas que C32 autoriza para su propia identidad y asignacion.

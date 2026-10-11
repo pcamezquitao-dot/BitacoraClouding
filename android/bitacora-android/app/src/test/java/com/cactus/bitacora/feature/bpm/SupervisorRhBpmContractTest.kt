@@ -42,11 +42,20 @@ class SupervisorRhBpmContractTest {
     }
 
     @Test
-    fun `acceso c33 requiere rol efectivo supervisor rh`() {
+    fun `todos los participantes identificados acceden a tareas y c33 conserva pantalla especializada`() {
         val mode = projectRoot.resolve("src/main/java/com/cactus/bitacora/SupervisorModeScreen.kt").readText()
         val main = projectRoot.resolve("src/main/java/com/cactus/bitacora/MainActivity.kt").readText()
+        val worker = projectRoot.resolve("src/main/java/com/cactus/bitacora/WorkerModeScreen.kt").readText()
+        val management = projectRoot.resolve("src/main/java/com/cactus/bitacora/ManagementModeScreen.kt").readText()
+        val inbox = projectRoot.resolve("src/main/java/com/cactus/bitacora/feature/bpm/ParticipantBpmTasksScreen.kt").readText()
         assertTrue(mode.contains("isSupervisorRh"))
-        assertTrue(mode.contains("Tareas BPM C33"))
+        assertTrue(mode.contains("Text(\"Tareas BPM\")"))
+        assertTrue(mode.contains("ParticipantBpmTasksScreen"))
+        assertTrue(mode.contains("SupervisorRhBpmScreen"))
+        assertTrue(worker.contains("ParticipantBpmTasksScreen(active.codigo)"))
+        assertTrue(management.contains("ParticipantBpmTasksScreen(active.codigo)"))
+        assertTrue(inbox.contains("No tiene tareas pendientes"))
+        assertTrue(inbox.contains("repository.tasks(actorCode)"))
         assertTrue(main.contains("SUPERVISOR / SUPERVISOR RH"))
     }
 }

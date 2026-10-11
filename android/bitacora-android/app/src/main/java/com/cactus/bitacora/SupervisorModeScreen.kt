@@ -30,6 +30,7 @@ import com.cactus.bitacora.feature.supervisorevents.SupervisorEventForm
 import com.cactus.bitacora.feature.supervisorevents.rememberSupervisorEventRepository
 import com.cactus.bitacora.feature.supervisorevents.rememberSupervisorEventSyncAction
 import com.cactus.bitacora.feature.bpm.SupervisorRhBpmScreen
+import com.cactus.bitacora.feature.bpm.ParticipantBpmTasksScreen
 import com.cactus.bitacora.model.SupervisedParticipantOut
 import com.cactus.bitacora.model.SupervisorSessionOut
 import com.cactus.bitacora.ui.query.BitacoraQueryScreen
@@ -101,9 +102,7 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             Button({ view = SupervisorView.TODAY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar movimientos del día") }
             Button({ view = SupervisorView.CONTROL }, modifier = Modifier.fillMaxWidth()) { Text("CONTROL") }
             Button({ view = SupervisorView.NOVELTIES }, modifier = Modifier.fillMaxWidth()) { Text("Novedades") }
-            if (isSupervisorRh) {
-                Button({ view = SupervisorView.BPM_TASKS }, modifier = Modifier.fillMaxWidth()) { Text("Tareas BPM C33") }
-            }
+            Button({ view = SupervisorView.BPM_TASKS }, modifier = Modifier.fillMaxWidth()) { Text("Tareas BPM") }
         } else {
             OutlinedButton({ view = SupervisorView.MENU }, modifier = Modifier.fillMaxWidth()) { Text("Volver al menú") }
             if (view == SupervisorView.TODAY) {
@@ -129,11 +128,18 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
                     enqueueSync = enqueueSupervisorEventSync
                 )
             } else if (view == SupervisorView.BPM_TASKS) {
-                SupervisorRhBpmScreen(
-                    actorCode = activeSession.codigo,
-                    areas = activeSession.areas,
-                    onBack = { view = SupervisorView.MENU }
-                )
+                if (isSupervisorRh) {
+                    SupervisorRhBpmScreen(
+                        actorCode = activeSession.codigo,
+                        areas = activeSession.areas,
+                        onBack = { view = SupervisorView.MENU }
+                    )
+                } else {
+                    ParticipantBpmTasksScreen(
+                        actorCode = activeSession.codigo,
+                        onBack = { view = SupervisorView.MENU }
+                    )
+                }
             } else if (view == SupervisorView.QUERY) {
                 BitacoraQueryScreen(
                     repository = repository,

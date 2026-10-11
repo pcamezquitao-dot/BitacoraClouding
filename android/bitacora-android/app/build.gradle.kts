@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 57
-        versionName = "maria57-c33-alcance-empleados-rh"
+        versionCode = 59
+        versionName = "maria59-c32-tareas-bpm-roles-offline"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

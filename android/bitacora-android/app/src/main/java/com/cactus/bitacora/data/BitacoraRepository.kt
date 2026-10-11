@@ -123,8 +123,14 @@ class BitacoraRepository(
         }
     }
 
-    suspend fun identifyManagement(reference: String): com.cactus.bitacora.model.ManagementSessionOut =
-        api.identifyManagement(com.cactus.bitacora.model.ManagementIdentifyIn(normalizeCatalogCode(reference)))
+    suspend fun identifyManagement(reference: String): com.cactus.bitacora.model.ManagementSessionOut {
+        val local = referenceCatalogRepository.localManagementSession(reference)
+        return try {
+            api.identifyManagement(com.cactus.bitacora.model.ManagementIdentifyIn(local.codigo))
+        } catch (error: Exception) {
+            if (error is IOException || error is HttpException && error.code() >= 500) local else throw error
+        }
+    }
 
     suspend fun managementAggregateReport(
         session: com.cactus.bitacora.model.ManagementSessionOut,

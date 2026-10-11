@@ -37,6 +37,7 @@ import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.model.WorkerDayOut
 import com.cactus.bitacora.model.WorkerSessionOut
 import com.cactus.bitacora.model.WorkerTimeOut
+import com.cactus.bitacora.feature.bpm.ParticipantBpmTasksScreen
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -45,7 +46,7 @@ import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
-private enum class WorkerView { IDENTIFY, MENU, TIME, FACE }
+private enum class WorkerView { IDENTIFY, MENU, TIME, BPM_TASKS, FACE }
 
 @Composable
 internal fun WorkerModeScreen(repository: BitacoraRepository, onExit: () -> Unit) {
@@ -88,10 +89,15 @@ internal fun WorkerModeScreen(repository: BitacoraRepository, onExit: () -> Unit
         WorkerTimeScreen(repository, active) { view = WorkerView.MENU }
         return
     }
+    if (view == WorkerView.BPM_TASKS) {
+        ParticipantBpmTasksScreen(active.codigo) { view = WorkerView.MENU }
+        return
+    }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Trabajador", style = MaterialTheme.typography.headlineSmall)
         Text("${active.codigo} · ${active.nombre_completo}", style = MaterialTheme.typography.titleMedium)
         Button({ view = WorkerView.TIME }, modifier = Modifier.fillMaxWidth()) { Text("Tiempo trabajado") }
+        Button({ view = WorkerView.BPM_TASKS }, modifier = Modifier.fillMaxWidth()) { Text("Tareas BPM") }
         OutlinedButton({ session = null; code = ""; view = WorkerView.IDENTIFY }, modifier = Modifier.fillMaxWidth()) { Text("Cambiar trabajador") }
         OutlinedButton(onExit, modifier = Modifier.fillMaxWidth()) { Text("Salir del módulo") }
     }

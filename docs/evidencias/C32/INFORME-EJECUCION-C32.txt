@@ -170,3 +170,27 @@ Estado: TERMINADA; validación aislada y verificación productiva completadas.
 - C32 MOTOR BPM: TERMINADA.
 
 FIN — DOCUMENTO CERRADO
+
+13. AMPLIACION: ACCESO BPM PARA TODOS LOS ROLES — 2026-10-11
+
+- Base: C33 funcional version 57, commit
+  `4c7f724d9cd535f8c5c2a8f8223bed9f42bf5300`.
+- Se incorporo una bandeja vinculada a la identidad para Supervisor ordinario,
+  Trabajador y Gerencia. Supervisor RH conserva la pantalla especializada C33.
+- La identificacion de Gerencia ahora dispone del mismo respaldo Room que los
+  otros roles cuando no hay red.
+- Backend: el contrato vigente ya filtra por responsable/ejecutor y revalida
+  operaciones. No hubo cambio de esquema ni despliegue de backend.
+- Pruebas CP-C32-057 a 060: APROBADAS. CP-C33-027: APROBADA.
+- V2035: recorridos P0276, P0003, P0039 y P0001; bandeja vacia ONLINE/OFFLINE;
+  cambio de participante; pantalla especializada RH conservada.
+- Seguridad aislada: P0276 obtuvo cero tareas y caso ajeno 35 devolvio HTTP
+  403; conjuntos de tareas RH/empleado sin interseccion.
+- APK principal: `com.cactus.bitacora`, versionCode 59, versionName
+  `maria59-c32-tareas-bpm-roles-offline`, SHA-256
+  `84F2B79831C875B6451680FB68884CEED469344CC0178F7BDF2464F8E81CF7EB`.
+- Respaldo previo: `C:\Bitacora\backups\C32\universal-bpm_20261011`.
+- Instalacion por actualizacion; `firstInstallTime` y archivos Room/WAL/SHM se
+  conservaron. No se insertaron fixtures ni se modifico produccion.
+
+Resultado de la ampliacion: APROBADA, cero pendientes obligatorios.
