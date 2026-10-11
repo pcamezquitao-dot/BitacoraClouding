@@ -96,3 +96,12 @@ INFORME DE EJECUCION C33 - 2026-10-10
 
 Estado: C33 INTEGRADA; 24 pruebas aprobadas y verificacion principal aprobada.
 Conforme a INVARIANTES, la declaracion formal VALIDADA corresponde a Patricia.
+
+8. CONTROL DE VERSIONES
+- Rama funcional integrada: `C33-supervisor-rh`, descendiente lineal de
+  `C32-motor-bpm` (`571213cac81975922eb9abef462696ac31830870`).
+- Commit de implementacion, pruebas y evidencias:
+  `a233e026dcfd0dce057fd73de9ac7380cf8a996f`.
+- Publicacion: `origin/C33-supervisor-rh`.
+- La rama local `main` no se utilizo: no existe `origin/main` y su commit local
+  no corresponde a la linea funcional C29-C32 vigente.
