@@ -24,6 +24,13 @@ A03. El backend valida identidad, rol, responsabilidad, revision y transicion;
 ocultar botones en Android no constituye autorizacion.
 A04. Administradores conservan sus facultades C32, pero no se consideran
 Supervisor RH para generar una actuacion C33 salvo que posean tambien el rol.
+A05. El Supervisor RH puede consultar y seleccionar a todos los empleados
+activos de la empresa con asignacion vigente, aunque pertenezcan a otra area,
+no le reporten jerarquicamente o sea el propio Supervisor RH. El Supervisor
+ordinario conserva exclusivamente el alcance jerarquico vigente de sus areas.
+A06. La regla A05 se aplica igual ONLINE y OFFLINE. El cliente obtiene el mismo
+conjunto desde el catalogo sincronizado en Room y muestra los conteos de
+empleados distintos y asignaciones para permitir su contraste.
 
 3. PRECONDICIONES
 
@@ -105,3 +112,6 @@ CA05-CA08: detalle, resultados configurados, observacion obligatoria y confirmac
 CA09-CA12: evidencias multiples, atomicidad Bitacora-Novedad-BPM, transicion e historial.
 CA13-CA16: idempotencia, concurrencia, offline/reinicio y conflicto obsoleto.
 CA17-CA19: recuperacion de fallos, regresiones C08/C32 y recorrido fisico V2035.
+CA20: P0003 ve y puede seleccionar a P0003 y a todos los empleados activos con
+asignacion vigente; los conteos ONLINE/OFFLINE coinciden con el catalogo.
+CA21: el Supervisor ordinario no adquiere el alcance global de Supervisor RH.

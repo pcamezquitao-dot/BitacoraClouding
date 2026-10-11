@@ -88,6 +88,32 @@ INFORME DE EJECUCION C33 - 2026-10-10
 - C31 mostro XML2ER, destino productivo y acciones Seleccionar XML, Validar y
   Cancelar; no se selecciono ni importo un XML.
 - C32 mostro Motor BPM, apertura, tareas y administracion; no se abrio caso.
+
+8. REAPERTURA INC-C33-001/002 - 11 DE OCTUBRE DE 2026
+- Patricia comprobo el acceso BPM de P0003 en la version 56. El alcance de
+  empleados se mantuvo pendiente.
+- Se corrigieron backend y Room para que `supervisor_RH` use el catalogo
+  empresarial completo; el Supervisor ordinario conserva su CTE jerarquica.
+- Contraste independiente MariaDB/API/Room: 30 empleados, 31 asignaciones,
+  P0003 incluido; hash canonico comun
+  276524089d74a601598a14503dade1613747a4aa4863a301e4cb2c957dc3ac15.
+- Backend productivo desplegado y activo; no hubo migraciones ni escrituras de
+  datos. Suite backend: 255 aprobadas, 2 omitidas, 17 subpruebas aprobadas.
+  Android: 278 aprobadas; compilacion aprobada.
+- Principal actualizada mediante `adb install -r`: versionCode 57, versionName
+  `maria57-c33-alcance-empleados-rh`, SHA-256
+  5B74CBA864F7A543598A592A7A7DB426F221877E33A6B0EBCF045A17F261C24B.
+  Firma compatible y `firstInstallTime` conservado.
+- Respaldo backend: `/root/bitacora_backups/c33/scope_fix_20261011_0345/`.
+  Respaldo APK/datos v56:
+  `C:\Bitacora\backups\C33\scope-fix_20261011_0345\`.
+- Validacion fisica final: P0003 mostro y selecciono 30 empleados/31
+  asignaciones ONLINE; despues de cerrar/reabrir sin Wi-Fi ni datos moviles,
+  Room mostro el mismo 30/31 y permitio seleccionar P0003. P0276 mostro rol
+  ordinario, 29 empleados/29 asignaciones de su alcance y no mostro C33.
+- No se guardaron novedades. Conteos productivos finales:
+  supervisor_novedad=12, bpm_actividad=0, actuaciones C33=0, evidencias C33=0.
+- Estado tecnico: pruebas completas, 27/27 aprobadas; incidencia corregida.
 - Consulta final de MariaDB: base `bitacora`, 12 novedades existentes,
   0 tareas BPM, 0 actuaciones C33 y 0 evidencias C33. El recorrido visual no
   genero escrituras.

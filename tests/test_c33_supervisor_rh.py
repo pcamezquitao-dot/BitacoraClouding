@@ -52,3 +52,18 @@ def test_android_uses_supervisor_session_and_configured_results():
     assert 'Text("Tareas BPM - Supervisor RH"' in screen
     assert "REQUIERE_CORRECCION" in screen
     assert "Revisar y confirmar" in screen
+
+
+def test_android_exposes_c33_only_for_effective_supervisor_rh_role():
+    mode = Path(
+        "android/bitacora-android/app/src/main/java/com/cactus/bitacora/"
+        "SupervisorModeScreen.kt"
+    ).read_text(encoding="utf-8")
+    main = Path(
+        "android/bitacora-android/app/src/main/java/com/cactus/bitacora/"
+        "MainActivity.kt"
+    ).read_text(encoding="utf-8")
+    assert 'equals("supervisor_RH", ignoreCase = true)' in mode
+    assert 'if (isSupervisorRh)' in mode
+    assert 'Text("Tareas BPM C33")' in mode
+    assert 'Text("SUPERVISOR / SUPERVISOR RH")' in main

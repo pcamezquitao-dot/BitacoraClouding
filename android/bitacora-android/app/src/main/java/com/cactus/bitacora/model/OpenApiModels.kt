@@ -68,7 +68,8 @@ data class SupervisorSessionOut(
     val codigo: String,
     val nombre_completo: String,
     val estado: String,
-    val areas: List<SupervisorAreaOut>
+    val areas: List<SupervisorAreaOut>,
+    val roles: List<String> = emptyList()
 )
 data class SupervisedParticipantOut(
     val id_participante: Int,

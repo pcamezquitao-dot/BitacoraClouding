@@ -55,6 +55,50 @@ class ReferenceCatalogRepositoryTest {
     }
 
     @Test
+    fun supervisorRhCanIdentifyFromOfflineCatalogAndKeepsEffectiveRole() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participantTypes[2] = participantType(2, "supervisor")
+            participantTypes[4] = participantType(4, "supervisor_RH")
+            participants[3] = participant(3, "P0003")
+            areas[24] = area(24)
+            assignments[3 to 24] = assignment(3, 24, 4)
+        }
+
+        val session = repository(dao, FakeCatalogApi(failNetwork = true))
+            .localSupervisorSession("p0003")
+
+        assertEquals(3, session.id_supervisor)
+        assertEquals(listOf("supervisor_RH"), session.roles)
+        assertEquals("Supervisor RH identificado", session.estado)
+    }
+
+    @Test
+    fun supervisorRhOfflineCatalogIncludesEveryActiveEmployeeAndSelfAcrossAreas() = runBlocking {
+        val dao = FakeCatalogDao().apply {
+            participantTypes[1] = participantType(1, "operario")
+            participantTypes[2] = participantType(2, "supervisor")
+            participantTypes[4] = participantType(4, "supervisor_RH")
+            participants[3] = participant(3, "P0003")
+            participants[51] = participant(51, "P0051")
+            participants[276] = participant(276, "P0276")
+            participants[999] = participant(999, "P0999").copy(activo = false)
+            areas[10] = area(10)
+            areas[24] = area(24)
+            areas[25] = area(25)
+            assignments[3 to 24] = assignment(3, 24, 4)
+            assignments[51 to 10] = assignment(51, 10, 1)
+            assignments[276 to 25] = assignment(276, 25, 2)
+            assignments[999 to 10] = assignment(999, 10, 1)
+        }
+        val result = repository(dao, FakeCatalogApi(failNetwork = true))
+            .localSupervisedParticipants("P0003")
+
+        assertEquals(listOf(3, 51, 276), result.map { it.id_participante })
+        assertTrue(result.any { it.codigo == "P0003" && it.id_area == 24 })
+        assertEquals(3, result.distinctBy { it.id_participante }.size)
+    }
+
+    @Test
     fun participantMasterReturnsAll513RowsInNumericIdOrder() = runBlocking {
         val dao = FakeCatalogDao().apply {
             (513 downTo 1).forEach { id ->

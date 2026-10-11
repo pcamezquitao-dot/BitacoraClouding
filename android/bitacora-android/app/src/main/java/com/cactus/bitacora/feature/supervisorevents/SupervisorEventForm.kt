@@ -49,6 +49,8 @@ internal fun SupervisorEventForm(
     var observations by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var history by remember { mutableStateOf<List<SupervisorEventLocalEntity>>(emptyList()) }
+    val isSupervisorRh = session.roles.any { it.equals("supervisor_RH", ignoreCase = true) }
+    val employeeCount = authorizedParticipants.distinctBy { it.id_participante }.size
 
     fun loadHistory(participant: SupervisedParticipantOut?) {
         if (participant == null) {
@@ -67,7 +69,11 @@ internal fun SupervisorEventForm(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text("Novedades", style = MaterialTheme.typography.titleLarge)
-        Text("Seleccione un participante activo bajo su alcance")
+        Text(
+            if (isSupervisorRh) "Seleccione cualquier empleado activo de la empresa, incluido usted"
+            else "Seleccione un participante activo bajo su alcance"
+        )
+        Text("$employeeCount empleados · ${authorizedParticipants.size} asignaciones")
         LazyColumn(
             modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)

@@ -32,3 +32,14 @@ RESULTADO
 - CP-C33: 24 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS, 0 NO EJECUTADAS.
 - Regresiones fisicas finales: 8 APROBADAS.
 - Pendientes tecnicos: NINGUNO.
+
+ACTUALIZACION POR INC-C33-001/002 - 11 DE OCTUBRE DE 2026
+- Version final: versionCode 57, versionName
+  `maria57-c33-alcance-empleados-rh`.
+- APK SHA-256:
+  5B74CBA864F7A543598A592A7A7DB426F221877E33A6B0EBCF045A17F261C24B.
+- P0003 ONLINE/OFFLINE: 30 empleados/31 asignaciones y seleccion propia.
+- P0276: 29 empleados/29 asignaciones jerarquicas; sin acceso C33.
+- CP-C33 actualizado: 27 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS y 0 NO
+  EJECUTADAS.
+- Produccion sin nuevas novedades, tareas, actuaciones ni evidencias C33.

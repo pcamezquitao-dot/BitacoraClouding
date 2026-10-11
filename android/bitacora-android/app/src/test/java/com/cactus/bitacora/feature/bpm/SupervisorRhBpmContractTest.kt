@@ -40,4 +40,13 @@ class SupervisorRhBpmContractTest {
         assertTrue(repository.contains("dao.removeTerminalConflictSuccessors()"))
         assertTrue(entities.contains("o.syncState IN ('CONFLICT','REJECTED')"))
     }
+
+    @Test
+    fun `acceso c33 requiere rol efectivo supervisor rh`() {
+        val mode = projectRoot.resolve("src/main/java/com/cactus/bitacora/SupervisorModeScreen.kt").readText()
+        val main = projectRoot.resolve("src/main/java/com/cactus/bitacora/MainActivity.kt").readText()
+        assertTrue(mode.contains("isSupervisorRh"))
+        assertTrue(mode.contains("Tareas BPM C33"))
+        assertTrue(main.contains("SUPERVISOR / SUPERVISOR RH"))
+    }
 }

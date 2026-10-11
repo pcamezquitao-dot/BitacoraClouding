@@ -228,3 +228,84 @@ cuatro filtros sin iniciar ni confirmar operaciones. Se recorrieron C08, C16,
 C28, C29, C30, C31 y C32 en modo de consulta. MariaDB conservo 12 novedades,
 0 tareas BPM, 0 actuaciones C33 y 0 evidencias C33. Resultado: APROBADA, sin
 fixtures ni modificaciones de datos de negocio.
+
+REAPERTURA POR INCIDENCIA INC-C33-001 - 11 DE OCTUBRE DE 2026
+
+Defecto reportado: la aplicacion principal no hacia visible desde el inicio que
+Supervisor RH comparte el acceso Supervisor. La sesion preservada correspondia
+a un Supervisor comun y, por un defecto Android, mostraba `Tareas BPM` sin
+comprobar el rol `supervisor_RH`. Adicionalmente, la identificacion offline solo
+admitia el tipo `supervisor`, aunque Room contenia ambos tipos activos.
+
+Causa: `SupervisorSessionOut` no transportaba roles; `SupervisorModeScreen`
+mostraba el boton C33 incondicionalmente; `localSupervisorSession` filtraba solo
+el codigo resuelto para `supervisor`. La verificacion fisica anterior comprobo
+una pantalla interna con un actor no RH y no reprodujo completo CP-C33-001.
+
+Correccion y regresion requeridas:
+- El inicio rotula `SUPERVISOR / SUPERVISOR RH` sin crear un rol nuevo.
+- La sesion devuelve los roles efectivos del catalogo del servidor.
+- Room admite `supervisor` y `supervisor_RH` por descripcion, no por codigo fijo.
+- Solo `supervisor_RH` ve `Tareas BPM C33`; Supervisor comun conserva sus
+  funciones y no ve C33.
+- Repetir CP-C33-001 y el tramo de identificacion de CP-C33-024 desde el inicio
+  con ambos actores. Patricia comprobo el acceso BPM de P0003 en la version 56.
+  El alcance completo de empleados quedo pendiente y origino INC-C33-002.
+
+CP-C33-025 - Catalogo empresarial completo ONLINE para Supervisor RH
+Reglas: A05, A06; CA20.
+Objetivo: demostrar que P0003 recibe todos los empleados activos con asignacion
+vigente, incluidos empleados de otras areas, quienes no reportan a RH y P0003.
+Precondiciones: backend y base efectivos comprobados; catalogo sin fixtures.
+Pasos: 1) obtener por SQL los pares empleado-area vigentes y empleados
+distintos; 2) identificar P0003; 3) consultar la lista ONLINE; 4) comparar
+conjuntos y conteos; 5) seleccionar P0003 en Android sin guardar una novedad.
+Esperado: igualdad exacta de conjuntos y conteos, P0003 seleccionable.
+Evidencia: SQL, respuesta API y XML de UI.
+Resultado obtenido: backend productivo y SQL coincidieron exactamente en 30
+empleados y 31 asignaciones, hash canonico
+276524089d74a601598a14503dade1613747a4aa4863a301e4cb2c957dc3ac15;
+P0003 esta incluido. En el V2035, la pantalla mostro 30/31 y P0003 fue
+seleccionado visualmente sin guardar una novedad.
+Estado: APROBADA.
+
+CP-C33-026 - Catalogo empresarial completo OFFLINE desde Room
+Reglas: A05, A06; CA20.
+Objetivo: comprobar el mismo alcance tras sincronizar, desconectar y reabrir.
+Precondiciones: CP-C33-025 y sincronizacion de catalogos completas.
+Pasos: 1) conservar conteos ONLINE; 2) desconectar; 3) cerrar y abrir la app;
+4) identificar P0003 desde Room; 5) comparar lista/conteos y seleccionar P0003.
+Esperado: mismo conjunto y conteos; P0003 disponible; ninguna escritura remota.
+Evidencia: XML de UI, copia/consulta Room y estado de conectividad.
+Resultado obtenido: Room conservado contiene 30 empleados/31 asignaciones,
+incluye P0003 y produce el mismo hash canonico que MariaDB/API. Con Wi-Fi y
+datos moviles apagados, se cerro/reabrio la app, se mostro 30/31 y se selecciono
+P0003 desde Room sin guardar una novedad.
+Estado: APROBADA.
+
+CP-C33-027 - Regresion de alcance del Supervisor ordinario
+Reglas: A05; CA21.
+Objetivo: demostrar que un Supervisor ordinario mantiene solo sus areas y
+descendientes y no recibe el catalogo empresarial global ni acceso a C33.
+Pasos: 1) identificar un Supervisor ordinario vigente; 2) comparar su lista
+con su jerarquia; 3) comprobar que no aparece Tareas BPM C33.
+Esperado: lista jerarquica sin ampliacion y acceso C33 ausente.
+Evidencia: respuesta API, consulta SQL y XML de UI.
+Resultado obtenido: prueba automatizada y API confirman que P0276 mantiene la
+CTE jerarquica y rol `supervisor`. Fisicamente P0276 mostro 29 empleados/29
+asignaciones bajo su alcance, el texto ordinario y ningun acceso Tareas BPM C33.
+Estado: APROBADA.
+
+Trazabilidad adicional: A05 -> 025-027; A06 -> 025-026; CA20 -> 025-026;
+CA21 -> 027. Total tras reapertura: 27 pruebas.
+
+CIERRE INC-C33-002 - 11 DE OCTUBRE DE 2026
+
+CP-C33-025, 026 y 027: APROBADAS. Evidencias UI:
+`c33_v57_p0003_online_list.xml`, `c33_v57_p0003_online_selected.xml/.png`,
+`c33_v57_p0003_offline_list.xml`, `c33_v57_p0003_offline_selected.xml/.png`,
+`c33_v57_p0276_menu.xml` y `c33_v57_p0276_scope.xml/.png`.
+
+Resultado actualizado: 27 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS y 0 NO
+EJECUTADAS. Patricia habia comprobado el acceso BPM; esta ejecucion completa el
+alcance de empleados ONLINE/OFFLINE y la regresion del Supervisor ordinario.

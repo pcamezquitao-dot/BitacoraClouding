@@ -676,7 +676,7 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.SUPERVISOR) }
-        ) { Text("SUPERVISOR") }
+        ) { Text("SUPERVISOR / SUPERVISOR RH") }
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.TRABAJADOR) }

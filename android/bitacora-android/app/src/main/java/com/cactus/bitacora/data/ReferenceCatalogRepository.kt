@@ -61,6 +61,7 @@ data class ParticipantUpdateResult(
 )
 
 internal const val SUPERVISOR_TYPE_NAME = "supervisor"
+internal const val SUPERVISOR_RH_TYPE_NAME = "supervisor_RH"
 internal val MANAGER_TYPE_NAMES = setOf("gerente", "directivo")
 
 class CatalogValidationException(message: String) : IllegalStateException(message)
@@ -223,12 +224,21 @@ class ReferenceCatalogRepository(
         val participant = dao.participantByCode(code)
             ?: throw CatalogValidationException("El supervisor no está en el catálogo local")
         if (!participant.activo) throw CatalogValidationException("El supervisor está inactivo")
-        val supervisorType = supervisorTypeCode()
-        val assignments = dao.activeAssignmentsForParticipant(participant.idParticipante)
-            .filter { it.cargo == supervisorType }
-        if (assignments.isEmpty()) throw CatalogValidationException(
-            "El participante no tiene cargo supervisor vigente"
+        val supervisorRoles = dao.participantTypes().filter {
+            it.activo && (
+                it.descripcion.trim().equals(SUPERVISOR_TYPE_NAME, ignoreCase = true) ||
+                    it.descripcion.trim().equals(SUPERVISOR_RH_TYPE_NAME, ignoreCase = true)
+                )
+        }.associate { it.codigo to it.descripcion.trim() }
+        if (supervisorRoles.isEmpty()) throw CatalogValidationException(
+            "El catalogo local no contiene supervisor ni supervisor_RH activos"
         )
+        val assignments = dao.activeAssignmentsForParticipant(participant.idParticipante)
+            .filter { it.cargo in supervisorRoles.keys }
+        if (assignments.isEmpty()) throw CatalogValidationException(
+            "El participante no tiene cargo supervisor o supervisor_RH vigente"
+        )
+        val roles = assignments.mapNotNull { supervisorRoles[it.cargo] }.distinct().sorted()
         val areas = assignments.mapNotNull { assignment ->
             dao.areaById(assignment.idArea)?.takeIf { it.activo }?.let {
                 com.cactus.bitacora.model.SupervisorAreaOut(it.idArea, it.nombreArea)
@@ -237,18 +247,29 @@ class ReferenceCatalogRepository(
         return com.cactus.bitacora.model.SupervisorSessionOut(
             participant.idParticipante, participant.codigoQr,
             listOfNotNull(participant.nombre, participant.apellido).joinToString(" "),
-            "Supervisor identificado", areas
+            if (roles.any { it.equals(SUPERVISOR_RH_TYPE_NAME, ignoreCase = true) })
+                "Supervisor RH identificado" else "Supervisor identificado",
+            areas,
+            roles
         )
     }
 
     suspend fun localSupervisedParticipants(rawCode: String): List<com.cactus.bitacora.model.SupervisedParticipantOut> {
         val session = localSupervisorSession(rawCode)
         val allAreas = dao.activeAreas()
-        val allowed = session.areas.mapTo(mutableSetOf()) { it.id_area }
-        do {
-            val before = allowed.size
-            allAreas.filter { it.idPadre in allowed }.forEach { allowed += it.idArea }
-        } while (allowed.size != before)
+        val isSupervisorRh = session.roles.any {
+            it.equals(SUPERVISOR_RH_TYPE_NAME, ignoreCase = true)
+        }
+        val allowed = if (isSupervisorRh) {
+            allAreas.mapTo(mutableSetOf()) { it.idArea }
+        } else {
+            session.areas.mapTo(mutableSetOf()) { it.id_area }.also { supervised ->
+                do {
+                    val before = supervised.size
+                    allAreas.filter { it.idPadre in supervised }.forEach { supervised += it.idArea }
+                } while (supervised.size != before)
+            }
+        }
         val areas = allAreas.associateBy { it.idArea }
         val people = dao.activeParticipants().associateBy { it.idParticipante }
         return dao.activeAssignments().filter { it.idArea in allowed }.mapNotNull { assignment ->

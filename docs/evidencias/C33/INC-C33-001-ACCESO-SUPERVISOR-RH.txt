@@ -1,0 +1,48 @@
+INC-C33-001 - ACCESO SUPERVISOR RH
+Fecha: 11 de octubre de 2026
+
+REPORTE
+En la aplicacion principal no era visible la opcion SUPERVISOR_RH desde la
+pantalla inicial.
+
+DIAGNOSTICO COMPROBADO
+- SUPERVISOR_SH es el codigo documental de C33; no es un rol de catalogo.
+- El rol funcional y persistido es `supervisor_RH`.
+- MariaDB `bitacora`: tipo 2=`supervisor`, tipo 4=`supervisor_RH`, ambos activos.
+- Room principal contenia los mismos tipos, asignaciones y participantes.
+- Participante productivo RH para comprobar acceso: codigo `P0003`, tipo 4,
+  area 10024.
+- La sesion preservada `P0276` pertenece al tipo 2 `supervisor`, no al rol RH.
+- Android mostraba `Tareas BPM` a cualquier sesion Supervisor.
+- La ruta local offline solo aceptaba el tipo `supervisor`.
+
+CAUSA
+La respuesta de identificacion no incluia roles, el cliente no podia distinguir
+ambos tipos y el acceso C33 se renderizaba sin condicion. La prueba previa entro
+con una sesion Supervisor comun y verifico la pantalla interna, no el recorrido
+de rol completo exigido por CP-C33-001.
+
+CORRECCION
+- Contrato aditivo `SupervisorSessionOut.roles`.
+- Estado explicito `Supervisor RH identificado`.
+- Acceso inicial `SUPERVISOR / SUPERVISOR RH`.
+- Encabezado y rol funcional visibles tras identificar.
+- `Tareas BPM C33` solo para rol efectivo `supervisor_RH`.
+- Resolucion offline por descripcion `supervisor`/`supervisor_RH`.
+
+PRUEBAS TECNICAS
+- Backend focal: 29 aprobadas.
+- Android focal: BUILD SUCCESSFUL.
+- API productiva: P0003 devuelve `supervisor_RH`; P0276 devuelve `supervisor`.
+- MariaDB no fue modificada.
+
+VERSION CORREGIDA
+- package: com.cactus.bitacora
+- versionCode: 56
+- versionName: maria56-c33-acceso-supervisor-rh
+- APK SHA-256: 0A4F00617E129FD6CBA94F9F3DAF5AB656D4FD9E80DDFDCE907156C2F16F73BB
+
+RECORRIDO FISICO
+Patricia comprobo el acceso BPM con P0003 en la version 56. Esta validacion
+cierra el defecto de acceso, pero no valida el alcance del listado de empleados,
+que se registra separadamente como INC-C33-002.

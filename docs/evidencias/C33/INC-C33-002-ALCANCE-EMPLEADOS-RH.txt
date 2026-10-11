@@ -1,0 +1,50 @@
+INC-C33-002 - ALCANCE DE EMPLEADOS DEL SUPERVISOR RH
+Fecha: 11 de octubre de 2026
+
+REPORTE
+El rol `supervisor_RH` debe ver y seleccionar a todos los empleados de la
+empresa, incluido el participante identificado. P0003 debe incluir a P0003.
+
+ESTADO DE VALIDACION AL ABRIR LA INCIDENCIA
+Patricia comprobo el acceso BPM de P0003. El alcance de empleados permanecia
+pendiente; por tanto C33 se mantiene REABIERTA y la incidencia no esta resuelta.
+
+DIAGNOSTICO
+- Backend aplicaba a todos los roles la CTE de areas supervisadas.
+- Room construia siempre las areas permitidas desde la jerarquia del actor.
+- Android recibia la lista recortada y no mostraba un conteo contrastable.
+- Antes de corregir, P0003 obtenia 1 empleado/1 asignacion: solo P0003.
+- El catalogo productivo efectivo contiene 30 empleados distintos y 31 pares
+  empleado-area vigentes. P0003 corresponde al empleado 3, area 10024.
+
+CAUSA
+El alcance global del rol funcional `supervisor_RH` no estaba diferenciado del
+alcance jerarquico del Supervisor ordinario en backend ni en Room.
+
+CORRECCION
+- Backend usa el catalogo empresarial vigente para `supervisor_RH` y conserva
+  la CTE jerarquica para `supervisor`.
+- Room aplica la misma bifurcacion usando el rol efectivo sincronizado.
+- Android informa empleados distintos/asignaciones y explicita que el actor
+  puede seleccionarse a si mismo.
+
+PRUEBAS Y CIERRE
+- Backend focal: 12 aprobadas.
+- Suite backend: 255 aprobadas, 2 omitidas previstas, 17 subpruebas aprobadas.
+- Suite Android: 278 aprobadas, cero fallos, errores u omisiones.
+- MariaDB/API: 30 empleados, 31 asignaciones, hash identico
+  276524089d74a601598a14503dade1613747a4aa4863a301e4cb2c957dc3ac15.
+- Room: 30 empleados, 31 asignaciones, incluye P0003 y el mismo hash.
+- Version 57 instalada con datos conservados.
+- ONLINE: P0003 mostro 30 empleados/31 asignaciones y pudo seleccionarse a si
+  mismo; evidencia `c33_v57_p0003_online_selected.xml/.png`.
+- OFFLINE: tras cerrar/reabrir con Wi-Fi y datos moviles apagados, Room mostro
+  el mismo 30/31 y P0003 pudo seleccionarse; evidencia
+  `c33_v57_p0003_offline_selected.xml/.png`.
+- Supervisor ordinario P0276 mostro 29 empleados/29 asignaciones de su alcance
+  y no mostro Tareas BPM C33; evidencia `c33_v57_p0276_menu.xml` y
+  `c33_v57_p0276_scope.xml/.png`.
+- No se guardaron novedades. Produccion conservo supervisor_novedad=12,
+  bpm_actividad=0, actuaciones C33=0 y evidencias C33=0.
+
+RESULTADO: INCIDENCIA CORREGIDA Y PRUEBAS TECNICAS/FISICAS APROBADAS.

@@ -61,10 +61,11 @@ def identify_supervisor(db: Session, code: str) -> dict:
             f"""
             SELECT p.id_participante, p.identificacion_participante,
                    TRIM(CONCAT_WS(' ', p.nombre, p.apellido)) nombre_completo,
-                   ea.id_area, aa.descripcion area
+                   ea.id_area, aa.descripcion area, tp.descripcion rol
             FROM {participant} p
             JOIN {employee_area} ea ON ea.id_participante=p.id_participante
             JOIN {areas} aa ON aa.id_Area_Administrativa=ea.id_area
+            JOIN tipos_participante tp ON tp.codigo=ea.cargo AND tp.activo=TRUE
             WHERE UPPER(TRIM(p.identificacion_participante))=:codigo
               AND (ea.cargo=:supervisor_type OR ea.cargo IN (
                 SELECT codigo FROM tipos_participante
@@ -84,12 +85,17 @@ def identify_supervisor(db: Session, code: str) -> dict:
             "El participante no existe, está inactivo o no tiene cargo supervisor vigente"
         )
     first = rows[0]
+    roles = sorted({str(row.get("rol") or SUPERVISOR_TYPE_DESCRIPTION) for row in rows})
+    is_supervisor_rh = any(
+        role.strip().lower() == SUPERVISOR_RH_TYPE_DESCRIPTION for role in roles
+    )
     return {
         "id_supervisor": int(first["id_participante"]),
         "codigo": first["identificacion_participante"],
         "nombre_completo": first["nombre_completo"],
-        "estado": "Supervisor identificado",
+        "estado": "Supervisor RH identificado" if is_supervisor_rh else "Supervisor identificado",
         "areas": [{"id_area": int(row["id_area"]), "area": row["area"]} for row in rows],
+        "roles": roles,
     }
 
 
@@ -99,17 +105,16 @@ def supervised_participants(db: Session, code: str, search: str = "") -> list[di
     employee_area = settings.EMPLEADO_AREA_TABLE
     areas = settings.AREAS_TABLE
     pattern = f"%{search.strip().upper()}%"
-    rows = db.execute(
-        text(
-            f"""
+    is_supervisor_rh = any(
+        str(role).strip().lower() == SUPERVISOR_RH_TYPE_DESCRIPTION
+        for role in session.get("roles", [])
+    )
+    scope_cte = "" if is_supervisor_rh else f"""
             WITH RECURSIVE areas_supervisadas AS (
                 SELECT ea.id_area
                 FROM {employee_area} ea
                 WHERE ea.id_participante=:id_supervisor
-                  AND (ea.cargo=:supervisor_type OR ea.cargo IN (
-                    SELECT codigo FROM tipos_participante
-                    WHERE activo=TRUE AND LOWER(TRIM(descripcion))='supervisor_rh'
-                  ))
+                  AND ea.cargo=:supervisor_type
                   AND ea.activo=TRUE
                   AND ea.fecha_inicia<=CURDATE()
                   AND (ea.fecha_final IS NULL OR ea.fecha_final>=CURDATE())
@@ -118,11 +123,23 @@ def supervised_participants(db: Session, code: str, search: str = "") -> list[di
                 FROM {areas} hija
                 JOIN areas_supervisadas padre ON hija.nodo_padre=padre.id_area
             )
+    """
+    scope_join = "" if is_supervisor_rh else "JOIN areas_supervisadas ars ON ea.id_area=ars.id_area"
+    query_params = {
+        "id_supervisor": session["id_supervisor"],
+        "pattern": pattern,
+    }
+    if not is_supervisor_rh:
+        query_params["supervisor_type"] = resolve_supervisor_type_code(db)
+    rows = db.execute(
+        text(
+            f"""
+            {scope_cte}
             SELECT DISTINCT p.id_participante,
                    p.identificacion_participante codigo,
                    p.nombre, p.apellido, ea.id_area, aa.descripcion area
-            FROM areas_supervisadas ars
-            JOIN {employee_area} ea ON ea.id_area=ars.id_area
+            FROM {employee_area} ea
+            {scope_join}
             JOIN {participant} p ON p.id_participante=ea.id_participante
             JOIN {areas} aa ON aa.id_Area_Administrativa=ea.id_area
             WHERE ea.activo=TRUE
@@ -135,11 +152,7 @@ def supervised_participants(db: Session, code: str, search: str = "") -> list[di
             ORDER BY p.id_participante, ea.id_area
             """
         ),
-        {
-            "id_supervisor": session["id_supervisor"],
-            "supervisor_type": resolve_supervisor_type_code(db),
-            "pattern": pattern,
-        },
+        query_params,
     ).mappings().all()
     return [dict(row) for row in rows]
 

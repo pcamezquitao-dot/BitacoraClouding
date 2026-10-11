@@ -69,6 +69,7 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
     if (activeSession == null) {
         Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Identificación del supervisor", style = MaterialTheme.typography.headlineSmall)
+            Text("Supervisor RH ingresa por este mismo acceso con su código de participante.")
             OutlinedTextField(code, { code = it }, label = { Text("Código del participante") }, modifier = Modifier.fillMaxWidth())
             Button(onClick = ::identify, enabled = !loading, modifier = Modifier.fillMaxWidth()) {
                 Text(if (loading) "Validando…" else "Ingresar como supervisor")
@@ -83,10 +84,14 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
         view = SupervisorView.MENU
     }
 
+    val isSupervisorRh = activeSession.roles.any {
+        it.trim().equals("supervisor_RH", ignoreCase = true)
+    }
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("SUPERVISOR", style = MaterialTheme.typography.headlineSmall)
+        Text(if (isSupervisorRh) "SUPERVISOR RH" else "SUPERVISOR", style = MaterialTheme.typography.headlineSmall)
         Text("${activeSession.codigo} · ${activeSession.nombre_completo}")
         Text(activeSession.estado, color = MaterialTheme.colorScheme.primary)
+        Text("Rol funcional: ${if (isSupervisorRh) "supervisor_RH · C33 SUPERVISOR_SH" else "supervisor"}")
         Text("Áreas: ${activeSession.areas.joinToString { it.area }}")
         if (view == SupervisorView.MENU) {
             Button({ view = SupervisorView.ENTRADA }, modifier = Modifier.fillMaxWidth()) { Text("Registrar entrada") }
@@ -96,7 +101,9 @@ internal fun SupervisorModeScreen(repository: BitacoraRepository, onExit: () -> 
             Button({ view = SupervisorView.TODAY }, modifier = Modifier.fillMaxWidth()) { Text("Consultar movimientos del día") }
             Button({ view = SupervisorView.CONTROL }, modifier = Modifier.fillMaxWidth()) { Text("CONTROL") }
             Button({ view = SupervisorView.NOVELTIES }, modifier = Modifier.fillMaxWidth()) { Text("Novedades") }
-            Button({ view = SupervisorView.BPM_TASKS }, modifier = Modifier.fillMaxWidth()) { Text("Tareas BPM") }
+            if (isSupervisorRh) {
+                Button({ view = SupervisorView.BPM_TASKS }, modifier = Modifier.fillMaxWidth()) { Text("Tareas BPM C33") }
+            }
         } else {
             OutlinedButton({ view = SupervisorView.MENU }, modifier = Modifier.fillMaxWidth()) { Text("Volver al menú") }
             if (view == SupervisorView.TODAY) {

@@ -61,11 +61,14 @@ def test_p0002_identification_uses_resolved_type_code_two():
             "nombre_completo": "AURELIO UBAQUE PINEDA JOSE AURELIO",
             "id_area": 2,
             "area": "Finca1",
+            "rol": "supervisor_RH",
         }]),
     ]
     result = identify_supervisor(db, " p0002 ")
     assert result["id_supervisor"] == 2
     assert result["areas"] == [{"id_area": 2, "area": "Finca1"}]
+    assert result["roles"] == ["supervisor_RH"]
+    assert result["estado"] == "Supervisor RH identificado"
     params = db.execute.call_args_list[1].args[1]
     assert params["codigo"] == "P0002"
     assert params["supervisor_type"] == 2
@@ -93,6 +96,35 @@ def test_hierarchical_query_filters_active_and_uses_parameterized_type():
     assert "P.FECHA_SALIDA IS NULL" in query
     assert "CARGO=:SUPERVISOR_TYPE" in query
     assert "CARGO=2" not in query
+
+
+def test_supervisor_rh_receives_company_catalog_including_self_and_other_areas():
+    db = MagicMock()
+    db.execute.side_effect = [
+        scalar_result([2]),
+        mapping_result([{
+            "id_participante": 3, "identificacion_participante": "P0003",
+            "nombre_completo": "SUPERVISOR RH", "id_area": 24, "area": "RH",
+            "rol": "supervisor_RH",
+        }]),
+        mapping_result([
+            {"id_participante": 3, "codigo": "P0003", "nombre": "SUPERVISOR",
+             "apellido": "RH", "id_area": 24, "area": "RH"},
+            {"id_participante": 51, "codigo": "P0051", "nombre": "OTRA",
+             "apellido": "AREA", "id_area": 10, "area": "OPERACION"},
+        ]),
+    ]
+
+    result = supervised_participants(db, "P0003")
+
+    assert {(row["codigo"], row["id_area"]) for row in result} == {
+        ("P0003", 24), ("P0051", 10)
+    }
+    query = str(db.execute.call_args_list[2].args[0]).upper()
+    assert "WITH RECURSIVE AREAS_SUPERVISADAS" not in query
+    assert "FROM " in query and "EMPLEADO_AREA" in query
+    assert "EA.ACTIVO=TRUE" in query
+    assert "P.FECHA_SALIDA IS NULL" in query
 
 
 def test_today_movements_uses_colombia_day_and_keeps_row_without_area_observation():

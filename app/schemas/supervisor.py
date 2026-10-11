@@ -16,6 +16,7 @@ class SupervisorSessionOut(BaseModel):
     nombre_completo: str
     estado: str = "Supervisor identificado"
     areas: list[SupervisorAreaOut]
+    roles: list[str] = Field(default_factory=list)
 
 
 class SupervisedParticipantOut(BaseModel):
