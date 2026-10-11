@@ -1,7 +1,10 @@
+import hashlib
+import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -47,6 +50,22 @@ def calculate_event(payload: SupervisorEventIn) -> tuple[int | None, int | None]
     return days, minutes
 
 
+def payload_hash(payload: SupervisorEventIn) -> str:
+    canonical = json.dumps(payload.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _find_by_client_uuid(db: Session, client_uuid: str):
+    return db.execute(text(f"SELECT * FROM {TABLE} WHERE client_uuid=:uuid"), {"uuid": client_uuid}).mappings().first()
+
+
+def _return_existing(existing, payload: SupervisorEventIn):
+    stored_hash = existing.get("request_sha256")
+    if stored_hash and stored_hash != payload_hash(payload):
+        raise HTTPException(409, "client_uuid ya fue usado con un contenido diferente")
+    return serialize_row(existing, payload.codigo_supervisor)
+
+
 @router.post("", response_model=SupervisorEventOut)
 def create_event(payload: SupervisorEventIn, db: Session = Depends(get_db)):
     try:
@@ -57,9 +76,9 @@ def create_event(payload: SupervisorEventIn, db: Session = Depends(get_db)):
         raise HTTPException(422, str(error)) from error
     except SupervisorAuthorizationError as error:
         raise HTTPException(403, str(error)) from error
-    existing = db.execute(text(f"SELECT * FROM {TABLE} WHERE client_uuid=:uuid"), {"uuid": payload.client_uuid}).mappings().first()
+    existing = _find_by_client_uuid(db, payload.client_uuid)
     if existing:
-        return serialize_row(existing, payload.codigo_supervisor)
+        return _return_existing(existing, payload)
     if payload.tipo_novedad == 7:
         overlap = db.execute(text(f"""
             SELECT 1 FROM {TABLE} WHERE tipo_novedad=7 AND estado='ACTIVO'
@@ -69,18 +88,39 @@ def create_event(payload: SupervisorEventIn, db: Session = Depends(get_db)):
                 "start": payload.hora_inicio, "end": payload.hora_final}).first()
         if overlap:
             raise HTTPException(409, "Existe una autorizaciÃ³n superpuesta")
-    values = payload.model_dump(exclude={"codigo_supervisor"}) | {
-        "id_supervisor": session["id_supervisor"], "dias_calculados": days,
-        "minutos_autorizados": minutes, "estado": "ACTIVO", "origen": "SUPERVISOR",
-    }
-    db.execute(text(f"""
-        INSERT INTO {TABLE} (client_uuid,tipo_novedad,id_participante,id_supervisor,id_area,
-          fecha_inicio,fecha_final,hora_inicio,hora_final,dias_calculados,minutos_autorizados,
-          observaciones,estado,origen)
-        VALUES (:client_uuid,:tipo_novedad,:id_participante,:id_supervisor,:id_area,
-          :fecha_inicio,:fecha_final,:hora_inicio,:hora_final,:dias_calculados,:minutos_autorizados,
-          :observaciones,:estado,:origen)
-    """), values)
-    row = db.execute(text(f"SELECT * FROM {TABLE} WHERE client_uuid=:client_uuid"), values).mappings().one()
-    db.commit()
+    occurrence = datetime.combine(payload.fecha_inicio, payload.hora_inicio or datetime.min.time())
+    try:
+        log_result = db.execute(text("""
+            INSERT INTO bitacora_diaria
+              (id_empleado,id_supervisor,ts_in_min,tipo_anotacion,observaciones,
+               fecha_in,hora_in,client_uuid,origen_bitacora)
+            VALUES (:employee,:supervisor,:ts,NULL,:observations,:date,:time,:uuid,'SUPERVISOR')
+        """), {"employee": payload.id_participante, "supervisor": session["id_supervisor"],
+                 "ts": int(occurrence.timestamp() // 60), "date": payload.fecha_inicio,
+                 "time": payload.hora_inicio or datetime.min.time(), "uuid": payload.client_uuid,
+                 "observations": (payload.observaciones or f"Novedad tipo {payload.tipo_novedad}")[:200]})
+        values = payload.model_dump(exclude={"codigo_supervisor"}) | {
+            "id_supervisor": session["id_supervisor"], "dias_calculados": days,
+            "minutos_autorizados": minutes, "estado": "ACTIVO", "origen": "SUPERVISOR",
+            "request_sha256": payload_hash(payload), "id_bitacora_registrada": int(log_result.lastrowid),
+        }
+        db.execute(text(f"""
+            INSERT INTO {TABLE} (client_uuid,tipo_novedad,id_participante,id_supervisor,id_area,
+              fecha_inicio,fecha_final,hora_inicio,hora_final,dias_calculados,minutos_autorizados,
+              observaciones,estado,origen,request_sha256,id_bitacora_registrada)
+            VALUES (:client_uuid,:tipo_novedad,:id_participante,:id_supervisor,:id_area,
+              :fecha_inicio,:fecha_final,:hora_inicio,:hora_final,:dias_calculados,:minutos_autorizados,
+              :observaciones,:estado,:origen,:request_sha256,:id_bitacora_registrada)
+        """), values)
+        row = _find_by_client_uuid(db, payload.client_uuid)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        row = _find_by_client_uuid(db, payload.client_uuid)
+        if row is None:
+            raise
+        return _return_existing(row, payload)
+    except Exception:
+        db.rollback()
+        raise
     return serialize_row(row, payload.codigo_supervisor)

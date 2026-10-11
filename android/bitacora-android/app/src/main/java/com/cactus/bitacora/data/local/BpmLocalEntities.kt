@@ -175,4 +175,10 @@ interface BpmLocalDao {
 
     @Query("UPDATE bpm_tasks_local SET responsibleCode=:responsible,revision=revision+1,syncState=:syncState,lastError=NULL WHERE clientUuid=:uuid")
     suspend fun reassignLocalTask(uuid: String, responsible: String, syncState: String)
+
+    @Query("DELETE FROM bpm_tasks_local WHERE clientUuid=:uuid AND provisional=1 AND remoteId IS NULL")
+    suspend fun removeUnconfirmedSuccessor(uuid: String)
+
+    @Query("DELETE FROM bpm_tasks_local WHERE provisional=1 AND remoteId IS NULL AND EXISTS (SELECT 1 FROM bpm_operations_local o WHERE o.successorClientUuid=bpm_tasks_local.clientUuid AND o.syncState IN ('CONFLICT','REJECTED'))")
+    suspend fun removeTerminalConflictSuccessors()
 }

@@ -1,0 +1,34 @@
+EVIDENCIA FINAL C33 - 11 DE OCTUBRE DE 2026
+
+DISPOSITIVO Y APLICACION
+- Dispositivo: vivo V2035, serie 3065397347006YM.
+- Paquete: com.cactus.bitacora.
+- versionCode: 55.
+- versionName: maria55-c33-supervisor-rh.
+- firstInstallTime conservado: 2026-10-06 13:50:35.
+- APK SHA-256: B77B440854DF0517DED2EC360B9D693B0FBC1A9E4B63944E88DE5F227257085E.
+- Firma SHA-256: 81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0.
+
+RECORRIDO FINAL
+- C33: acceso, bandeja, actualizacion y cuatro filtros visibles; aprobado.
+- C08: Novedades; aprobado.
+- C16: resumen y arbol de areas; aprobado.
+- C28: catalogo, nota, busqueda y alta; aprobado.
+- C29: arbol y alta de proceso raiz; aprobado.
+- C30: Normalizar proceso; aprobado.
+- C31: selector, Validar y Cancelar visibles; aprobado sin importar datos.
+- C32: apertura, tareas y administracion visibles; aprobado sin abrir casos.
+
+CONSERVACION Y BASE EFECTIVA
+- Backend: https://161-22-47-89.sslip.io/bitacora/.
+- Base efectiva: bitacora.
+- Conteos posteriores: supervisor_novedad=12, bpm_actividad=0,
+  bpm_supervisor_rh_actuacion=0, bpm_supervisor_rh_evidencia=0.
+- DB, WAL y SHM de Room posteriores a `install -r` fueron identicos a sus
+  respaldos previos, incluidos sus SHA-256.
+- No se crearon fixtures ni registros productivos durante la comprobacion.
+
+RESULTADO
+- CP-C33: 24 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS, 0 NO EJECUTADAS.
+- Regresiones fisicas finales: 8 APROBADAS.
+- Pendientes tecnicos: NINGUNO.

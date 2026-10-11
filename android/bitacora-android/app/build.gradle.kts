@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 54
-        versionName = "maria54-c32-motor-bpm"
+        versionCode = 55
+        versionName = "maria55-c33-supervisor-rh"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -81,6 +81,12 @@ android {
             applicationId = "com.cactus.bitacora.c32test"
             manifestPlaceholders["appLabel"] = "Bitacora C32 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c32-test/\"")
+        }
+        create("c33test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c33test"
+            manifestPlaceholders["appLabel"] = "Bitacora C33 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c33-test/\"")
         }
         create("facial1") {
             dimension = "edition"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -43,6 +43,12 @@ class BpmOperationIn(BaseModel):
     observations: str | None = None
     reason: str | None = None
     evidences: list[BpmEvidenceIn] = Field(default_factory=list, max_length=20)
+    novelty_type: int | None = None
+    novelty_area_id: int | None = Field(None, ge=1)
+    novelty_start_date: date | None = None
+    novelty_end_date: date | None = None
+    novelty_start_time: time | None = None
+    novelty_end_time: time | None = None
 
     @field_validator("actor_code", "affected_code")
     @classmethod
@@ -63,6 +69,8 @@ class BpmOperationOut(BaseModel):
     task_state: str | None = None
     case_revision: int | None = None
     task_revision: int | None = None
+    bitacora_id: int | None = None
+    novelty_id: int | None = None
     message: str | None = None
     server_time: datetime
 

@@ -18,6 +18,8 @@ class SupervisorEventIn(BaseModel):
 class SupervisorEventOut(SupervisorEventIn):
     id_novedad: int
     id_supervisor: int
+    id_bitacora_registrada: int
+    id_bitacora_causada: int | None = None
     dias_calculados: int | None = None
     minutos_autorizados: int | None = None
     estado: str

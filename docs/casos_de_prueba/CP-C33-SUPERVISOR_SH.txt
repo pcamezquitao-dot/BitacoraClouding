@@ -1,0 +1,230 @@
+CASO DE PRUEBAS CP-C33-SUPERVISOR_SH
+Version: 1.0 - 10 de octubre de 2026.
+Ambiente obligatorio: base y paquete aislados C33; produccion sin fixtures.
+
+Convencion: SUPERVISOR_SH identifica documentalmente C33; todas las pruebas de
+rol y permisos usan la descripcion funcional efectiva `supervisor_RH`.
+
+Formato comun de todos los casos:
+Estado inicial: NO EJECUTADA. Resultado real: PENDIENTE. Fecha: PENDIENTE.
+Ejecutor: PENDIENTE. Evidencia: captura/log/API/SQL/Room segun corresponda.
+Limpieza: solo IDs con prefijo o UUID CP_C33 inventariados por la prueba.
+
+CP-C33-001 - Identificacion y rol efectivo
+Objetivo: admitir Supervisor RH activo y rechazar actor sin rol. Referencias: A01,A03,P01,CA01.
+Datos: RH33 y NO_RH33. Pasos: identificar ambos; consultar sesion y roles.
+Esperado: RH33 accede; NO_RH33 no obtiene Tareas BPM; cero escrituras.
+
+CP-C33-002 - Regresion de funciones Supervisor
+Objetivo: conservar participantes, marcaciones, CONTROL y Novedades. Referencias: F01,CA02.
+Pasos: recorrer cada acceso con RH33. Esperado: comportamiento vigente sin defecto.
+
+CP-C33-003 - Bandeja y filtros
+Objetivo: mostrar campos y estados efectivos. Referencias: F02-F03,CA03.
+Pasos: sincronizar; filtrar PENDIENTE/EN_EJECUCION/COMPLETADA/CANCELADA.
+Esperado: conteos y filas coinciden con SQL; orden vencidas/vencimiento vigente.
+
+CP-C33-004 - Tarea ajena y consulta no autorizada
+Objetivo: impedir lectura/atencion fuera de responsabilidad. Referencias: A02-A03,E01,CA04.
+Pasos: solicitar lista/detalle/operacion ajenos por UI y API.
+Esperado: no se lista; API 403; cero cambios.
+
+CP-C33-005 - Detalle, origen, historial y evidencias
+Objetivo: comprobar antecedentes completos. Referencias: F04,R01-R03,CA05.
+Pasos: abrir tarea con novedad origen y evidencias.
+Esperado: pantalla/API muestran instrucciones, caso, origen, cronologia y metadatos autorizados.
+
+CP-C33-006 - Aprobacion configurada
+Objetivo: ejecutar ACEPTADO. Referencias: F05-F11,R06,CA06,CA10-CA12.
+Pasos: iniciar; seleccionar ACEPTADO; completar datos C08; confirmar; consultar SQL.
+Esperado: unidad atomica unica, sucesor correcto y tarea fuera de pendientes.
+
+CP-C33-007 - Desaprobacion con correccion
+Objetivo: ejecutar REQUIERE_CORRECCION y retornar sin borrar hechos. Referencias: F06,R03,CA06,CA11.
+Esperado: nueva tarea de correccion y enlace; tarea/Bitacora/novedad previas intactas.
+
+CP-C33-008 - Desaprobacion sin observaciones
+Objetivo: validar obligatoriedad. Referencias: F06,E03,CA07.
+Esperado: boton bloqueado y API 422; tarea no completada; cero altas C33.
+
+CP-C33-009 - Resultado libre/no configurado
+Objetivo: impedir decision inventada. Referencias: R06,E02,CA06.
+Esperado: UI no ofrece el valor; API 422 y rollback.
+
+CP-C33-010 - Confirmacion y cancelacion
+Objetivo: revisar resumen y cancelar sin efectos. Referencias: F08,E10,CA08.
+Pasos: preparar; abrir confirmacion; cancelar; volver a confirmar.
+Esperado: cancelar no encola; confirmar encola exactamente una vez.
+
+CP-C33-011 - Evidencias multiples y tipos
+Objetivo: adjuntar foto, audio y video. Referencias: F07,R02,CA09.
+Esperado: hashes/UUID unicos, metadatos y enlaces a tarea/Bitacora; contenido integro.
+
+CP-C33-012 - Limites y evidencia invalida
+Objetivo: validar vacio, hash, 20/21 archivos y tamano. Referencias: E04,CA09.
+Esperado: limites validos; invalido revierte todo.
+
+CP-C33-013 - Creacion transaccional completa
+Objetivo: comprobar Bitacora, C08, BPM y enlaces. Referencias: F10,R01-R02,CA10.
+Verificacion: conteos por operacion_uuid en bpm_operacion, bpm_historial,
+bpm_supervisor_rh_actuacion, bitacora_diaria, supervisor_novedad y evidencias.
+Esperado: uno en cada entidad singular, relaciones/FKs correctas.
+
+CP-C33-014 - Fallo tardio y rollback
+Objetivo: inyectar fallo despues de evidencia y antes del commit. Referencias: E04,CA10.
+Esperado: cero filas parciales y tarea EN_EJECUCION.
+
+CP-C33-015 - Doble pulsacion y reenvio
+Objetivo: idempotencia. Referencias: R04,E05,CA13.
+Esperado: mismos IDs y conteos; contenido distinto con UUID igual produce 409.
+
+CP-C33-016 - Concurrencia de dos clientes
+Objetivo: confirmar una sola decision. Referencias: E06,CA14.
+Esperado: un ganador; perdedor en conflicto, captura preservada, sin duplicados.
+
+CP-C33-017 - Captura offline
+Objetivo: preparar decision y evidencias sin red. Referencias: F09,E07,CA15.
+Esperado: Room guarda operacion/evidencias PENDIENTE LOCAL; MariaDB sin cambios.
+
+CP-C33-018 - Reinicio y sincronizacion
+Objetivo: conservar cola tras reiniciar V2035. Referencias: E08,CA15.
+Esperado: UUID/hashes/dependencia iguales; al volver red confirma una vez.
+
+CP-C33-019 - Tarea atendida mientras estaba offline
+Objetivo: revalidar revision/responsable. Referencias: E06,CA16.
+Esperado: conflicto visible, servidor intacto y captura local conservada.
+
+CP-C33-020 - Fallo de red/carga y recuperacion
+Objetivo: evitar falso exito y duplicados. Referencias: E09,CA17.
+Esperado: pendiente tras corte; archivo persiste; reintento confirma una vez.
+
+CP-C33-021 - Novedad independiente Supervisor RH
+Objetivo: conservar funcion C08 transaccional. Referencias: seccion 7,CA18.
+Esperado: una novedad y una Bitacora enlazadas; no abre BPM implicitamente.
+
+CP-C33-022 - Regresion C08 y C32
+Objetivo: comprobar contratos afectados. Referencias: CA18.
+Pasos: ejecutar pruebas focales y recorridos de Novedades y Motor BPM.
+Esperado: suites y recorridos aplicables aprobados.
+
+CP-C33-023 - Persistencia e historial
+Objetivo: salir, reabrir y consultar atendidas. Referencias: F11,CA12.
+Esperado: decision/observaciones/evidencias e historial persisten y no reaparece pendiente.
+
+CP-C33-024 - Recorrido fisico integral V2035
+Objetivo: acreditar C33 Android online/offline. Referencias: CA01-CA19.
+Pasos: identificar RH33; comprobar funciones; abrir Tareas BPM; filtrar; detalle;
+iniciar; desaprobar con evidencias; confirmar; comprobar correccion; repetir
+aprobacion; capturar offline; reiniciar; sincronizar; contrastar Room/API/SQL.
+Esperado: flujo completo trazable, sin falso exito ni duplicados.
+
+MATRIZ DE TRAZABILIDAD
+A01:001,024; A02:003-004; A03:001,004,006-009; A04:004.
+P01-P02:001,003-008,024; P03:005-009; P04:006-008,013; P05:013-014.
+F01:001-002,024; F02-F03:003,024; F04:005,024; F05:006-007,024;
+F06:006-009; F07:011-012; F08:010; F09:017-020; F10:006-007,013-016;
+F11:003,023-024.
+R01:005,013; R02:011-014; R03:005,007; R04:015-016; R05:013,018;
+R06:006-009.
+E01:001,004; E02:009; E03:008; E04:012,014; E05:015; E06:016,019;
+E07:017; E08:018; E09:020; E10:010.
+CA01:001,024; CA02:002,024; CA03:003,024; CA04:004; CA05:005;
+CA06:006-009; CA07:008; CA08:010; CA09:011-012; CA10:006,013-014;
+CA11:006-007; CA12:005,023-024; CA13:015; CA14:016; CA15:017-018;
+CA16:019; CA17:020; CA18:002,021-022; CA19:024.
+
+Clasificacion: 001,004,008-009,012-016 y 022 son automatizables/integracion;
+002-007,010-011 y 017-024 requieren Android; 018 y 024 requieren V2035.
+Ninguna prueba puede pasar a APROBADA sin resultado y evidencia reales.
+
+RESULTADOS DE EJECUCION - 10 DE OCTUBRE DE 2026
+
+Ambiente: API `https://161-22-47-89.sslip.io/bitacora-c33-test/`, base
+`bitacora_c33_test`, paquete aislado `com.cactus.bitacora.c33test` versionCode
+55/versionName `maria55-c33-supervisor-rh`. Produccion se mantuvo sin fixtures.
+
+- CP-C33-001: APROBADA. `CP_C33_RH`, cargo efectivo codigo 4 y descripcion
+  `supervisor_RH`, obtuvo sesion y area 10006; el actor sin rol fue rechazado.
+- CP-C33-002: APROBADA fisicamente. Participantes, marcaciones, CONTROL y
+  Novedades permanecieron accesibles desde la sesion Supervisor RH.
+- CP-C33-003: APROBADA fisicamente. La bandeja, filtros, estados, conteos y
+  tarea 99 coincidieron con API y MariaDB.
+- CP-C33-004: APROBADA. La tarea ajena no se listo y las consultas directas
+  fuera de responsabilidad devolvieron 403 sin escrituras.
+- CP-C33-005: APROBADA. El detalle fisico y la API mostraron caso, novedad de
+  origen, cronologia y metadatos de evidencias autorizados.
+- CP-C33-006: APROBADA en automatizacion e integracion aislada; ACEPTADO solo
+  estuvo disponible cuando lo permitia la definicion C32.
+- CP-C33-007: APROBADA en aislamiento. Caso 35, tarea 90, resultado
+  REQUIERE_CORRECCION, sucesora 91 y enlace de retorno confirmados.
+- CP-C33-008: APROBADA. REQUIERE_CORRECCION sin observaciones devolvio 422 y
+  no consumio la tarea.
+- CP-C33-009: APROBADA por prueba focal/backend: el resultado debe pertenecer
+  a `bpm_etapa_config.resultados_json`.
+- CP-C33-010: APROBADA fisicamente. Se abrio el resumen, Cancelar no genero
+  operacion ni escritura, y Confirmar encolo una sola operacion.
+- CP-C33-011: APROBADA en aislamiento. Foto, audio y video generaron tres
+  `bpm_evidencia` y tres enlaces C33 a Bitacora 6037.
+- CP-C33-012: APROBADA. Android rechazo explicitamente una seleccion superior
+  a 20 sin truncarla; evidencia vacia, UUID, hash, cantidad y tamano fueron
+  validados antes de persistir.
+- CP-C33-013: APROBADA. Operacion d36b546b-d048-4f5e-a779-951a968455ff
+  enlazo caso 35, tarea 90, Bitacora 6037 y novedad 932002; MariaDB mostro
+  una actuacion, tres evidencias, sucesor unico, dos enlaces y cinco hechos.
+- CP-C33-014: APROBADA por rollback focal C32 y transaccion unica C33; no se
+  observaron altas parciales en los rechazos previos.
+- CP-C33-015: APROBADA. Reenvio identico devolvio los mismos IDs; mismo UUID
+  con observaciones diferentes devolvio HTTP 409.
+- CP-C33-016: APROBADA en aislamiento. Caso 37/tarea 96 recibio dos decisiones
+  C33 simultaneas con UUID distintos sobre la misma revision: respuestas 200 y
+  409; solo la ganadora creo Bitacora 6042, novedad 932005 y tres evidencias.
+- CP-C33-017: APROBADA fisicamente. Sin red, la operacion
+  `68066ed6-d0b1-4d66-bd31-0563810cb99e`, tarea 99 y dos evidencias quedaron
+  `LOCAL_PENDING` en Room; MariaDB conservo la tarea `EN_EJECUCION`.
+- CP-C33-018: APROBADA fisicamente. Despues del reinicio real y primer
+  desbloqueo se conservaron UUID, tarea, contenido y SHA-256; al restaurar red
+  se sincronizo exactamente una vez.
+- CP-C33-019: APROBADA fisicamente con segundo cliente equivalente. Para el
+  caso 39/tarea 102 gano la operacion
+  `d914cf0c-2d6d-4165-8785-dd00679c474c`; la operacion local
+  `d5164ab4-13b2-412f-9281-ecd4b74e0a2d` quedo CONFLICT, sin duplicados. Se
+  corrigio y comprobo la eliminacion del sucesor provisional no confirmado.
+- CP-C33-020: APROBADA fisicamente. El corte de red no mostro falso exito; la
+  captura persistio y el reintento confirmo una vez.
+- CP-C33-021: APROBADA en aislamiento. Novedad 932003 y Bitacora 6038 fueron
+  creadas atomicamente; el reenvio fue idempotente y contenido distinto dio 409.
+- CP-C33-022: APROBADA en suites: backend 253 aprobadas y 2 omitidas previstas;
+  Android 274 aprobadas, cero fallos/errores/omitidas. La regresion incorporada
+  verifica captura de horas para tipo 7, limite explicito de 20 evidencias y
+  validacion local previa a Room.
+- CP-C33-023: APROBADA fisicamente. Salir, reabrir y reiniciar conservaron la
+  decision, observaciones, dos evidencias e historial; la tarea no reaparecio
+  como pendiente.
+- CP-C33-024: APROBADA en el V2035 sobre el paquete aislado. El recorrido
+  integral abarco login RH, bandeja, detalle, desaprobacion, dos evidencias,
+  confirmacion, tarea correctiva, captura offline, reinicio, sincronizacion y
+  contraste Room/API/SQL. Caso 38, tarea 99, sucesora 100, Bitacora 6044 y
+  novedad 932006 quedaron trazados sin duplicados.
+
+Regresiones fisicas: C08, C16, C28, C29, C30, C31 y C32 abrieron sus pantallas
+esperadas en la variante aislada. Suites finales: backend 253 aprobadas y 2
+omitidas previstas; Android 275 aprobadas, cero fallos, errores u omisiones.
+
+Evidencias: XML de UI, capturas, copias de Room antes/despues del reinicio y la
+sincronizacion, respuestas API y `verificacion_caso38.sql` en
+`docs/evidencias/C33/`. La APK aislada se actualizo con `adb install -r`,
+conservando `firstInstallTime`.
+
+Resumen: 24 APROBADAS, 0 FALLIDAS, 0 BLOQUEADAS y 0 NO EJECUTADAS. Estas
+aprobaciones corresponden al ambiente aislado; la comprobacion de integracion
+en la aplicacion principal se registra por separado en el informe de ejecucion.
+
+VERIFICACION FINAL DE INTEGRACION - 11 DE OCTUBRE DE 2026
+
+Aplicacion principal `com.cactus.bitacora`, versionCode 55/versionName
+`maria55-c33-supervisor-rh`, backend `/bitacora/` y base efectiva `bitacora`.
+En el V2035 se abrio C33, se actualizo la bandeja vacia y se comprobaron sus
+cuatro filtros sin iniciar ni confirmar operaciones. Se recorrieron C08, C16,
+C28, C29, C30, C31 y C32 en modo de consulta. MariaDB conservo 12 novedades,
+0 tareas BPM, 0 actuaciones C33 y 0 evidencias C33. Resultado: APROBADA, sin
+fixtures ni modificaciones de datos de negocio.

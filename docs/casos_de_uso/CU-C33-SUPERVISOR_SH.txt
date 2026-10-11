@@ -1,0 +1,107 @@
+CASO DE USO CU-C33-SUPERVISOR_SH
+Nombre: Atender tareas BPM como Supervisor RH.
+Version: 1.0 - 10 de octubre de 2026.
+Estado: especificacion funcional para implementacion y prueba.
+
+Convencion documental: SUPERVISOR_SH es el codigo oficial de esta celula. No
+define un rol adicional. En catalogos, API, BPM y permisos corresponde al rol
+funcional `supervisor_RH`, denominado Supervisor de Recursos Humanos.
+
+1. OBJETIVO
+
+Permitir que un participante identificado y autorizado como Supervisor RH
+conserve las funciones vigentes de Supervisor y atienda las tareas que C32 le
+asigna. La confirmacion registra atomicamente la decision, una nueva Bitacora,
+una novedad C08, sus evidencias y el avance BPM, sin alterar los antecedentes.
+
+2. ACTORES Y PERMISOS
+
+A01. Actor principal: participante activo cuyo cargo efectivo tenga descripcion
+`supervisor_RH`. El codigo numerico no se fija en la aplicacion.
+A02. C32 resuelve un responsable concreto. C33 no crea una bandeja global por
+rol ni autoriza tareas de otra persona.
+A03. El backend valida identidad, rol, responsabilidad, revision y transicion;
+ocultar botones en Android no constituye autorizacion.
+A04. Administradores conservan sus facultades C32, pero no se consideran
+Supervisor RH para generar una actuacion C33 salvo que posean tambien el rol.
+
+3. PRECONDICIONES
+
+P01. Participante identificado mediante el flujo Supervisor vigente.
+P02. Rol Supervisor RH activo y tarea C32 asignada al participante.
+P03. Definicion versionada disponible, con resultados y una transicion unica.
+P04. Para crear la novedad, tipo 1, 2 o 7, fechas y area deben satisfacer C08.
+P05. Las migraciones C08/C33 estan aplicadas a la base efectiva.
+
+4. FLUJO PRINCIPAL
+
+F01. El actor se identifica en Supervisor. El sistema conserva consulta de
+participantes, marcaciones, CONTROL y Novedades y muestra `Tareas BPM`.
+F02. Abre la bandeja, inicialmente en PENDIENTE, y puede filtrar por los estados
+efectivos PENDIENTE, EN_EJECUCION, COMPLETADA y CANCELADA.
+F03. Cada fila muestra proceso/caso, actividad, afectado, responsable, fechas,
+vencimiento y estado. Solo se listan tareas asignadas o ya ejecutadas por el actor.
+F04. El detalle muestra instrucciones, origen, historial, evidencias y resultados
+configurados por la version del proceso.
+F05. El actor inicia una tarea PENDIENTE mediante C32.
+F06. Selecciona un resultado configurado. `ACEPTADO` representa aprobacion y
+`REQUIERE_CORRECCION` desaprobacion cuando esas rutas existen; C33 no agrega
+transiciones. Para desaprobar, las observaciones son obligatorias.
+F07. Registra los datos C08 y puede adjuntar hasta veinte evidencias admitidas,
+incluidas foto, audio y video.
+F08. El sistema presenta confirmacion con decision, observaciones y evidencias.
+F09. Al confirmar, el cliente guarda una operacion durable y muestra PENDIENTE
+LOCAL hasta recibir confirmacion del servidor.
+F10. El servidor bloquea tarea/caso, revalida rol, responsable, revision,
+resultado y C08; en una transaccion crea Bitacora, novedad, evidencias y enlaces,
+completa la tarea y crea el sucesor o cierra el caso conforme a C32.
+F11. La tarea sale de pendientes y permanece en atendidas e historial.
+
+5. DATOS Y TRAZABILIDAD
+
+R01. supervisor_novedad conserva el contrato C08 y enlaza su Bitacora de
+registro. La actuacion C33 enlaza operacion, caso, tarea, Bitacora, novedad y
+novedad de origen cuando existe.
+R02. Las evidencias se conservan en bpm_evidencia y se relacionan con la
+Bitacora mediante bpm_supervisor_rh_evidencia; no se duplican los binarios.
+R03. La Bitacora y novedad originales son inmutables.
+R04. El UUID de operacion y el hash canonico garantizan reenvio identico; el
+mismo UUID con contenido distinto es conflicto.
+R05. Fechas de ocurrencia provienen de C08; confirmacion y sincronizacion usan
+hora del servidor. No se confunden.
+R06. Los resultados validos provienen de bpm_etapa_config.resultados_json y
+bpm_transicion. No se admite texto libre como decision.
+
+6. ALTERNATIVAS
+
+E01. Sin rol o tarea ajena: 403, sin escrituras.
+E02. Resultado no configurado o ruta ambigua: rechazo, sin escrituras.
+E03. REQUIERE_CORRECCION sin observaciones: rechazo, tarea sin completar.
+E04. Datos C08 invalidos o evidencia invalida: rollback total.
+E05. Doble pulsacion o respuesta perdida: devuelve IDs previos sin duplicar.
+E06. Revision obsoleta/tarea atendida: conflicto; conserva la captura local.
+E07. Sin red: consulta cache, encola actuacion y no muestra exito confirmado.
+E08. Reinicio: Room conserva operacion y evidencias; al reconectar revalida.
+E09. Fallo de evidencia o red: contenido local permanece para reintento.
+E10. Cancelar la confirmacion no encola ni escribe.
+
+7. NUEVA BITACORA Y NOVEDAD DESDE SUPERVISOR RH
+
+El acceso Novedades vigente sigue disponible y usa el contrato transaccional
+C08: una novedad y su Bitacora en una sola transaccion. Solo inicia BPM mediante
+las reglas de apertura C32 existentes; C33 no inicia procesos implicitamente.
+
+8. POSTCONDICIONES
+
+- Una confirmacion produce exactamente una tarea completada, una Bitacora, una
+  novedad, cero o mas evidencias enlazadas y como maximo un sucesor.
+- El historial conserva actor, resultado, observaciones, fechas y correlacion.
+- Ninguna captura local pendiente se presenta como confirmada.
+
+9. CRITERIOS DE ACEPTACION
+
+CA01-CA04: identificacion/rol, funciones previas, bandeja/filtros y permisos.
+CA05-CA08: detalle, resultados configurados, observacion obligatoria y confirmacion.
+CA09-CA12: evidencias multiples, atomicidad Bitacora-Novedad-BPM, transicion e historial.
+CA13-CA16: idempotencia, concurrencia, offline/reinicio y conflicto obsoleto.
+CA17-CA19: recuperacion de fallos, regresiones C08/C32 y recorrido fisico V2035.

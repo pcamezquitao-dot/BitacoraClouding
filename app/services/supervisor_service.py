@@ -7,6 +7,7 @@ from app.core.config import settings
 
 
 SUPERVISOR_TYPE_DESCRIPTION = "supervisor"
+SUPERVISOR_RH_TYPE_DESCRIPTION = "supervisor_rh"
 
 
 class SupervisorAuthorizationError(ValueError):
@@ -37,6 +38,19 @@ def resolve_supervisor_type_code(db: Session) -> int:
     return int(rows[0])
 
 
+def resolve_supervisor_type_codes(db: Session) -> list[int]:
+    rows = db.execute(text("""
+        SELECT codigo FROM tipos_participante
+        WHERE activo=TRUE AND LOWER(TRIM(descripcion)) IN (:supervisor,:rh)
+        ORDER BY codigo
+    """), {"supervisor": SUPERVISOR_TYPE_DESCRIPTION,
+             "rh": SUPERVISOR_RH_TYPE_DESCRIPTION}).scalars().all()
+    if not rows:
+        raise SupervisorAuthorizationError(
+            "El catalogo no contiene cargos activos Supervisor o Supervisor RH")
+    return [int(value) for value in rows]
+
+
 def identify_supervisor(db: Session, code: str) -> dict:
     participant = settings.PARTICIPANTE_TABLE
     employee_area = settings.EMPLEADO_AREA_TABLE
@@ -52,7 +66,10 @@ def identify_supervisor(db: Session, code: str) -> dict:
             JOIN {employee_area} ea ON ea.id_participante=p.id_participante
             JOIN {areas} aa ON aa.id_Area_Administrativa=ea.id_area
             WHERE UPPER(TRIM(p.identificacion_participante))=:codigo
-              AND ea.cargo=:supervisor_type
+              AND (ea.cargo=:supervisor_type OR ea.cargo IN (
+                SELECT codigo FROM tipos_participante
+                WHERE activo=TRUE AND LOWER(TRIM(descripcion))='supervisor_rh'
+              ))
               AND ea.activo=TRUE
               AND ea.fecha_inicia<=CURDATE()
               AND (ea.fecha_final IS NULL OR ea.fecha_final>=CURDATE())
@@ -89,7 +106,10 @@ def supervised_participants(db: Session, code: str, search: str = "") -> list[di
                 SELECT ea.id_area
                 FROM {employee_area} ea
                 WHERE ea.id_participante=:id_supervisor
-                  AND ea.cargo=:supervisor_type
+                  AND (ea.cargo=:supervisor_type OR ea.cargo IN (
+                    SELECT codigo FROM tipos_participante
+                    WHERE activo=TRUE AND LOWER(TRIM(descripcion))='supervisor_rh'
+                  ))
                   AND ea.activo=TRUE
                   AND ea.fecha_inicia<=CURDATE()
                   AND (ea.fecha_final IS NULL OR ea.fecha_final>=CURDATE())

@@ -1,0 +1,98 @@
+INFORME DE EJECUCION C33 - 2026-10-10
+
+1. CODIGO Y ENTORNO
+- Rama: C33-supervisor-rh; base: 571213cac81975922eb9abef462696ac31830870.
+- Worktree: C:\Bitacora\BitacoraClouding-C33.
+- Base aislada: bitacora_c33_test, clonada de bitacora_c32_test.
+- Backend aislado: /srv/bitacora-c33-test, servicio puerto 8016.
+- URL: https://161-22-47-89.sslip.io/bitacora-c33-test/.
+- Produccion efectiva: backend `/srv/bitacora`, base `bitacora` y URL
+  `https://161-22-47-89.sslip.io/bitacora/`.
+
+2. RESPALDOS
+- /root/bitacora_backups/c33/preclone_20261010_125642/bitacora_c32_test.sql.gz.
+- La base origen no se altero; la prueba escribe solo CP_C33 en la copia.
+- Productivo previo a C33: `/root/bitacora_backups/c33/production_20261010_2330/`.
+- `bitacora.sql.gz`: SHA-256
+  207a40887fe6d826ea84e8ce1aec05aaae0cb2e34356470ce3f7debaa716ce03.
+- `backend-bitacora.tar.gz`: SHA-256
+  02dede1c5a786d867effe2342cbd7209f890f0c1954482f2fbf032ce80bbee76.
+- APK anterior versionCode 54: `C:\Bitacora\backups\C33\production_20261010_2330\bitacora-v54.apk`,
+  SHA-256 CC53965EC4EB6EE22C6F24672B1C4A85300AD24891298BB59C2B9C0AFFCA6596.
+- Datos recuperables de la app: `com.cactus.bitacora-data-v54.tar`, SHA-256
+  881C7D810B88C0D7AC15A226492120BE5C0FFF05E48E4F9AE36673CFCCF60BC6.
+
+3. IMPLEMENTACION
+- Supervisor RH se resuelve por descripcion efectiva, no por numero fijo.
+- Se agrego Tareas BPM a la sesion Supervisor existente.
+- Decisiones provienen de la definicion C32; desaprobacion exige observacion.
+- Confirmacion encola operacion/evidencias y mantiene estado local pendiente.
+- Backend registra en una transaccion BPM, Bitacora, C08, historial y enlaces.
+- C08 independiente crea Novedad-Bitacora atomicamente e idempotente.
+
+4. EVIDENCIA TECNICA
+- Python: 253 passed, 2 skipped, 17 subtests passed.
+- Android: 275 tests, 0 failures, 0 errors, 0 skipped; assemble C33 aprobado.
+- Integracion: caso 35; tareas 89, 90 y 91; Bitacora 6037; novedad 932002;
+  operacion d36b546b-d048-4f5e-a779-951a968455ff; tres evidencias.
+- Novedad independiente: 932003; Bitacora 6038; reenvio sin duplicados.
+- Revalidacion: caso 36, tarea RH 93, Bitacora 6040, novedad 932004 y tres
+  evidencias; idempotencia y rechazo de contenido distinto aprobados.
+- Concurrencia C33: caso 37, tarea RH 96, respuestas simultaneas 200/409;
+  solo la ganadora creo Bitacora 6042, novedad 932005 y tres evidencias.
+- Se corrigio la pantalla para capturar las dos horas obligatorias del tipo 7,
+  rechazar explicitamente mas de veinte evidencias y validar fechas/horas antes
+  de escribir la operacion pendiente en Room.
+- Recorrido fisico aislado: CP-C33-002, 003, 010, 017, 018, 019, 020, 023
+  y 024 aprobadas. Room conservo operacion, tarea y dos evidencias durante un
+  reinicio real; la recuperacion sincronizo una vez. El conflicto de segundo
+  cliente fue visible y no dejo sucesor provisional huerfano.
+- Resultado CP-C33: 24 aprobadas, 0 fallidas, 0 bloqueadas, 0 no ejecutadas.
+
+5. INSTALACION AISLADA
+- Dispositivo: vivo V2035, serie 3065397347006YM.
+- Paquete: com.cactus.bitacora.c33test.
+- versionCode 55; versionName maria55-c33-supervisor-rh.
+- Reinstalacion corregida `adb install -r`: Success a las 22:40:46. Se conservo
+  `firstInstallTime=2026-10-10 13:39:22`; la app principal no se modifico.
+
+6. INTEGRACION PRODUCTIVA
+- Migracion aplicada: `migrations/20261010_c33_supervisor_rh.sql`.
+- Postcondicion: tres columnas y dos tablas C33 presentes; 12 novedades
+  productivas conservadas; cero filas C33 y cero tareas BPM creadas por el
+  despliegue; servicio activo y salud HTTP 200.
+- Verificaciones SQL: `verificacion_preproduccion.sql` y
+  `verificacion_postproduccion.sql`.
+- APK principal: `app-production-debug.apk`, package `com.cactus.bitacora`,
+  versionCode 55, versionName `maria55-c33-supervisor-rh`, SHA-256
+  B77B440854DF0517DED2EC360B9D693B0FBC1A9E4B63944E88DE5F227257085E.
+- Firma anterior/nueva identica: SHA-256
+  81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0.
+- Instalacion `adb install -r`: Success; `firstInstallTime` se conservo en
+  2026-10-06 13:50:35 y `lastUpdateTime` fue 2026-10-10 23:51:19.
+- Room principal se comparo inmediatamente despues de instalar: DB, WAL y SHM
+  conservaron exactamente los SHA-256 previos al cambio.
+
+7. VERIFICACION PRINCIPAL - 11 DE OCTUBRE DE 2026
+- V2035 serie 3065397347006YM desbloqueado y accesible por USB.
+- La aplicacion principal abrio `Tareas BPM - Supervisor RH`, mostro participante,
+  aviso de confirmacion exclusiva del servidor, acciones Actualizar/Sincronizar,
+  y filtros PENDIENTE, EN_EJECUCION, COMPLETADA y CANCELADA.
+- `Actualizar` respondio `Bandeja actualizada`; no existian tareas productivas y
+  no se inicio ni confirmo ninguna operacion.
+- C08 abrio Novedades con participantes y tipos vigentes.
+- C16 mostro resumen de solo lectura y arbol de areas administrativas.
+- C28 mostro Catalogo de Actividades, su nota funcional, busqueda y alta.
+- C29 mostro Administracion Proceso, arbol y creacion de proceso raiz.
+- C30 mostro Normalizar proceso y su lista productiva vacia.
+- C31 mostro XML2ER, destino productivo y acciones Seleccionar XML, Validar y
+  Cancelar; no se selecciono ni importo un XML.
+- C32 mostro Motor BPM, apertura, tareas y administracion; no se abrio caso.
+- Consulta final de MariaDB: base `bitacora`, 12 novedades existentes,
+  0 tareas BPM, 0 actuaciones C33 y 0 evidencias C33. El recorrido visual no
+  genero escrituras.
+- Las capturas y XML productivos se conservaron fuera de Git en el respaldo
+  privado C33 para no publicar datos de participantes.
+
+Estado: C33 INTEGRADA; 24 pruebas aprobadas y verificacion principal aprobada.
+Conforme a INVARIANTES, la declaracion formal VALIDADA corresponde a Patricia.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -64,6 +64,10 @@ def _roles(db: Session, participant_id: int) -> set[str]:
     """), {"id": participant_id}).scalars()}
 
 
+def _is_supervisor_rh(db: Session, participant_id: int) -> bool:
+    return "SUPERVISOR_RH" in _roles(db, participant_id)
+
+
 def _is_admin(db: Session, participant_id: int) -> bool:
     return bool(db.execute(text("""
         SELECT 1 FROM administrador_autorizacion
@@ -77,7 +81,7 @@ def _can_open_for(db: Session, actor_id: int, affected_id: int) -> bool:
     if _is_admin(db, actor_id):
         return True
     actor_roles = _roles(db, actor_id)
-    if not actor_roles.intersection({"SUPERVISOR", "GERENTE", "DIRECTIVO"}):
+    if not actor_roles.intersection({"SUPERVISOR", "SUPERVISOR_RH", "GERENTE", "DIRECTIVO"}):
         return False
     return bool(db.execute(text("""
         WITH RECURSIVE alcance AS (
@@ -419,7 +423,7 @@ def start_task(db: Session, operation: BpmOperationIn) -> dict:
         db.rollback(); raise
 
 
-def _store_evidence(db: Session, item: BpmEvidenceIn, case_id: int, task_id: int, actor_id: int):
+def _store_evidence(db: Session, item: BpmEvidenceIn, case_id: int, task_id: int, actor_id: int) -> int:
     try:
         content = base64.b64decode(item.content_base64, validate=True)
     except Exception as error:
@@ -433,8 +437,9 @@ def _store_evidence(db: Session, item: BpmEvidenceIn, case_id: int, task_id: int
     if existing:
         if str(existing).lower() != digest:
             raise BpmConflict("La clave de evidencia ya fue usada con otro contenido")
-        return
-    db.execute(text("""
+        value = db.execute(text("SELECT id_evidencia FROM bpm_evidencia WHERE client_uuid=:uuid"), {"uuid": item.client_uuid}).scalar_one()
+        return int(value)
+    result = db.execute(text("""
         INSERT INTO bpm_evidencia(client_uuid,id_caso,id_actividad,autor_id,
           nombre_archivo,tipo_mime,sha256,tamano,contenido,fecha_captura)
         VALUES(:uuid,:case_id,:task_id,:author,:filename,:mime,:sha,:size,:content,:captured)
@@ -442,6 +447,97 @@ def _store_evidence(db: Session, item: BpmEvidenceIn, case_id: int, task_id: int
              "author": actor_id, "filename": item.filename, "mime": item.mime_type,
              "sha": digest, "size": len(content), "content": content,
              "captured": item.captured_at})
+    return int(result.lastrowid)
+
+
+def _configured_results(db: Session, process_id: int, stage_id: int) -> set[str]:
+    raw = db.execute(text("""
+        SELECT resultados_json FROM bpm_etapa_config
+        WHERE id_bpm_proceso=:p AND id_etapa=:e
+    """), {"p": process_id, "e": stage_id}).scalar_one_or_none()
+    try:
+        values = json.loads(raw or "[]")
+    except (TypeError, json.JSONDecodeError) as error:
+        raise BpmError("La etapa no tiene resultados configurados validos") from error
+    return {str(value).strip().upper() for value in values if str(value).strip()}
+
+
+def _validate_c08_data(operation: BpmOperationIn) -> tuple[int | None, int | None]:
+    if operation.novelty_type not in (1, 2, 7):
+        raise BpmError("Supervisor RH debe seleccionar una novedad C08 de tipo 1, 2 o 7")
+    if not operation.novelty_area_id or not operation.novelty_start_date or not operation.novelty_end_date:
+        raise BpmError("Area y fechas de la novedad C08 son obligatorias")
+    if operation.novelty_end_date < operation.novelty_start_date:
+        raise BpmError("La fecha final de la novedad no puede ser anterior a la inicial")
+    if (operation.novelty_start_time is None) != (operation.novelty_end_time is None):
+        raise BpmError("Debe registrar ambas horas de la novedad o dejarlas vacias")
+    days = ((operation.novelty_end_date - operation.novelty_start_date).days + 1
+            if operation.novelty_type == 2 else None)
+    minutes = None
+    if operation.novelty_type == 7:
+        if operation.novelty_start_time is None or operation.novelty_end_time is None:
+            raise BpmError("Las horas son obligatorias para una novedad de permiso")
+        start = datetime.combine(operation.novelty_start_date, operation.novelty_start_time)
+        end = datetime.combine(operation.novelty_end_date, operation.novelty_end_time)
+        if end <= start and operation.novelty_start_date == operation.novelty_end_date:
+            end += timedelta(days=1)
+        minutes = int((end - start).total_seconds() // 60)
+        if minutes <= 0:
+            raise BpmError("La autorizacion debe ser mayor que cero")
+    return days, minutes
+
+
+def _create_supervisor_rh_novelty(db: Session, operation: BpmOperationIn, task: dict,
+                                  case: dict, actor: dict, bitacora_id: int,
+                                  evidence_ids: list[int]) -> tuple[int, int | None]:
+    days, minutes = _validate_c08_data(operation)
+    area_ok = db.execute(text("""
+        SELECT 1 FROM empleado_area
+        WHERE id_participante=:participant AND id_area=:area AND activo=1
+          AND fecha_inicia<=:date AND (fecha_final IS NULL OR fecha_final>=:date)
+        LIMIT 1
+    """), {"participant": _participant_by_code(db, str(case["id_participante_afectado"]))["id_participante"],
+             "area": operation.novelty_area_id, "date": operation.novelty_start_date}).first()
+    if not area_ok:
+        raise BpmForbidden("El area de la novedad no corresponde al participante afectado")
+    source_novelty_id = None
+    control = db.execute(text("SELECT origen_tipo,origen_id FROM bpm_caso_control WHERE id_caso=:id"),
+                         {"id": case["id_caso"]}).mappings().first()
+    if control and control["origen_tipo"] == "NOVEDAD" and control["origen_id"]:
+        source_novelty_id = int(control["origen_id"])
+    caused_bitacora = None
+    if source_novelty_id is not None:
+        caused_bitacora = db.execute(text("""
+            SELECT id_bitacora_registrada FROM supervisor_novedad
+            WHERE id_novedad=:id
+        """), {"id": source_novelty_id}).scalar_one_or_none()
+    request_sha = _hash({
+        "operation_uuid": operation.operation_uuid, "result": operation.result,
+        "novelty_type": operation.novelty_type, "area": operation.novelty_area_id,
+        "start_date": operation.novelty_start_date, "end_date": operation.novelty_end_date,
+        "start_time": operation.novelty_start_time, "end_time": operation.novelty_end_time,
+    })
+    affected = _participant_by_code(db, str(case["id_participante_afectado"]))
+    result = db.execute(text("""
+        INSERT INTO supervisor_novedad
+          (client_uuid,tipo_novedad,id_participante,id_supervisor,id_area,
+           fecha_inicio,fecha_final,hora_inicio,hora_final,dias_calculados,
+           minutos_autorizados,observaciones,estado,origen,request_sha256,
+           id_bitacora_registrada,id_bitacora_causada)
+        VALUES (:uuid,:type,:participant,:supervisor,:area,:start_date,:end_date,
+                :start_time,:end_time,:days,:minutes,:observations,'ACTIVO','BPM',
+                :request_sha,:bitacora,:caused)
+    """), {"uuid": operation.operation_uuid, "type": operation.novelty_type,
+             "participant": affected["id_participante"], "supervisor": actor["id_participante"],
+             "area": operation.novelty_area_id, "start_date": operation.novelty_start_date,
+             "end_date": operation.novelty_end_date, "start_time": operation.novelty_start_time,
+             "end_time": operation.novelty_end_time, "days": days, "minutes": minutes,
+             "observations": (operation.observations or operation.result or "")[:400],
+             "request_sha": request_sha, "bitacora": bitacora_id, "caused": caused_bitacora})
+    novelty_id = int(result.lastrowid)
+    # bpm_operacion se inserta al final de complete_task; la actuacion se inserta
+    # despues de ese registro para satisfacer su FK.
+    return novelty_id, source_novelty_id
 
 
 def complete_task(db: Session, operation: BpmOperationIn) -> dict:
@@ -456,8 +552,15 @@ def complete_task(db: Session, operation: BpmOperationIn) -> dict:
         sha = _snapshot_hash(db, int(case["id_bpm_proceso"]))
         if operation.definition_sha256 and operation.definition_sha256.lower() != sha.lower():
             raise BpmConflict("La definición local no corresponde al caso")
-        for evidence in operation.evidences:
+        configured_results = _configured_results(db, int(task["id_bpm_proceso"]), int(task["id_etapa"]))
+        if operation.result.strip().upper() not in configured_results:
+            raise BpmError("El resultado no esta configurado para esta etapa")
+        if operation.result.strip().upper() == "REQUIERE_CORRECCION" and not (operation.observations or "").strip():
+            raise BpmError("Las observaciones son obligatorias al desaprobar")
+        evidence_ids = [
             _store_evidence(db, evidence, int(case["id_caso"]), int(task["id_actividad"]), int(actor["id_participante"]))
+            for evidence in operation.evidences
+        ]
         required = int(db.execute(text("""
             SELECT COALESCE(documentos_requeridos,0) FROM bpm_etapa_config
             WHERE id_bpm_proceso=:p AND id_etapa=:e
@@ -485,6 +588,12 @@ def complete_task(db: Session, operation: BpmOperationIn) -> dict:
                  "observations": (operation.observations or operation.result)[:200],
                  "uuid": operation.operation_uuid})
         bitacora_id = int(db.execute(text("SELECT LAST_INSERT_ID()")).scalar_one())
+        novelty_id = None
+        source_novelty_id = None
+        supervisor_rh = _is_supervisor_rh(db, int(actor["id_participante"]))
+        if supervisor_rh:
+            novelty_id, source_novelty_id = _create_supervisor_rh_novelty(
+                db, operation, task, case, actor, bitacora_id, evidence_ids)
         db.execute(text("""
             UPDATE bpm_actividad SET estado='COMPLETADA',id_ejecutor=:actor,
               fecha_ejecucion=NOW(),resultado=:result,observaciones=:observations,
@@ -535,11 +644,30 @@ def complete_task(db: Session, operation: BpmOperationIn) -> dict:
                               successor_client_uuid=operation.successor_client_uuid,
                               case_state=case_state,
                               task_state="COMPLETADA", case_revision=int(case["revision"])+1,
-                              task_revision=int(task["revision"])+1)
+                              task_revision=int(task["revision"])+1,
+                              bitacora_id=bitacora_id, novelty_id=novelty_id)
         _record_operation(db, operation, result, int(case["id_caso"]), int(task["id_actividad"]))
+        if supervisor_rh:
+            db.execute(text("""
+                INSERT INTO bpm_supervisor_rh_actuacion
+                  (operacion_uuid,id_caso,id_actividad,id_bitacora,id_novedad,
+                   id_novedad_origen,resultado,actor_id)
+                VALUES (:uuid,:case_id,:task_id,:bitacora,:novelty,:source,:result,:actor)
+            """), {"uuid": operation.operation_uuid, "case_id": case["id_caso"],
+                     "task_id": task["id_actividad"], "bitacora": bitacora_id,
+                     "novelty": novelty_id, "source": source_novelty_id,
+                     "result": operation.result, "actor": actor["id_participante"]})
+            for evidence_id in evidence_ids:
+                db.execute(text("""
+                    INSERT INTO bpm_supervisor_rh_evidencia
+                      (operacion_uuid,id_evidencia,id_bitacora)
+                    VALUES (:uuid,:evidence,:bitacora)
+                """), {"uuid": operation.operation_uuid, "evidence": evidence_id,
+                         "bitacora": bitacora_id})
         _history(db, operation, actor, "FINALIZACION", int(case["id_caso"]), int(task["id_actividad"]),
                  "EN_EJECUCION", "COMPLETADA", detail={"result": operation.result,
-                 "next_task_id": next_task_id, "bitacora_id": bitacora_id})
+                 "next_task_id": next_task_id, "bitacora_id": bitacora_id,
+                 "novelty_id": novelty_id})
         db.commit(); return result
     except Exception:
         db.rollback(); raise

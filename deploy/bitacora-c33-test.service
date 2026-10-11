@@ -1,0 +1,12 @@
+[Unit]
+Description=Bitacora C33 isolated test API
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/bitacora-c33-test
+ExecStart=/srv/bitacora/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8016
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -16,6 +16,8 @@ import com.google.gson.Gson
 import com.google.gson.JsonParser
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
 import android.util.Base64
 import java.util.UUID
 import retrofit2.http.Body
@@ -93,7 +95,13 @@ internal data class BpmOperationRemoteIn(
     val observations: String? = null,
     val reason: String? = null,
     val evidences: List<BpmEvidenceRemoteIn> = emptyList(),
-    val dependency_uuid: String? = null
+    val dependency_uuid: String? = null,
+    val novelty_type: Int? = null,
+    val novelty_area_id: Int? = null,
+    val novelty_start_date: String? = null,
+    val novelty_end_date: String? = null,
+    val novelty_start_time: String? = null,
+    val novelty_end_time: String? = null
 )
 
 internal data class BpmSyncRemoteIn(val operations: List<BpmOperationRemoteIn>)
@@ -138,6 +146,24 @@ internal data class BpmEvidenceCapture(
     val bytes: ByteArray
 )
 
+internal data class C33NoveltyCapture(
+    val type: Int,
+    val areaId: Int,
+    val startDate: String,
+    val endDate: String,
+    val startTime: String? = null,
+    val endTime: String? = null
+)
+
+internal data class BpmTaskContext(
+    val task: BpmTaskLocalEntity,
+    val case: BpmCaseLocalEntity,
+    val processName: String,
+    val instructions: String?,
+    val allowedResults: List<String>,
+    val localEvidences: List<BpmEvidenceLocalEntity>
+)
+
 internal class BpmRepository(
     private val database: BitacoraDatabase,
     private val dao: BpmLocalDao,
@@ -156,6 +182,26 @@ internal class BpmRepository(
     suspend fun definitions(): List<BpmDefinitionLocalEntity> = dao.definitions()
     suspend fun tasks(actor: String): List<BpmTaskLocalEntity> = dao.tasks(actor.trim().uppercase())
     suspend fun cases(actor: String): List<BpmCaseLocalEntity> = dao.cases(actor.trim().uppercase())
+
+    suspend fun taskContext(task: BpmTaskLocalEntity): BpmTaskContext {
+        val case = requireNotNull(dao.caseByUuid(task.caseClientUuid)) { "No existe el caso local" }
+        val definition = requireNotNull(dao.definitions().firstOrNull { it.processId == task.processId }) {
+            "Falta la definicion local"
+        }
+        val root = JsonParser.parseString(definition.definitionJson).asJsonObject
+        val stage = root["stages"].asJsonArray.first {
+            it.asJsonObject["id_etapa"].asInt == task.stageId
+        }.asJsonObject
+        val results = stage["resultados_json"]?.takeUnless { it.isJsonNull }?.asString
+            ?.let { raw -> JsonParser.parseString(raw).asJsonArray.map { it.asString } }
+            ?: emptyList()
+        return BpmTaskContext(task, case, definition.name,
+            stage["instrucciones"]?.takeUnless { it.isJsonNull }?.asString,
+            results, dao.evidences(task.clientUuid))
+    }
+
+    suspend fun caseDetailJson(actor: String, remoteCaseId: Long): String =
+        gson.toJson(api.caseDetail(remoteCaseId, actor.trim().uppercase()))
 
     suspend fun refresh(actor: String) {
         val now = System.currentTimeMillis()
@@ -256,10 +302,25 @@ internal class BpmRepository(
         task: BpmTaskLocalEntity,
         result: String,
         observations: String,
-        supports: List<BpmEvidenceCapture>
+        supports: List<BpmEvidenceCapture>,
+        novelty: C33NoveltyCapture? = null
     ): String = database.withTransaction {
         require(task.state == "EN_EJECUCION") { "La tarea debe estar en ejecución" }
         require(result.isNotBlank() && result.length <= 100) { "Seleccione un resultado permitido" }
+        novelty?.let {
+            require(it.type in setOf(1, 2, 7)) { "Seleccione una novedad C08 valida" }
+            val start = runCatching { LocalDate.parse(it.startDate) }.getOrNull()
+            val end = runCatching { LocalDate.parse(it.endDate) }.getOrNull()
+            require(start != null && end != null && !end.isBefore(start)) {
+                "Las fechas de la novedad C08 no son validas"
+            }
+            if (it.type == 7) {
+                require(runCatching { LocalTime.parse(it.startTime) }.isSuccess &&
+                    runCatching { LocalTime.parse(it.endTime) }.isSuccess) {
+                    "Las horas son obligatorias para una novedad de permiso"
+                }
+            }
+        }
         val case = requireNotNull(dao.caseByUuid(task.caseClientUuid)) { "No existe el caso local" }
         val definition = requireNotNull(dao.definitions().firstOrNull { it.processId == task.processId }) { "Falta la definición local" }
         val next = nextStage(definition.definitionJson, task.stageId, result.trim())
@@ -278,7 +339,13 @@ internal class BpmRepository(
             Instant.now().toString(), task.revision, task.processId, case.definitionSha256,
             case.remoteId, task.remoteId, case.clientUuid, task.clientUuid, successorUuid,
             result = result.trim(), observations = observations.takeIf { it.isNotBlank() },
-            evidences = evidences.map { it.toRemote() })
+            evidences = evidences.map { it.toRemote() },
+            novelty_type = novelty?.type,
+            novelty_area_id = novelty?.areaId,
+            novelty_start_date = novelty?.startDate,
+            novelty_end_date = novelty?.endDate,
+            novelty_start_time = novelty?.startTime,
+            novelty_end_time = novelty?.endTime)
         dao.updateLocalTask(task.clientUuid, "COMPLETADA", task.revision + 1, result.trim(),
             observations.takeIf { it.isNotBlank() }, true, BpmSyncState.LOCAL_PENDING, null)
         if (next != null && successorUuid != null) {
@@ -360,6 +427,7 @@ internal class BpmRepository(
         // Repairs evidence state after a process/app restart without replaying an
         // operation the server has already confirmed.
         dao.reconcileConfirmedEvidences()
+        dao.removeTerminalConflictSuccessors()
         val pending = dao.pendingOperations()
         var confirmed = 0; var conflicts = 0; var rejected = 0
         pending.forEach { local ->
@@ -407,7 +475,14 @@ internal class BpmRepository(
                         if (current != null) dao.confirmTask(successor, remote.next_task_id,
                             current.state, current.revision, false, BpmSyncState.CONFIRMED, null)
                     }
-                } else if (state == BpmSyncState.CONFLICT) conflicts++ else rejected++
+                } else {
+                    // A successor predicted offline is not a real task when the
+                    // parent operation loses a concurrency race or is rejected.
+                    // Keep the operation payload for explicit resolution, but
+                    // remove only that unconfirmed provisional successor.
+                    local.successorClientUuid?.let { dao.removeUnconfirmedSuccessor(it) }
+                    if (state == BpmSyncState.CONFLICT) conflicts++ else rejected++
+                }
             } catch (error: Exception) {
                 dao.updateOperation(local.operationUuid, BpmSyncState.LOCAL_PENDING,
                     local.serverResultJson, error.message?.take(500))
