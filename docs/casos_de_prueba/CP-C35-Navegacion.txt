@@ -1,0 +1,504 @@
+CP-C35 — ADMINISTRACIÓN DEL ÁRBOL DE NAVEGACIÓN
+Versión: 01
+Estado inicial de todos los casos: NO EJECUTADA
+Fuente: docs/casos_de_uso/CU_C35-Navegacion.txt
+
+1. OBJETIVO
+Verificar integralmente la consulta y administración jerárquica de dim_accion en servidor y Android, sin escrituras offline ni efectos sobre procesos, Áreas u otros maestros.
+
+2. CONDICIONES GENERALES
+- Ejecutar CRUD únicamente en base aislada identificada y respaldada.
+- Confirmar antes de cada escritura que la conexión apunta al entorno aislado.
+- Producción se verifica solo mediante lectura y navegación.
+- Usar administrador autorizado y un participante sin autorización.
+- Registrar fecha, versión, entorno, datos, resultado observado y evidencia de cada caso.
+- Estado permitido: NO EJECUTADA, APROBADA, FALLIDA, BLOQUEADA o NO APLICA con justificación.
+
+3. CASOS DE PRUEBA
+
+CP-C35-001 — Acceso autorizado y ruta
+Estado: NO EJECUTADA
+Objetivo: comprobar acceso por Administración → Administrar maestros → Navegación.
+Precondiciones: servidor disponible; administrador autorizado.
+Datos: credencial administrativa válida.
+Pasos: abrir la ruta; observar encabezado, controles y carga inicial.
+Resultado esperado: acceso concedido y pantalla C35 visible.
+Evidencias: captura y respuesta de consulta sin secretos.
+Trazabilidad: CU 3, 4 y 5.
+
+CP-C35-002 — Rechazo sin autorización
+Estado: NO EJECUTADA
+Objetivo: verificar autorización en interfaz y servidor.
+Precondiciones: participante sin permiso y cliente API.
+Datos: solicitud sin credencial administrativa.
+Pasos: intentar abrir C35 e invocar consulta y escrituras.
+Resultado esperado: acceso rechazado; dim_accion no cambia.
+Evidencias: respuestas 401/403 y SELECT antes/después.
+Trazabilidad: CU 3 y 9.
+
+CP-C35-003 — Catálogo vacío
+Estado: NO EJECUTADA
+Objetivo: distinguir catálogo vacío de error.
+Precondiciones: base aislada sin acciones.
+Datos: ninguna fila.
+Pasos: abrir C35; pulsar Actualizar.
+Resultado esperado: «No hay acciones de navegación registradas» y Crear raíz habilitado.
+Evidencias: captura y consulta de conteo.
+Trazabilidad: CU 4 y 10.
+
+CP-C35-004 — Consulta del catálogo
+Estado: NO EJECUTADA
+Objetivo: comparar pantalla, API y dim_accion.
+Precondiciones: jerarquía controlada cargada.
+Datos: varias raíces, hijas y nietas.
+Pasos: consultar API, abrir C35 y comparar registros.
+Resultado esperado: cada acción aparece una vez con sus valores.
+Evidencias: JSON, SELECT y captura.
+Trazabilidad: CU 5 y 12.
+
+CP-C35-005 — Orden de raíces y hermanas
+Estado: NO EJECUTADA
+Objetivo: validar orden por nombre y luego id_accion.
+Precondiciones: nombres desordenados y duplicados.
+Datos: raíces y hermanas con igual nombre.
+Pasos: cargar árbol; comparar orden esperado.
+Resultado esperado: orden contractual estable.
+Evidencias: lista esperada/observada.
+Trazabilidad: CU 4 y 9.
+
+CP-C35-006 — Expansión de rama
+Estado: NO EJECUTADA
+Objetivo: mostrar descendientes al expandir.
+Precondiciones: rama de tres niveles.
+Datos: raíz, hija y nieta.
+Pasos: pulsar ▶ de la raíz y luego de la hija.
+Resultado esperado: símbolos ▼ y descendientes con sangría de 10 dp por nivel.
+Evidencias: capturas antes/después.
+Trazabilidad: CU 4, 4.1 y 5.
+
+CP-C35-007 — Contracción recursiva visible
+Estado: NO EJECUTADA
+Objetivo: ocultar todos los descendientes.
+Precondiciones: rama completamente expandida.
+Datos: rama de tres niveles.
+Pasos: contraer la raíz.
+Resultado esperado: hijas y nietas quedan ocultas; no se eliminan.
+Evidencias: captura y SELECT.
+Trazabilidad: CU 5 y 12.
+
+CP-C35-008 — Selección resaltada y detalle
+Estado: NO EJECUTADA
+Objetivo: verificar selección y consulta completa.
+Precondiciones: acción con padre y proceso.
+Datos: fila conocida.
+Pasos: seleccionar; abrir consulta.
+Resultado esperado: selección resaltada y campos correctos no editables.
+Evidencias: captura y comparación con API.
+Trazabilidad: CU 4 y 5.
+
+CP-C35-009 — Crear raíz mínima
+Estado: NO EJECUTADA
+Objetivo: crear una raíz con datos mínimos.
+Precondiciones: entorno aislado y acceso autorizado.
+Datos: nombre válido; descripción, padre y proceso vacíos.
+Pasos: Crear raíz; Guardar; recargar.
+Resultado esperado: ID automático, tipo 1 y NULL reales en padre, proceso y descripción.
+Evidencias: respuesta, SELECT y captura.
+Trazabilidad: CU 6 y 9.
+
+CP-C35-010 — Crear hija
+Estado: NO EJECUTADA
+Objetivo: crear una acción bajo la seleccionada.
+Precondiciones: raíz existente.
+Datos: nombre y padre raíz.
+Pasos: pulsar + de la raíz; guardar.
+Resultado esperado: hija visible, seleccionada y rama abierta.
+Evidencias: respuesta, árbol y SELECT.
+Trazabilidad: CU 6.
+
+CP-C35-011 — Crear con proceso
+Estado: NO EJECUTADA
+Objetivo: asociar un proceso existente.
+Precondiciones: proceso válido disponible.
+Datos: id_proceso existente.
+Pasos: crear acción; seleccionar proceso; guardar.
+Resultado esperado: asociación persistida y nombre del proceso en detalle.
+Evidencias: SELECT conjunto y captura.
+Trazabilidad: CU 2, 6 y 9.
+
+CP-C35-012 — Identificador inmutable
+Estado: NO EJECUTADA
+Objetivo: comprobar que id_accion no se edita.
+Precondiciones: acción existente.
+Datos: ID asignado.
+Pasos: consultar y editar; intentar alterar mediante API.
+Resultado esperado: campo no editable y servidor ignora/rechaza cambio.
+Evidencias: UI, respuesta y SELECT.
+Trazabilidad: CU 2 y 9.
+
+CP-C35-013 — Tipo fijo en 1
+Estado: NO EJECUTADA
+Objetivo: validar tipo_accion.
+Precondiciones: creación y edición disponibles.
+Datos: tipo 1 y valores distintos por API.
+Pasos: crear; editar; enviar tipo inválido.
+Resultado esperado: UI solo lectura; servidor conserva o exige 1.
+Evidencias: respuestas y SELECT.
+Trazabilidad: CU 2 y 9.
+
+CP-C35-014 — Nombre obligatorio
+Estado: NO EJECUTADA
+Objetivo: rechazar vacío y solo espacios.
+Precondiciones: formulario abierto.
+Datos: vacío y espacios.
+Pasos: intentar guardar en UI y API.
+Resultado esperado: error junto al campo; formulario conservado; sin fila nueva.
+Evidencias: captura, respuesta y conteo.
+Trazabilidad: CU 9 y 10.
+
+CP-C35-015 — Nombre, trim y límite
+Estado: NO EJECUTADA
+Objetivo: validar 150 caracteres.
+Precondiciones: entorno aislado.
+Datos: 150, 151 y nombre con espacios extremos.
+Pasos: guardar cada variante.
+Resultado esperado: 150 aceptado, 151 rechazado y extremos recortados.
+Evidencias: respuestas y SELECT.
+Trazabilidad: CU 2 y 9.
+
+CP-C35-016 — Nombres duplicados
+Estado: NO EJECUTADA
+Objetivo: confirmar que no se exige unicidad.
+Precondiciones: acción existente.
+Datos: mismo nombre bajo igual y distinto padre.
+Pasos: crear duplicados.
+Resultado esperado: ambos se guardan y ordenan por id en empate.
+Evidencias: SELECT y árbol.
+Trazabilidad: CU 4 y 9.
+
+CP-C35-017 — Descripción opcional y NULL
+Estado: NO EJECUTADA
+Objetivo: guardar descripción vacía como NULL.
+Precondiciones: formulario disponible.
+Datos: vacío y espacios.
+Pasos: crear y editar dejando descripción vacía.
+Resultado esperado: NULL real, nunca cadena vacía forzada.
+Evidencias: SELECT.
+Trazabilidad: CU 2 y 9.
+
+CP-C35-018 — Límite de descripción
+Estado: NO EJECUTADA
+Objetivo: validar 200 caracteres sin truncar.
+Precondiciones: entorno aislado.
+Datos: textos de 200 y 201 caracteres.
+Pasos: guardar ambos en UI y API.
+Resultado esperado: 200 aceptado; 201 rechazado conservando formulario.
+Evidencias: capturas, respuestas y SELECT.
+Trazabilidad: CU 2, 9 y 10.
+
+CP-C35-019 — Padre NULL
+Estado: NO EJECUTADA
+Objetivo: convertir una acción en raíz.
+Precondiciones: acción hija sin dependencias impeditivas.
+Datos: selector «Sin padre».
+Pasos: editar; elegir Sin padre; guardar.
+Resultado esperado: id_accion_padre NULL y nodo en raíz.
+Evidencias: SELECT y árbol.
+Trazabilidad: CU 7 y 9.
+
+CP-C35-020 — Proceso NULL
+Estado: NO EJECUTADA
+Objetivo: retirar asociación sin usar cero.
+Precondiciones: acción con proceso.
+Datos: «Sin proceso asociado».
+Pasos: editar; retirar proceso; guardar.
+Resultado esperado: id_proceso NULL; proceso no cambia.
+Evidencias: SELECT de ambas tablas.
+Trazabilidad: CU 7, 9 y 12.
+
+CP-C35-021 — Padre inexistente
+Estado: NO EJECUTADA
+Objetivo: rechazar referencia inválida.
+Precondiciones: cliente API.
+Datos: id_accion_padre inexistente.
+Pasos: crear y editar con ese ID.
+Resultado esperado: conflicto comprensible y operación atómica.
+Evidencias: respuestas y SELECT antes/después.
+Trazabilidad: CU 9 y 10.
+
+CP-C35-022 — Proceso inexistente
+Estado: NO EJECUTADA
+Objetivo: rechazar proceso inválido.
+Precondiciones: cliente API.
+Datos: id_proceso inexistente.
+Pasos: crear y editar con ese ID.
+Resultado esperado: asociación rechazada y formulario recuperable.
+Evidencias: respuestas y SELECT.
+Trazabilidad: CU 9 y 10.
+
+CP-C35-023 — Autoparentesco
+Estado: NO EJECUTADA
+Objetivo: impedir que una acción sea su propio padre.
+Precondiciones: acción existente.
+Datos: padre igual al ID.
+Pasos: revisar selector; invocar API directamente.
+Resultado esperado: opción excluida y servidor rechaza.
+Evidencias: UI, respuesta y SELECT.
+Trazabilidad: CU 7 y 9.
+
+CP-C35-024 — Ciclo con descendiente
+Estado: NO EJECUTADA
+Objetivo: impedir ciclos indirectos.
+Precondiciones: raíz, hija y nieta.
+Datos: asignar nieta como padre de raíz.
+Pasos: probar UI y API.
+Resultado esperado: descendientes excluidos y servidor rechaza.
+Evidencias: selector, respuesta y árbol.
+Trazabilidad: CU 7, 9 y 10.
+
+CP-C35-025 — Edición válida
+Estado: NO EJECUTADA
+Objetivo: modificar nombre, descripción y proceso.
+Precondiciones: acción existente.
+Datos: valores válidos nuevos.
+Pasos: editar; guardar; recargar.
+Resultado esperado: mismo ID y valores actualizados.
+Evidencias: respuesta, SELECT y captura.
+Trazabilidad: CU 7.
+
+CP-C35-026 — Mover hoja
+Estado: NO EJECUTADA
+Objetivo: cambiar el padre de una hoja.
+Precondiciones: dos ramas.
+Datos: hoja y nuevo padre.
+Pasos: editar padre; guardar; expandir destino.
+Resultado esperado: hoja aparece solo bajo el nuevo padre.
+Evidencias: árbol y SELECT.
+Trazabilidad: CU 7 y 12.
+
+CP-C35-027 — Mover subárbol
+Estado: NO EJECUTADA
+Objetivo: mover una rama conservando descendientes.
+Precondiciones: nodo con hijas y destino válido.
+Datos: subárbol controlado.
+Pasos: cambiar padre del nodo; recargar.
+Resultado esperado: descendientes conservan relaciones y se desplazan con la rama.
+Evidencias: SELECT de IDs y capturas.
+Trazabilidad: CU 7.
+
+CP-C35-028 — Cancelar creación
+Estado: NO EJECUTADA
+Objetivo: no persistir un alta cancelada.
+Precondiciones: formulario de creación.
+Datos: campos modificados.
+Pasos: completar; Cancelar; confirmar descarte.
+Resultado esperado: ninguna fila nueva.
+Evidencias: conteo y captura.
+Trazabilidad: CU 10 y 12.
+
+CP-C35-029 — Cancelar edición
+Estado: NO EJECUTADA
+Objetivo: conservar valores originales.
+Precondiciones: acción existente.
+Datos: cambios no guardados.
+Pasos: editar; Cancelar; confirmar; recargar.
+Resultado esperado: datos originales intactos.
+Evidencias: SELECT antes/después.
+Trazabilidad: CU 10 y 12.
+
+CP-C35-030 — Cancelar eliminación
+Estado: NO EJECUTADA
+Objetivo: verificar confirmación segura.
+Precondiciones: hoja eliminable.
+Datos: ID y nombre conocidos.
+Pasos: pulsar eliminar; comprobar texto; Cancelar.
+Resultado esperado: registro permanece.
+Evidencias: diálogo y SELECT.
+Trazabilidad: CU 8.
+
+CP-C35-031 — Eliminar hoja
+Estado: NO EJECUTADA
+Objetivo: eliminar solo una acción sin dependencias.
+Precondiciones: SELECT previo confirma hoja libre.
+Datos: hoja aislada.
+Pasos: eliminar y confirmar; recargar.
+Resultado esperado: desaparece solo la acción.
+Evidencias: SELECT previo/posterior y auditoría.
+Trazabilidad: CU 8 y 12.
+
+CP-C35-032 — Rechazar eliminación con hijas
+Estado: NO EJECUTADA
+Objetivo: impedir borrado de rama.
+Precondiciones: acción padre.
+Datos: padre con al menos una hija.
+Pasos: intentar eliminar en UI y API.
+Resultado esperado: mensaje contractual; ninguna fila eliminada.
+Evidencias: respuesta y SELECT.
+Trazabilidad: CU 8, 9 y 10.
+
+CP-C35-033 — Rechazar eliminación referenciada
+Estado: NO EJECUTADA
+Objetivo: proteger referencias entrantes reales.
+Precondiciones: esquema real inspeccionado y acción referenciada.
+Datos: referencia impeditiva documentada.
+Pasos: intentar eliminar.
+Resultado esperado: rechazo con explicación; relaciones intactas.
+Evidencias: SHOW CREATE TABLE, SELECT y respuesta.
+Trazabilidad: CU 8, 9 y 10.
+
+CP-C35-034 — Proceso no eliminado
+Estado: NO EJECUTADA
+Objetivo: asegurar independencia de dim_proceso.
+Precondiciones: hoja asociada a proceso y eliminable.
+Datos: IDs de acción y proceso.
+Pasos: eliminar acción; consultar proceso.
+Resultado esperado: acción eliminada y proceso intacto.
+Evidencias: SELECT antes/después.
+Trazabilidad: CU 8 y 12.
+
+CP-C35-035 — Registro desaparecido
+Estado: NO EJECUTADA
+Objetivo: manejar edición/eliminación obsoleta.
+Precondiciones: dos clientes aislados.
+Datos: misma acción abierta.
+Pasos: eliminar con cliente A; guardar o eliminar con B.
+Resultado esperado: B informa inexistencia y actualiza árbol.
+Evidencias: respuestas y captura.
+Trazabilidad: CU 10.
+
+CP-C35-036 — Fallo al consultar acciones
+Estado: NO EJECUTADA
+Objetivo: diferenciar error de catálogo vacío.
+Precondiciones: catálogo visible y servicio interrumpible.
+Datos: última vista válida.
+Pasos: cortar servicio; Actualizar; restaurar; Reintentar.
+Resultado esperado: error explícito, datos válidos conservados y recuperación posterior.
+Evidencias: capturas y logs.
+Trazabilidad: CU 10 y 11.
+
+CP-C35-037 — Fallo al consultar procesos
+Estado: NO EJECUTADA
+Objetivo: no confundir fallo con catálogo vacío ni retirar asociación.
+Precondiciones: acción con proceso y endpoint de procesos fallando.
+Datos: asociación existente.
+Pasos: abrir edición durante el fallo.
+Resultado esperado: error específico; asociación vigente preservada.
+Evidencias: captura, respuesta y SELECT.
+Trazabilidad: CU 3, 10 y 11.
+
+CP-C35-038 — Fallo antes del commit
+Estado: NO EJECUTADA
+Objetivo: impedir falso éxito.
+Precondiciones: fallo controlado en base aislada.
+Datos: creación o edición válida.
+Pasos: provocar fallo antes de commit; guardar.
+Resultado esperado: mensaje de no guardado, formulario conservado y base intacta.
+Evidencias: logs y SELECT.
+Trazabilidad: CU 9, 10 y 11.
+
+CP-C35-039 — Commit confirmado y refresco fallido
+Estado: NO EJECUTADA
+Objetivo: no repetir escritura confirmada.
+Precondiciones: interceptar refresco posterior.
+Datos: cambio válido.
+Pasos: confirmar escritura; hacer fallar recarga; reintentar consulta.
+Resultado esperado: «Cambio guardado; pendiente actualizar la vista» y una sola escritura.
+Evidencias: auditoría, logs y conteo.
+Trazabilidad: CU 11.
+
+CP-C35-040 — Respuesta perdida sin duplicado
+Estado: NO EJECUTADA
+Objetivo: recuperar creación confirmada sin duplicarla.
+Precondiciones: pérdida de respuesta simulable.
+Datos: creación con identificador de solicitud.
+Pasos: perder respuesta tras commit; recuperar resultado; recargar.
+Resultado esperado: una sola acción creada y resultado identificable.
+Evidencias: auditoría, respuestas y SELECT.
+Trazabilidad: CU 6, 9 y 11.
+
+CP-C35-041 — Doble pulsación
+Estado: NO EJECUTADA
+Objetivo: impedir escrituras duplicadas desde Android.
+Precondiciones: latencia controlada.
+Datos: creación válida.
+Pasos: pulsar Guardar repetidamente.
+Resultado esperado: botón bloqueado durante solicitud y una sola fila.
+Evidencias: video, logs y conteo.
+Trazabilidad: CU 6 y 11.
+
+CP-C35-042 — Concurrencia de edición
+Estado: NO EJECUTADA
+Objetivo: evitar sobrescritura silenciosa.
+Precondiciones: dos clientes con la misma versión.
+Datos: cambios diferentes.
+Pasos: guardar A; intentar guardar B con estado obsoleto.
+Resultado esperado: conflicto o mecanismo explícito; no mezcla parcial.
+Evidencias: respuestas, auditoría y SELECT.
+Trazabilidad: CU 7 y 9.
+
+CP-C35-043 — Concurrencia padre/eliminación
+Estado: NO EJECUTADA
+Objetivo: mantener integridad ante operaciones simultáneas.
+Precondiciones: transacciones coordinadas.
+Datos: asignación de hija y eliminación del padre.
+Pasos: ejecutar simultáneamente; esperar commits.
+Resultado esperado: solo un resultado compatible; nunca referencia inválida.
+Evidencias: logs transaccionales y SELECT.
+Trazabilidad: CU 8 y 9.
+
+CP-C35-044 — Jerarquía inconsistente
+Estado: NO EJECUTADA
+Objetivo: mostrar huérfanos y ciclos sin bucle infinito.
+Precondiciones: fixture aislado documentado.
+Datos: padre ausente y ciclo preexistente.
+Pasos: abrir y actualizar árbol.
+Resultado esperado: todos los nodos visibles una vez, marcados inconsistentes, sin reparación automática.
+Evidencias: fixture, captura y tiempo de respuesta.
+Trazabilidad: CU 4.1 y 10.
+
+CP-C35-045 — Persistencia y reinicio
+Estado: NO EJECUTADA
+Objetivo: verificar datos confirmados después de reiniciar.
+Precondiciones: CRUD aislado completado.
+Datos: raíz, hija, edición y eliminación confirmadas.
+Pasos: cerrar app; reiniciar dispositivo/app; abrir y actualizar.
+Resultado esperado: árbol coincide con servidor.
+Evidencias: capturas y SELECT.
+Trazabilidad: CU 11 y 12.
+
+CP-C35-046 — Sin conexión y caché
+Estado: NO EJECUTADA
+Objetivo: comprobar lectura disponible y prohibición de escritura offline.
+Precondiciones: catálogo previamente consultado.
+Datos: dispositivo sin red.
+Pasos: abrir C35; intentar crear/editar/eliminar; reconectar.
+Resultado esperado: caché identificada si existe; escrituras rechazadas; al reconectar converge con servidor.
+Evidencias: video, estado de red y SELECT.
+Trazabilidad: CU 3, 10 y 11.
+
+CP-C35-047 — Regresión de Áreas y Procesos
+Estado: NO EJECUTADA
+Objetivo: confirmar que C35 no cambia C16 ni C29.
+Precondiciones: versión integrada y catálogos disponibles.
+Datos: datos reales en solo lectura o fixtures aislados.
+Pasos: recorrer Áreas y Administración Proceso; comparar contratos; volver a C35.
+Resultado esperado: árboles, controles, autorización y consultas funcionan sin regresión; dim_proceso no cambia por navegar C35.
+Evidencias: capturas, pruebas automatizadas y SELECT.
+Trazabilidad: CU 1, 4.1, 8 y 12.
+
+CP-C35-048 — Recorrido físico integral
+Estado: NO EJECUTADA
+Objetivo: acreditar C35 en el dispositivo autorizado.
+Precondiciones: APK candidata instalada conservando datos; backend aislado para CRUD.
+Datos: fixture C35 aislado y credencial válida.
+Pasos: abrir Navegación; crear raíz e hija; expandir/contraer; consultar; editar; mover rama; asociar/cambiar/retirar proceso; cancelar; rechazar eliminación de padre; eliminar hoja; reiniciar; probar sin conexión; finalmente verificar producción solo en lectura.
+Resultado esperado: recorrido completo conforme al CU; datos del dispositivo conservados; ninguna escritura de prueba en producción.
+Evidencias: capturas/video, versión, paquete, hash APK, SELECT aislado y verificación productiva de solo lectura.
+Trazabilidad: CU 3 a 12.
+
+4. CRITERIO DE CIERRE
+- Existen exactamente 48 casos numerados CP-C35-001 a CP-C35-048.
+- Ningún caso se declara aprobado sin ejecución y evidencia.
+- Todo defecto se corrige y repiten los casos afectados.
+- Producción permanece libre de fixtures C35.
+- Solo Patricia declara satisfactoria la validación física.

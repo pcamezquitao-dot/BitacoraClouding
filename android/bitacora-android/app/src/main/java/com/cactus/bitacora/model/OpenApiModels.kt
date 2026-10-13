@@ -444,6 +444,30 @@ data class ProcessAdminIn(
 
 data class ProcessDeleteOut(val id_proceso: Int, val mensaje: String)
 
+data class NavigationAdminOut(
+    val id_accion: Int,
+    val tipo_accion: Int,
+    val nombre: String,
+    val descripcion: String? = null,
+    val id_accion_padre: Int? = null,
+    val id_proceso: Int? = null,
+    val nombre_padre: String? = null,
+    val nombre_proceso: String? = null,
+    val fingerprint: String
+)
+
+data class NavigationAdminIn(
+    val tipo_accion: Int = 1,
+    val nombre: String,
+    val descripcion: String? = null,
+    val id_accion_padre: Int? = null,
+    val id_proceso: Int? = null,
+    val request_id: String,
+    val original_fingerprint: String? = null
+)
+
+data class NavigationDeleteOut(val id_accion: Int, val mensaje: String)
+
 data class Cu30CandidateOut(
     val id_actividad: Long, val nombre: String, val descripcion: String? = null,
     val coincidencias: List<String> = emptyList(), val diferencias: List<String> = emptyList(),

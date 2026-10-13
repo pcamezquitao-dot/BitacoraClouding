@@ -50,11 +50,14 @@ class AdminCatalogApiContractTest(unittest.TestCase):
             scheme="Bearer",
             credentials="secreto",
         )
-        with patch("app.core.admin_auth.settings.ADMIN_API_TOKEN", "secreto"):
+        with patch("app.core.admin_auth.settings.ADMIN_API_TOKEN", "secreto"), patch(
+            "app.core.admin_auth.settings.ADMIN_ACCESS_KEY", "clave-configurada"
+        ):
             identity = require_admin_access(
                 credentials,
                 "  responsable.catalogos  ",
                 "V2035-pruebas",
+                "clave-configurada",
             )
         self.assertEqual("responsable.catalogos", identity.actor)
         self.assertEqual("V2035-pruebas", identity.device)

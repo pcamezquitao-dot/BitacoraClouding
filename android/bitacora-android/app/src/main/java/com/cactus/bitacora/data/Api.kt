@@ -48,6 +48,9 @@ import com.cactus.bitacora.model.ActivityCatalogOut
 import com.cactus.bitacora.model.ProcessAdminIn
 import com.cactus.bitacora.model.ProcessAdminOut
 import com.cactus.bitacora.model.ProcessDeleteOut
+import com.cactus.bitacora.model.NavigationAdminIn
+import com.cactus.bitacora.model.NavigationAdminOut
+import com.cactus.bitacora.model.NavigationDeleteOut
 import com.cactus.bitacora.model.Cu30ApprovalOut
 import com.cactus.bitacora.model.Cu30VersionUpdate
 import com.cactus.bitacora.model.Cu30WorkCreate
@@ -72,6 +75,25 @@ object ApiConfig {
 }
 
 interface BitacoraApi {
+    @GET("admin/access/verify")
+    suspend fun verifyAdminAccess(
+        @Header("Authorization") authorization: String,
+        @Header("X-Admin-Actor") actor: String,
+        @Header("X-Admin-Device") device: String,
+        @Header("X-Admin-Key") accessKey: String
+    ): Response<ResponseBody>
+
+    @GET("admin/navegacion")
+    suspend fun getAdminNavigation(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String): List<NavigationAdminOut>
+
+    @POST("admin/navegacion")
+    suspend fun createAdminNavigation(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Body payload: NavigationAdminIn): NavigationAdminOut
+
+    @PUT("admin/navegacion/{id}")
+    suspend fun updateAdminNavigation(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: Int, @Body payload: NavigationAdminIn): NavigationAdminOut
+
+    @DELETE("admin/navegacion/{id}")
+    suspend fun deleteAdminNavigation(@Header("Authorization") authorization: String, @Header("X-Admin-Actor") actor: String, @Header("X-Admin-Device") device: String, @Path("id") id: Int): NavigationDeleteOut
     @Multipart
     @POST("admin/xml2er/validar")
     suspend fun validateXml2Er(

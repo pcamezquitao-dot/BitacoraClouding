@@ -1,0 +1,151 @@
+CU_C-35-Navegacion
+Nombre: Administrar el árbol de navegación.
+Actor principal: Administrador autorizado.
+Entidad: dim_accion.
+Objetivo: consultar, crear, editar y eliminar acciones organizadas jerárquicamente, mediante una interfaz de árbol similar a la administración de Áreas.
+
+1. Alcance
+El administrador podrá:
+- Visualizar y recorrer el árbol de acciones.
+- Expandir y contraer sus ramas.
+- Consultar los datos de una acción.
+- Crear acciones raíz o acciones hijas.
+- Modificar sus datos, su padre y su asociación con un proceso.
+- Eliminar acciones cuando las condiciones de integridad lo permitan.
+
+La asociación con un proceso es opcional. Este caso de uso administra la estructura de navegación; la ejecución del proceso asociado corresponde a un caso de uso independiente.
+
+2. Estructura de datos
+Campo | Definición | Comportamiento en el formulario
+id_accion | INT, clave primaria, autoincremental | Generado automáticamente. Visible y no editable.
+tipo_accion | INT, obligatorio, predeterminado 1 | En esta versión se asigna 1 y se muestra como no editable.
+nombre | VARCHAR(150), obligatorio | Editable; máximo 150 caracteres.
+descripcion | VARCHAR(200), opcional | Editable; máximo 200 caracteres.
+id_accion_padre | INT, opcional | Selección de una acción existente o «Sin padre».
+id_proceso | INT, opcional | Selección de un proceso existente o «Sin proceso asociado».
+
+Nota: tipo_accion = 1 se mantiene para esta versión mientras no se definan otros tipos y sus comportamientos.
+
+3. Precondiciones
+- El administrador está identificado y autorizado.
+- La tabla dim_accion está disponible.
+- El sistema puede consultar los procesos disponibles para su asociación.
+- Las operaciones de escritura requieren conexión con el servidor.
+
+4. Presentación de la pantalla
+Ruta: Administración → Administrar maestros → Navegación.
+
+La pantalla presenta:
+- Árbol jerárquico con sangría por nivel.
+- Control para expandir o contraer cada acción con hijos.
+- Nombre de cada acción.
+- Acción seleccionada visualmente resaltada.
+- Panel o formulario con los datos de la acción seleccionada.
+- Opciones Crear raíz, Crear hijo, Editar, Eliminar y Actualizar.
+
+Las acciones con id_accion_padre = NULL aparecen en el nivel raíz. Se admiten varias raíces. Los hermanos se ordenan por nombre y, en caso de igualdad, por id_accion. La estructura no contiene un campo para definir un orden manual.
+
+4.1. Contraste comprobado con C03_Áreas/C16 y Administración de Procesos
+El contraste se realizó contra `cells/C16_ADMINISTRACION_AREAS.md`, `AdminCatalogScreen.kt` y `ProcessAdminPanel.kt` de la base integrada `f0aa8bf`.
+
+Se reutilizan los patrones vigentes:
+- recorrido en preorden, padre seguido por descendientes;
+- sangría izquierda de 10 dp por nivel;
+- símbolos ▼ para rama expandida, ▶ para rama contraída y └─ para hoja;
+- controles por fila en orden: crear hijo, consultar, editar y eliminar;
+- iconos y colores vigentes para consultar, editar y eliminar;
+- creación raíz separada y creación de hijo desde la fila;
+- formularios con Guardar y Cancelar, sin perder datos ante errores;
+- confirmación de eliminación con identificador y nombre;
+- carga remota con error distinguible de catálogo vacío y opción Reintentar;
+- registros huérfanos o cíclicos visibles como inconsistentes, sin recorridos infinitos ni reparación automática;
+- escritura confirmada por servidor antes de informar éxito.
+
+C35 conserva sus reglas propias: `id_accion` autoincremental, `tipo_accion = 1`, nombres no únicos, descripción de 200 caracteres, padre y proceso opcionales mediante NULL, y asociación con `dim_proceso` sin ejecutar procesos.
+
+5. Flujo principal: consultar y navegar
+1. El administrador abre Navegación.
+2. El sistema consulta dim_accion y construye el árbol.
+3. El sistema muestra las acciones raíz.
+4. El administrador expande una acción.
+5. El sistema muestra sus hijos.
+6. El administrador selecciona una acción.
+7. El sistema muestra sus campos y, cuando exista, el nombre del proceso asociado.
+8. El administrador puede continuar navegando o elegir una operación.
+
+Resultado esperado: cada acción aparece una sola vez y en el nivel correspondiente a su padre. Al contraer una rama, todos sus descendientes quedan ocultos.
+
+6. Flujo: crear una acción
+1. El administrador elige Crear raíz o Crear hijo.
+2. Para raíz, id_accion_padre inicia en NULL; para hijo, inicia con la acción seleccionada.
+3. El formulario muestra identificador automático, tipo 1, nombre obligatorio, descripción opcional, padre seleccionable y proceso opcional.
+4. El administrador completa los datos y pulsa Guardar.
+5. El sistema valida campos y referencias, inserta la acción y obtiene el identificador generado.
+6. El sistema actualiza el árbol, selecciona la acción creada y abre sus antecesores.
+
+Resultado esperado: la nueva acción queda guardada y visible en su ubicación correspondiente.
+
+7. Flujo: editar una acción
+1. El administrador selecciona una acción y pulsa Editar.
+2. El sistema carga sus valores actuales.
+3. El administrador puede modificar nombre, descripción, padre y proceso asociado.
+4. Al Guardar, el sistema valida los cambios y rechaza relaciones circulares.
+5. El sistema guarda, actualiza el árbol y mantiene la acción seleccionada y visible.
+
+Resultado esperado: los cambios se reflejan en los datos y en el árbol. Si cambia el padre, sus descendientes conservan sus relaciones y se desplazan con la rama.
+
+8. Flujo: eliminar una acción
+1. El administrador selecciona una acción y pulsa Eliminar.
+2. El sistema comprueba que no tenga hijas ni referencias impeditivas.
+3. Solicita confirmación mostrando identificador y nombre.
+4. El administrador confirma.
+5. El sistema elimina únicamente la acción y actualiza el árbol.
+
+Resultado esperado: la eliminación no borra el proceso asociado ni registros relacionados.
+
+9. Reglas de negocio y validaciones
+- id_accion es generado automáticamente y no puede modificarse.
+- tipo_accion se mantiene en 1 durante esta versión.
+- nombre no puede estar vacío ni contener únicamente espacios; se recorta antes de guardar y admite hasta 150 caracteres.
+- descripcion admite hasta 200 caracteres; vacía se guarda como NULL.
+- id_accion_padre = NULL identifica una raíz; un padre informado debe existir.
+- Una acción no puede ser padre de sí misma ni depender de una descendiente.
+- id_proceso = NULL indica ausencia de proceso; un proceso informado debe existir en dim_proceso.
+- «Sin padre» y «Sin proceso asociado» guardan NULL, nunca 0.
+- No se permite eliminar acciones con hijas ni eliminar ramas en cascada.
+- No se exige unicidad del nombre.
+- Las validaciones se aplican también en el servidor.
+- Cada escritura es atómica.
+
+10. Flujos alternos y errores
+Situación | Respuesta esperada
+No existen acciones | Mostrar «No hay acciones de navegación registradas» y permitir crear una raíz.
+Nombre vacío o demasiado largo | Mostrar el error junto al campo y conservar el formulario.
+Descripción demasiado larga | Informar el límite de 200 caracteres, sin truncar silenciosamente.
+Padre inexistente o relación circular | Rechazar el cambio y explicar el motivo.
+Proceso inexistente | Rechazar la asociación y permitir seleccionar otro proceso o ninguno.
+Acción con hijas al eliminar | Mostrar «No se puede eliminar una acción que tiene acciones hijas».
+Acción referenciada | Informar que existen relaciones que impiden eliminarla.
+Registro inexistente | Informar y actualizar el árbol.
+Sin conexión o error del servidor | Informar que no se guardó y conservar los datos introducidos.
+Cancelar | Cerrar sin guardar; con cambios, solicitar confirmación para descartarlos.
+Jerarquía con ciclos o padres ausentes | Informar la inconsistencia y evitar recorridos infinitos u omisiones silenciosas.
+
+11. Persistencia y actualización
+El éxito se informa después de confirmar la escritura en el servidor. Luego se actualiza el estado local y el árbol con los datos confirmados.
+
+Si la escritura se confirma, pero falla la actualización local, se informa «Cambio guardado; pendiente actualizar la vista» y se permite reintentar la consulta sin repetir la escritura. Al actualizar el árbol se conservan, cuando sea posible, la selección y las ramas abiertas. C35 no habilita escrituras offline.
+
+12. Criterios de aceptación
+- Se pueden crear raíces y acciones hijas con y sin proceso asociado.
+- Los límites de 150 y 200 caracteres se respetan en interfaz y servidor.
+- La edición permite cambiar el padre sin generar ciclos.
+- «Sin proceso asociado» persiste como NULL.
+- Contraer una rama oculta todos sus descendientes.
+- Una acción con hijas no puede eliminarse.
+- Eliminar una acción no elimina su proceso asociado.
+- Cancelar o una validación fallida no modifica datos.
+- Un error de conexión no produce un mensaje de éxito.
+- Después de guardar y volver a consultar, el árbol coincide con los registros persistidos.
+
+Estado del documento: Definición funcional aprobada; pendiente de implementación y pruebas.

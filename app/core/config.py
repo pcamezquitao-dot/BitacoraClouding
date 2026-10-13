@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     FACE_TEMPLATE_API_TOKEN: str = ""
     FACE_TEMPLATE_MASTER_KEY: str = ""
     ADMIN_API_TOKEN: str = ""
+    ADMIN_ACCESS_KEY: str = ""
     # Prototipo C20A: debe habilitarse y configurarse solo en desarrollo.
     SUPERVISOR_DEV_AUTH_ENABLED: bool = False
     SUPERVISOR_TOKEN_SECRET: str = ""

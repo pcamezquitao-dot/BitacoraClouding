@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cactus.bitacora.R
@@ -102,6 +106,7 @@ private enum class AdminMasterSection {
     WORK_SCHEDULES,
     ACTIVITY_CATALOG,
     PROCESS_ADMIN,
+    NAVIGATION_ADMIN,
     NORMALIZE_PROCESS,
     XML2ER
 }
@@ -572,6 +577,43 @@ fun AdminCatalogScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    var accessKey by remember { mutableStateOf("") }
+    var accessGranted by remember { mutableStateOf(false) }
+    var accessLoading by remember { mutableStateOf(false) }
+    var accessError by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(repository) {
+        repository.clearProvisionalAdminAccess()
+        onDispose { repository.clearProvisionalAdminAccess() }
+    }
+
+    if (!accessGranted) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+            Text("Acceso a Administración de maestros", style = MaterialTheme.typography.titleLarge)
+            Text("Acceso provisional mediante clave compartida. No constituye autenticación individual ni protege contra la suplantación del participante.")
+            OutlinedTextField(
+                value = accessKey,
+                onValueChange = { accessKey = it.filter(Char::isDigit).take(32); accessError = null },
+                label = { Text("Clave administrativa") },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                singleLine = true, enabled = !accessLoading, modifier = Modifier.fillMaxWidth()
+            )
+            Button(enabled = accessKey.isNotBlank() && !accessLoading, modifier = Modifier.fillMaxWidth(), onClick = {
+                accessLoading = true; accessError = null
+                scope.launch {
+                    try {
+                        if (repository.verifyProvisionalAdminAccess(accessKey)) { accessKey = ""; accessGranted = true }
+                        else accessError = "Clave administrativa incorrecta"
+                    } catch (_: Exception) { accessError = "Clave incorrecta o servicio administrativo no disponible" }
+                    finally { accessLoading = false }
+                }
+            }) { Text(if (accessLoading) "Validando…" else "Ingresar") }
+            accessError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+        return
+    }
     var actor by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -1128,6 +1170,10 @@ fun AdminCatalogScreen(
             ) { Text("Administración Proceso") }
             Button(
                 modifier = Modifier.fillMaxWidth(),
+                onClick = { section = AdminMasterSection.NAVIGATION_ADMIN }
+            ) { Text("Navegación") }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
                 onClick = { section = AdminMasterSection.NORMALIZE_PROCESS }
             ) { Text("Normalizar proceso") }
             Button(
@@ -1160,6 +1206,7 @@ fun AdminCatalogScreen(
                         AdminMasterSection.PARTICIPANT_TYPES -> loadParticipantTypes()
                         AdminMasterSection.ACTIVITY_CATALOG -> Unit
                         AdminMasterSection.PROCESS_ADMIN -> Unit
+                        AdminMasterSection.NAVIGATION_ADMIN -> Unit
                         AdminMasterSection.NORMALIZE_PROCESS -> Unit
                         AdminMasterSection.XML2ER -> Unit
                         else -> refresh()
@@ -1184,6 +1231,10 @@ fun AdminCatalogScreen(
 
         if (section == AdminMasterSection.PROCESS_ADMIN) {
             ProcessAdminPanel(repository, actor)
+        }
+
+        if (section == AdminMasterSection.NAVIGATION_ADMIN) {
+            NavigationAdminPanel(repository, actor)
         }
 
         if (section == AdminMasterSection.NORMALIZE_PROCESS) {

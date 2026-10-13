@@ -1,0 +1,50 @@
+C35 — INFORME DE EJECUCIÓN PARCIAL
+Fecha: 2026-10-13
+Rama: C35-navegacion
+Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
+
+1. Documentación
+- CU aprobado, corregido y contrastado con C16/C03 y C29.
+- CP creado con 48 casos CP-C35-001 a CP-C35-048.
+- Los 48 casos comenzaron como NO EJECUTADA.
+
+2. Esquema comprobado
+- SHOW CREATE TABLE ejecutado en producción en modo solo lectura.
+- dim_accion coincide con el CU y tiene claves foráneas reales hacia sí misma y dim_proceso.
+- No se requirió migración.
+
+3. Pruebas automatizadas
+- Backend: 259 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- Android: suite productionDebug aprobada.
+- C35 Android: orden, contracción, descendientes e inconsistencias aprobados.
+- Regresiones focalizadas de Administración Proceso aprobadas.
+
+4. Entorno aislado
+- Base: bitacora_c35_test.
+- Respaldo previo: /srv/bitacora/db-backups/c35/20261013_143158/bitacora-before-c35.sql.
+- SHA-256 del respaldo: eb159bf0adc99381a8b9410458a5352e3f84bcc2f1e43ecaeae476864cc07c85.
+- Aprobados: creación raíz/hija, proceso opcional, NULL real, nombre de 150, rechazo de 151,
+  idempotencia sin duplicado, rechazo de ciclo, rechazo de eliminación con hija,
+  concurrencia optimista y auditoría.
+- Estado final aislado: dim_accion=0; permiso temporal del usuario técnico revocado.
+
+5. Producción
+- Backend desplegado con respaldo /srv/backups/c35-20261013_144309.
+- Salud, acceso administrativo y GET /admin/navegacion: HTTP 200.
+- Clave incorrecta y ausencia de clave: HTTP 401.
+- dim_accion permaneció en 0 filas; no se ejecutó CRUD productivo.
+
+6. V2035
+- Dispositivo: V2035, serial 3065397347006YM.
+- APK principal instalada mediante adb install -r, sin desinstalar ni borrar almacenamiento.
+- Versión: maria62-c35-navegacion; versionCode 62.
+- SHA-256 APK: 3FCA09F951A28D7EA52CA7D7FDE8A25378CF99C3C579CE842E997B711C37E60D.
+- Datos antes/después: 6450 KB.
+- Verificado físicamente: acceso con clave, actor de auditoría P0001, entrada Navegación,
+  consulta productiva y catálogo vacío coherente con MariaDB.
+- No se guardaron cambios en producción.
+
+7. Pendiente obligatorio
+- Ejecutar CP-C35-048 completo con CRUD desde Android contra una variante aislada.
+- Registrar individualmente los estados y evidencias finales de CP-C35-001 a CP-C35-048.
+- Solo Patricia puede declarar satisfactoria la validación física.

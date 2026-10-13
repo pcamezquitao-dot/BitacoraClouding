@@ -8,6 +8,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object NetworkClient {
+    @Volatile private var provisionalAdminKey: String = ""
+
+    fun setProvisionalAdminKey(value: String) { provisionalAdminKey = value.trim() }
+    fun clearProvisionalAdminKey() { provisionalAdminKey = "" }
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC
     }
@@ -17,6 +21,12 @@ object NetworkClient {
             .connectTimeout(AppConfig.CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(AppConfig.READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(AppConfig.WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val key = provisionalAdminKey
+                val protectedPath = request.url.encodedPath.contains("/admin/")
+                chain.proceed(if (protectedPath && key.isNotEmpty()) request.newBuilder().header("X-Admin-Key", key).build() else request)
+            }
             .addInterceptor(loggingInterceptor)
             .build()
     }

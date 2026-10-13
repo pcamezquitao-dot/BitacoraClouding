@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import androidx.room.withTransaction
 import com.cactus.bitacora.BuildConfig
+import com.cactus.bitacora.api.NetworkClient
 import com.cactus.bitacora.feature.testdata.GeneratedTestBitacoraBatch
 import com.cactus.bitacora.feature.testdata.TestBitacoraAccessPolicy
 import com.cactus.bitacora.feature.testdata.TestBitacoraConflictPolicy
@@ -38,6 +39,7 @@ import com.cactus.bitacora.model.ParticipantTypeStatusIn
 import com.cactus.bitacora.model.ActivityCatalogIn
 import com.cactus.bitacora.model.ProcessAdminIn
 import com.cactus.bitacora.model.ProcessAdminOut
+import com.cactus.bitacora.model.NavigationAdminIn
 import com.cactus.bitacora.model.Cu30Definition
 import com.cactus.bitacora.model.Cu30VersionUpdate
 import com.cactus.bitacora.model.Cu30WorkCreate
@@ -345,6 +347,21 @@ class BitacoraRepository(
 
     suspend fun retireAdminParticipant(actor: String, id: Int) =
         api.retireAdminParticipant(actor.trim(), Build.MODEL, id)
+
+    suspend fun verifyProvisionalAdminAccess(accessKey: String): Boolean {
+        val normalized = accessKey.trim()
+        if (normalized.isEmpty()) return false
+        val response = api.verifyAdminAccess(adminAuthorization(), "ACCESO-PROVISIONAL", Build.MODEL, normalized)
+        if (response.isSuccessful) NetworkClient.setProvisionalAdminKey(normalized)
+        return response.isSuccessful
+    }
+
+    fun clearProvisionalAdminAccess() = NetworkClient.clearProvisionalAdminKey()
+
+    suspend fun adminNavigation(actor: String) = api.getAdminNavigation(adminAuthorization(), actor.trim(), Build.MODEL)
+    suspend fun createAdminNavigation(actor: String, payload: NavigationAdminIn) = api.createAdminNavigation(adminAuthorization(), actor.trim(), Build.MODEL, payload)
+    suspend fun updateAdminNavigation(actor: String, id: Int, payload: NavigationAdminIn) = api.updateAdminNavigation(adminAuthorization(), actor.trim(), Build.MODEL, id, payload)
+    suspend fun deleteAdminNavigation(actor: String, id: Int) = api.deleteAdminNavigation(adminAuthorization(), actor.trim(), Build.MODEL, id)
 
     suspend fun adminParticipantTypes(actor: String) =
         api.getAdminParticipantTypes(
