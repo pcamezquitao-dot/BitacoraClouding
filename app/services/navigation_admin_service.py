@@ -118,10 +118,15 @@ def create_action(db: Session, payload: NavigationWrite, identity: AdminIdentity
 
 
 def update_action(db: Session, action_id: int, payload, identity: AdminIdentity) -> dict:
-    before = get_action(db, action_id)
-    if before is None:
+    locked = db.execute(
+        text("SELECT id_accion FROM dim_accion WHERE id_accion=:id FOR UPDATE"),
+        {"id": action_id},
+    ).first()
+    if locked is None:
         raise NavigationNotFound("La acción ya no está disponible")
+    before = get_action(db, action_id)
     if before["fingerprint"] != payload.original_fingerprint:
+        db.rollback()
         raise NavigationConflict("La acción cambió mientras se editaba; actualice")
     values = _values(payload)
     _validate_links(db, values, action_id)

@@ -40,6 +40,7 @@ def test_router_and_service_preserve_authorization_audit_and_integrity():
     assert "WITH RECURSIVE descendants" in service
     assert "administracion_catalogo_auditoria" in service
     assert "DELETE FROM dim_accion WHERE id_accion=:id" in service
+    assert "FOR UPDATE" in service
     assert "DELETE FROM dim_proceso" not in service
 
 

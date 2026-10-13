@@ -1,6 +1,7 @@
 CP-C35 — ADMINISTRACIÓN DEL ÁRBOL DE NAVEGACIÓN
 Versión: 01
 Estado inicial de todos los casos: NO EJECUTADA
+Estado final: 46 APROBADAS y 2 NO APLICA justificadas; 0 NO EJECUTADAS.
 Fuente: docs/casos_de_uso/CU_C35-Navegacion.txt
 
 1. OBJETIVO
@@ -17,7 +18,7 @@ Verificar integralmente la consulta y administración jerárquica de dim_accion 
 3. CASOS DE PRUEBA
 
 CP-C35-001 — Acceso autorizado y ruta
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: comprobar acceso por Administración → Administrar maestros → Navegación.
 Precondiciones: servidor disponible; administrador autorizado.
 Datos: credencial administrativa válida.
@@ -27,7 +28,7 @@ Evidencias: captura y respuesta de consulta sin secretos.
 Trazabilidad: CU 3, 4 y 5.
 
 CP-C35-002 — Rechazo sin autorización
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: verificar autorización en interfaz y servidor.
 Precondiciones: participante sin permiso y cliente API.
 Datos: solicitud sin credencial administrativa.
@@ -37,7 +38,7 @@ Evidencias: respuestas 401/403 y SELECT antes/después.
 Trazabilidad: CU 3 y 9.
 
 CP-C35-003 — Catálogo vacío
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: distinguir catálogo vacío de error.
 Precondiciones: base aislada sin acciones.
 Datos: ninguna fila.
@@ -47,7 +48,7 @@ Evidencias: captura y consulta de conteo.
 Trazabilidad: CU 4 y 10.
 
 CP-C35-004 — Consulta del catálogo
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: comparar pantalla, API y dim_accion.
 Precondiciones: jerarquía controlada cargada.
 Datos: varias raíces, hijas y nietas.
@@ -57,7 +58,7 @@ Evidencias: JSON, SELECT y captura.
 Trazabilidad: CU 5 y 12.
 
 CP-C35-005 — Orden de raíces y hermanas
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: validar orden por nombre y luego id_accion.
 Precondiciones: nombres desordenados y duplicados.
 Datos: raíces y hermanas con igual nombre.
@@ -67,7 +68,7 @@ Evidencias: lista esperada/observada.
 Trazabilidad: CU 4 y 9.
 
 CP-C35-006 — Expansión de rama
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: mostrar descendientes al expandir.
 Precondiciones: rama de tres niveles.
 Datos: raíz, hija y nieta.
@@ -77,7 +78,7 @@ Evidencias: capturas antes/después.
 Trazabilidad: CU 4, 4.1 y 5.
 
 CP-C35-007 — Contracción recursiva visible
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: ocultar todos los descendientes.
 Precondiciones: rama completamente expandida.
 Datos: rama de tres niveles.
@@ -87,7 +88,7 @@ Evidencias: captura y SELECT.
 Trazabilidad: CU 5 y 12.
 
 CP-C35-008 — Selección resaltada y detalle
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: verificar selección y consulta completa.
 Precondiciones: acción con padre y proceso.
 Datos: fila conocida.
@@ -97,7 +98,7 @@ Evidencias: captura y comparación con API.
 Trazabilidad: CU 4 y 5.
 
 CP-C35-009 — Crear raíz mínima
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: crear una raíz con datos mínimos.
 Precondiciones: entorno aislado y acceso autorizado.
 Datos: nombre válido; descripción, padre y proceso vacíos.
@@ -107,7 +108,7 @@ Evidencias: respuesta, SELECT y captura.
 Trazabilidad: CU 6 y 9.
 
 CP-C35-010 — Crear hija
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: crear una acción bajo la seleccionada.
 Precondiciones: raíz existente.
 Datos: nombre y padre raíz.
@@ -117,7 +118,7 @@ Evidencias: respuesta, árbol y SELECT.
 Trazabilidad: CU 6.
 
 CP-C35-011 — Crear con proceso
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: asociar un proceso existente.
 Precondiciones: proceso válido disponible.
 Datos: id_proceso existente.
@@ -127,7 +128,7 @@ Evidencias: SELECT conjunto y captura.
 Trazabilidad: CU 2, 6 y 9.
 
 CP-C35-012 — Identificador inmutable
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: comprobar que id_accion no se edita.
 Precondiciones: acción existente.
 Datos: ID asignado.
@@ -137,7 +138,7 @@ Evidencias: UI, respuesta y SELECT.
 Trazabilidad: CU 2 y 9.
 
 CP-C35-013 — Tipo fijo en 1
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: validar tipo_accion.
 Precondiciones: creación y edición disponibles.
 Datos: tipo 1 y valores distintos por API.
@@ -147,7 +148,7 @@ Evidencias: respuestas y SELECT.
 Trazabilidad: CU 2 y 9.
 
 CP-C35-014 — Nombre obligatorio
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: rechazar vacío y solo espacios.
 Precondiciones: formulario abierto.
 Datos: vacío y espacios.
@@ -157,7 +158,7 @@ Evidencias: captura, respuesta y conteo.
 Trazabilidad: CU 9 y 10.
 
 CP-C35-015 — Nombre, trim y límite
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: validar 150 caracteres.
 Precondiciones: entorno aislado.
 Datos: 150, 151 y nombre con espacios extremos.
@@ -167,7 +168,7 @@ Evidencias: respuestas y SELECT.
 Trazabilidad: CU 2 y 9.
 
 CP-C35-016 — Nombres duplicados
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: confirmar que no se exige unicidad.
 Precondiciones: acción existente.
 Datos: mismo nombre bajo igual y distinto padre.
@@ -177,7 +178,7 @@ Evidencias: SELECT y árbol.
 Trazabilidad: CU 4 y 9.
 
 CP-C35-017 — Descripción opcional y NULL
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: guardar descripción vacía como NULL.
 Precondiciones: formulario disponible.
 Datos: vacío y espacios.
@@ -187,7 +188,7 @@ Evidencias: SELECT.
 Trazabilidad: CU 2 y 9.
 
 CP-C35-018 — Límite de descripción
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: validar 200 caracteres sin truncar.
 Precondiciones: entorno aislado.
 Datos: textos de 200 y 201 caracteres.
@@ -197,7 +198,7 @@ Evidencias: capturas, respuestas y SELECT.
 Trazabilidad: CU 2, 9 y 10.
 
 CP-C35-019 — Padre NULL
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: convertir una acción en raíz.
 Precondiciones: acción hija sin dependencias impeditivas.
 Datos: selector «Sin padre».
@@ -207,7 +208,7 @@ Evidencias: SELECT y árbol.
 Trazabilidad: CU 7 y 9.
 
 CP-C35-020 — Proceso NULL
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: retirar asociación sin usar cero.
 Precondiciones: acción con proceso.
 Datos: «Sin proceso asociado».
@@ -217,7 +218,7 @@ Evidencias: SELECT de ambas tablas.
 Trazabilidad: CU 7, 9 y 12.
 
 CP-C35-021 — Padre inexistente
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: rechazar referencia inválida.
 Precondiciones: cliente API.
 Datos: id_accion_padre inexistente.
@@ -227,7 +228,7 @@ Evidencias: respuestas y SELECT antes/después.
 Trazabilidad: CU 9 y 10.
 
 CP-C35-022 — Proceso inexistente
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: rechazar proceso inválido.
 Precondiciones: cliente API.
 Datos: id_proceso inexistente.
@@ -237,7 +238,7 @@ Evidencias: respuestas y SELECT.
 Trazabilidad: CU 9 y 10.
 
 CP-C35-023 — Autoparentesco
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: impedir que una acción sea su propio padre.
 Precondiciones: acción existente.
 Datos: padre igual al ID.
@@ -247,7 +248,7 @@ Evidencias: UI, respuesta y SELECT.
 Trazabilidad: CU 7 y 9.
 
 CP-C35-024 — Ciclo con descendiente
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: impedir ciclos indirectos.
 Precondiciones: raíz, hija y nieta.
 Datos: asignar nieta como padre de raíz.
@@ -257,7 +258,7 @@ Evidencias: selector, respuesta y árbol.
 Trazabilidad: CU 7, 9 y 10.
 
 CP-C35-025 — Edición válida
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: modificar nombre, descripción y proceso.
 Precondiciones: acción existente.
 Datos: valores válidos nuevos.
@@ -267,7 +268,7 @@ Evidencias: respuesta, SELECT y captura.
 Trazabilidad: CU 7.
 
 CP-C35-026 — Mover hoja
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: cambiar el padre de una hoja.
 Precondiciones: dos ramas.
 Datos: hoja y nuevo padre.
@@ -277,7 +278,7 @@ Evidencias: árbol y SELECT.
 Trazabilidad: CU 7 y 12.
 
 CP-C35-027 — Mover subárbol
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: mover una rama conservando descendientes.
 Precondiciones: nodo con hijas y destino válido.
 Datos: subárbol controlado.
@@ -287,7 +288,7 @@ Evidencias: SELECT de IDs y capturas.
 Trazabilidad: CU 7.
 
 CP-C35-028 — Cancelar creación
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: no persistir un alta cancelada.
 Precondiciones: formulario de creación.
 Datos: campos modificados.
@@ -297,7 +298,7 @@ Evidencias: conteo y captura.
 Trazabilidad: CU 10 y 12.
 
 CP-C35-029 — Cancelar edición
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: conservar valores originales.
 Precondiciones: acción existente.
 Datos: cambios no guardados.
@@ -307,7 +308,7 @@ Evidencias: SELECT antes/después.
 Trazabilidad: CU 10 y 12.
 
 CP-C35-030 — Cancelar eliminación
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: verificar confirmación segura.
 Precondiciones: hoja eliminable.
 Datos: ID y nombre conocidos.
@@ -317,7 +318,7 @@ Evidencias: diálogo y SELECT.
 Trazabilidad: CU 8.
 
 CP-C35-031 — Eliminar hoja
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: eliminar solo una acción sin dependencias.
 Precondiciones: SELECT previo confirma hoja libre.
 Datos: hoja aislada.
@@ -327,7 +328,7 @@ Evidencias: SELECT previo/posterior y auditoría.
 Trazabilidad: CU 8 y 12.
 
 CP-C35-032 — Rechazar eliminación con hijas
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: impedir borrado de rama.
 Precondiciones: acción padre.
 Datos: padre con al menos una hija.
@@ -337,7 +338,7 @@ Evidencias: respuesta y SELECT.
 Trazabilidad: CU 8, 9 y 10.
 
 CP-C35-033 — Rechazar eliminación referenciada
-Estado: NO EJECUTADA
+Estado: NO APLICA
 Objetivo: proteger referencias entrantes reales.
 Precondiciones: esquema real inspeccionado y acción referenciada.
 Datos: referencia impeditiva documentada.
@@ -347,7 +348,7 @@ Evidencias: SHOW CREATE TABLE, SELECT y respuesta.
 Trazabilidad: CU 8, 9 y 10.
 
 CP-C35-034 — Proceso no eliminado
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: asegurar independencia de dim_proceso.
 Precondiciones: hoja asociada a proceso y eliminable.
 Datos: IDs de acción y proceso.
@@ -357,7 +358,7 @@ Evidencias: SELECT antes/después.
 Trazabilidad: CU 8 y 12.
 
 CP-C35-035 — Registro desaparecido
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: manejar edición/eliminación obsoleta.
 Precondiciones: dos clientes aislados.
 Datos: misma acción abierta.
@@ -367,7 +368,7 @@ Evidencias: respuestas y captura.
 Trazabilidad: CU 10.
 
 CP-C35-036 — Fallo al consultar acciones
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: diferenciar error de catálogo vacío.
 Precondiciones: catálogo visible y servicio interrumpible.
 Datos: última vista válida.
@@ -377,7 +378,7 @@ Evidencias: capturas y logs.
 Trazabilidad: CU 10 y 11.
 
 CP-C35-037 — Fallo al consultar procesos
-Estado: NO EJECUTADA
+Estado: NO APLICA
 Objetivo: no confundir fallo con catálogo vacío ni retirar asociación.
 Precondiciones: acción con proceso y endpoint de procesos fallando.
 Datos: asociación existente.
@@ -387,7 +388,7 @@ Evidencias: captura, respuesta y SELECT.
 Trazabilidad: CU 3, 10 y 11.
 
 CP-C35-038 — Fallo antes del commit
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: impedir falso éxito.
 Precondiciones: fallo controlado en base aislada.
 Datos: creación o edición válida.
@@ -397,7 +398,7 @@ Evidencias: logs y SELECT.
 Trazabilidad: CU 9, 10 y 11.
 
 CP-C35-039 — Commit confirmado y refresco fallido
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: no repetir escritura confirmada.
 Precondiciones: interceptar refresco posterior.
 Datos: cambio válido.
@@ -407,7 +408,7 @@ Evidencias: auditoría, logs y conteo.
 Trazabilidad: CU 11.
 
 CP-C35-040 — Respuesta perdida sin duplicado
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: recuperar creación confirmada sin duplicarla.
 Precondiciones: pérdida de respuesta simulable.
 Datos: creación con identificador de solicitud.
@@ -417,7 +418,7 @@ Evidencias: auditoría, respuestas y SELECT.
 Trazabilidad: CU 6, 9 y 11.
 
 CP-C35-041 — Doble pulsación
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: impedir escrituras duplicadas desde Android.
 Precondiciones: latencia controlada.
 Datos: creación válida.
@@ -427,7 +428,7 @@ Evidencias: video, logs y conteo.
 Trazabilidad: CU 6 y 11.
 
 CP-C35-042 — Concurrencia de edición
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: evitar sobrescritura silenciosa.
 Precondiciones: dos clientes con la misma versión.
 Datos: cambios diferentes.
@@ -437,7 +438,7 @@ Evidencias: respuestas, auditoría y SELECT.
 Trazabilidad: CU 7 y 9.
 
 CP-C35-043 — Concurrencia padre/eliminación
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: mantener integridad ante operaciones simultáneas.
 Precondiciones: transacciones coordinadas.
 Datos: asignación de hija y eliminación del padre.
@@ -447,7 +448,7 @@ Evidencias: logs transaccionales y SELECT.
 Trazabilidad: CU 8 y 9.
 
 CP-C35-044 — Jerarquía inconsistente
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: mostrar huérfanos y ciclos sin bucle infinito.
 Precondiciones: fixture aislado documentado.
 Datos: padre ausente y ciclo preexistente.
@@ -457,7 +458,7 @@ Evidencias: fixture, captura y tiempo de respuesta.
 Trazabilidad: CU 4.1 y 10.
 
 CP-C35-045 — Persistencia y reinicio
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: verificar datos confirmados después de reiniciar.
 Precondiciones: CRUD aislado completado.
 Datos: raíz, hija, edición y eliminación confirmadas.
@@ -467,7 +468,7 @@ Evidencias: capturas y SELECT.
 Trazabilidad: CU 11 y 12.
 
 CP-C35-046 — Sin conexión y caché
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: comprobar lectura disponible y prohibición de escritura offline.
 Precondiciones: catálogo previamente consultado.
 Datos: dispositivo sin red.
@@ -477,7 +478,7 @@ Evidencias: video, estado de red y SELECT.
 Trazabilidad: CU 3, 10 y 11.
 
 CP-C35-047 — Regresión de Áreas y Procesos
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: confirmar que C35 no cambia C16 ni C29.
 Precondiciones: versión integrada y catálogos disponibles.
 Datos: datos reales en solo lectura o fixtures aislados.
@@ -487,7 +488,7 @@ Evidencias: capturas, pruebas automatizadas y SELECT.
 Trazabilidad: CU 1, 4.1, 8 y 12.
 
 CP-C35-048 — Recorrido físico integral
-Estado: NO EJECUTADA
+Estado: APROBADA
 Objetivo: acreditar C35 en el dispositivo autorizado.
 Precondiciones: APK candidata instalada conservando datos; backend aislado para CRUD.
 Datos: fixture C35 aislado y credencial válida.
@@ -496,7 +497,61 @@ Resultado esperado: recorrido completo conforme al CU; datos del dispositivo con
 Evidencias: capturas/video, versión, paquete, hash APK, SELECT aislado y verificación productiva de solo lectura.
 Trazabilidad: CU 3 a 12.
 
-4. CRITERIO DE CIERRE
+4. REGISTRO INDIVIDUAL DE EJECUCIÓN — 2026-10-13
+Entorno común: paquete com.cactus.bitacora.c35test; URL /bitacora-c35-test/;
+base efectiva bitacora_c35_test; V2035 3065397347006YM; versión 62. Los secretos
+no forman parte de las evidencias. La base aislada terminó con dim_accion=0.
+
+- CP-C35-001 — APROBADA. Ruta física y acceso con clave aceptados. Evidencia: c35-048-01-url.png y c35-048-02-empty.png.
+- CP-C35-002 — APROBADA. Sin clave, sin token y clave incorrecta devolvieron 401 sin cambios. Evidencia: integration_c35_isolated.py, unauthorized_statuses=[401,401,401].
+- CP-C35-003 — APROBADA. Pantalla distinguió catálogo vacío y mostró Crear raíz. Evidencia: c35-048-02-empty.png; conteo SQL/API=0.
+- CP-C35-004 — APROBADA. API, SELECT y árbol físico coincidieron. Evidencia: c35-048-04-expanded.png y consultas de IDs 32,33,34.
+- CP-C35-005 — APROBADA. Orden nombre/ID comprobado con duplicados. Evidencia: integration_c35_isolated.py y NavigationAdminPolicyTest.
+- CP-C35-006 — APROBADA. Rama expandida mostró hija indentada. Evidencia: c35-048-04-expanded.png.
+- CP-C35-007 — APROBADA. Contracción ocultó la hija sin eliminarla. Evidencia: c35-048-05-collapsed.png y GET posterior.
+- CP-C35-008 — APROBADA. Consulta física mostró ID, padre y proceso correctos. Evidencia: diálogo físico y GET /admin/navegacion/33.
+- CP-C35-009 — APROBADA. Raíz mínima guardó tipo 1 y NULL reales. Evidencia: ID 32, c35-048-03-root.png y GET aislado.
+- CP-C35-010 — APROBADA. Hija ID 33 creada bajo raíz 32 y rama abierta. Evidencia: c35-048-04-expanded.png.
+- CP-C35-011 — APROBADA. Hija asociada físicamente a Enfermedad_Laboral, id_proceso=19. Evidencia: GET aislado de ID 33.
+- CP-C35-012 — APROBADA. ID visible como automático/no editable y rechazado fuera del contrato. Evidencia: formulario físico y validación Pydantic.
+- CP-C35-013 — APROBADA. Tipo fijo 1; tipo 2 devolvió 422. Evidencia: validation_statuses del recorrido API.
+- CP-C35-014 — APROBADA. Nombre vacío devolvió 422 y no creó fila. Evidencia: recorrido API y conteos previo/posterior.
+- CP-C35-015 — APROBADA. 150 aceptado, 151 rechazado y trim comprobado. Evidencia: recorrido API aislado.
+- CP-C35-016 — APROBADA. Duplicados guardados y ordenados por ID. Evidencia: dos IDs distintos en integration_c35_isolated.py.
+- CP-C35-017 — APROBADA. Descripción vacía/espacios persistió NULL. Evidencia: GET/SELECT aislado.
+- CP-C35-018 — APROBADA. 200 aceptado y 201 rechazado 422, sin truncamiento. Evidencia: recorrido API.
+- CP-C35-019 — APROBADA. Hija convertida en raíz con id_accion_padre NULL. Evidencia: recorrido API.
+- CP-C35-020 — APROBADA. Asociación física a proceso 19 retirada y persistida como NULL. Evidencia: GET de ID 33.
+- CP-C35-021 — APROBADA. Padre inexistente rechazado 409 atómicamente. Evidencia: validation_statuses y conteos.
+- CP-C35-022 — APROBADA. Proceso inexistente rechazado 409. Evidencia: validation_statuses y SELECT dim_proceso.
+- CP-C35-023 — APROBADA. Autoparentesco rechazado 409. Evidencia: cycle_statuses=[409,409].
+- CP-C35-024 — APROBADA. Ciclo indirecto con descendiente rechazado 409. Evidencia: cycle_statuses=[409,409].
+- CP-C35-025 — APROBADA. Edición física conservó ID 33 y cambió nombre, padre y proceso. Evidencia: GET aislado y c35-048-06-concurrency.png.
+- CP-C35-026 — APROBADA. Hoja movida de raíz A a B y apareció una sola vez. Evidencia: GET id_accion_padre=34 y recorrido físico.
+- CP-C35-027 — APROBADA. Movimiento de subárbol conservó nieta en prueba API. Evidencia: tree_ids y SELECT de relaciones.
+- CP-C35-028 — APROBADA. Creación CP-C35-FISICO-CANCELADA no persistió. Evidencia: formulario cancelado y GET sin coincidencias.
+- CP-C35-029 — APROBADA. Edición cancelada conservó valores previos. Evidencia: GET antes/después del intento físico.
+- CP-C35-030 — APROBADA. Eliminación cancelada conservó raíz B. Evidencia: c35-048-07-delete-cancel.png y GET posterior.
+- CP-C35-031 — APROBADA. Hoja ID 33 eliminada; GET posterior=404. Evidencia: c35-048-09-leaf-deleted.png.
+- CP-C35-032 — APROBADA. Raíz B con hija rechazó eliminación 409. Evidencia: c35-048-08-parent-blocked.png.
+- CP-C35-033 — NO APLICA. KEY_COLUMN_USAGE no contiene referencia entrante a dim_accion distinta de su FK jerárquica, ya cubierta por CP-C35-032; no existe fixture real adicional que probar.
+- CP-C35-034 — APROBADA. Eliminar acción asociada no alteró proceso 19. Evidencia: process_19_unchanged=true.
+- CP-C35-035 — APROBADA. Segundo cliente recibió 404 para registro ya eliminado. Evidencia: GET /33 posterior a eliminación.
+- CP-C35-036 — APROBADA. Sin red se mostró error explícito y se conservó formulario/datos. Evidencia: c35-048-11-offline.png.
+- CP-C35-037 — NO APLICA. Acciones y procesos comparten el mismo servicio/host y no existe mecanismo autorizado para interrumpir solo /admin/procesos; no se alteró proxy ni código para fabricar el escenario.
+- CP-C35-038 — APROBADA. Excepción previa al commit hizo rollback y dejó conteo intacto. Evidencia: prueba de servicio aislada y SELECT posterior.
+- CP-C35-039 — APROBADA. Escritura confirmada seguida de refresco fallido mostró aviso y la recuperación manual no duplicó. Evidencia: aviso físico y GET único.
+- CP-C35-040 — APROBADA. Reenvío con request_id devolvió el mismo ID. Evidencia: idempotent_id del recorrido API y una sola auditoría CREAR.
+- CP-C35-041 — APROBADA. Doble pulsación física produjo una sola fila. Evidencia: ID 33 único y conteo posterior.
+- CP-C35-042 — APROBADA tras corrección. Carrera real devolvió [200,409]; intento obsoleto físico también fue rechazado. Evidencia: concurrent_edit_statuses y c35-048-06-concurrency.png.
+- CP-C35-043 — APROBADA. Carrera crear-hija/eliminar-padre devolvió [200,409] sin huérfanos. Evidencia: concurrent_parent_delete_statuses y limpieza final.
+- CP-C35-044 — APROBADA. Huérfano se mostró una vez como inconsistente, sin bucle. Evidencia: NavigationAdminPolicyTest.orphanRemainsVisibleAsInconsistent.
+- CP-C35-045 — APROBADA. Tras force-stop/reinicio reaparecieron raíces A y B. Evidencia: c35-048-10-restart.png y GET aislado.
+- CP-C35-046 — APROBADA. Wi-Fi/datos desactivados: escritura rechazada, formulario conservado, cero filas offline; reconexión y salud restauradas. Evidencia: c35-048-11-offline.png.
+- CP-C35-047 — APROBADA. Áreas y Procesos cargaron físicamente en solo lectura y sus suites pasaron. Evidencia: c35-047-areas.png, c35-047-processes.png y suite completa.
+- CP-C35-048 — APROBADA TÉCNICAMENTE. Recorrido físico completo ejecutado en V2035; APK/test DB aislados, fixtures limpiados y producción leída sin tocar SUPERVISOR ID 1. Evidencia: serie c35-048-01 a c35-048-11, hash APK e informe final.
+
+5. CRITERIO DE CIERRE
 - Existen exactamente 48 casos numerados CP-C35-001 a CP-C35-048.
 - Ningún caso se declara aprobado sin ejecución y evidencia.
 - Todo defecto se corrige y repiten los casos afectados.

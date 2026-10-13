@@ -88,6 +88,12 @@ android {
             manifestPlaceholders["appLabel"] = "Bitacora C33 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c33-test/\"")
         }
+        create("c35test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c35test"
+            manifestPlaceholders["appLabel"] = "Bitacora C35 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c35-test/\"")
+        }
         create("facial1") {
             dimension = "edition"
             applicationId = "com.cactus.bitacora.facial1"

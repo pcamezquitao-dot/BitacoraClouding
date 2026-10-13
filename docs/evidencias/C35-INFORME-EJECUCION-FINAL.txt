@@ -1,0 +1,95 @@
+C35 — INFORME DE EJECUCIÓN FINAL
+Fecha: 2026-10-13
+Rama: C35-navegacion
+Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
+
+1. Documentación
+- CU aprobado, corregido y contrastado con C16/C03 y C29.
+- CP creado con 48 casos CP-C35-001 a CP-C35-048.
+- Los 48 casos comenzaron como NO EJECUTADA.
+
+2. Esquema comprobado
+- SHOW CREATE TABLE ejecutado en producción en modo solo lectura.
+- dim_accion coincide con el CU y tiene claves foráneas reales hacia sí misma y dim_proceso.
+- No se requirió migración.
+
+3. Pruebas automatizadas
+- Backend: 259 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- Android: suite productionDebug aprobada.
+- C35 Android: orden, contracción, descendientes e inconsistencias aprobados.
+- Regresiones focalizadas de Administración Proceso aprobadas.
+
+4. Entorno aislado
+- Base: bitacora_c35_test.
+- Respaldo previo: /srv/bitacora/db-backups/c35/20261013_143158/bitacora-before-c35.sql.
+- SHA-256 del respaldo: eb159bf0adc99381a8b9410458a5352e3f84bcc2f1e43ecaeae476864cc07c85.
+- Aprobados: creación raíz/hija, proceso opcional, NULL real, nombre de 150, rechazo de 151,
+  idempotencia sin duplicado, rechazo de ciclo, rechazo de eliminación con hija,
+  concurrencia optimista y auditoría.
+- Estado final aislado: dim_accion=0; el usuario técnico conserva solo los permisos
+  necesarios para que el servicio aislado permanezca operativo.
+
+5. Producción
+- Backend desplegado con respaldo /srv/backups/c35-20261013_144309.
+- Salud, acceso administrativo y GET /admin/navegacion: HTTP 200.
+- Clave incorrecta y ausencia de clave: HTTP 401.
+- En la primera verificación dim_accion estaba vacía. En la continuación apareció
+  la fila real ID 1, SUPERVISOR, auditada por P0001 desde V2035; se protegió y no se
+  ejecutó CRUD productivo durante CP-C35-048.
+
+6. V2035
+- Dispositivo: V2035, serial 3065397347006YM.
+- APK principal instalada mediante adb install -r, sin desinstalar ni borrar almacenamiento.
+- Versión: maria62-c35-navegacion; versionCode 62.
+- SHA-256 APK: 3FCA09F951A28D7EA52CA7D7FDE8A25378CF99C3C579CE842E997B711C37E60D.
+- Datos antes/después: 6450 KB.
+- Verificado físicamente: acceso con clave, actor de auditoría P0001, entrada Navegación,
+  consulta productiva y catálogo vacío coherente con MariaDB.
+- No se guardaron cambios en producción.
+
+7. Resultado del ciclo físico y documental
+- CP-C35-001 a CP-C35-048 quedaron registrados individualmente: 46 APROBADAS y
+  2 NO APLICA justificadas (CP-C35-033 y CP-C35-037).
+- CP-C35-048 se ejecutó físicamente en V2035 contra paquete y base aislados:
+  creación raíz/hija, expansión/contracción, edición, movimiento, asociación y
+  retiro de proceso, cancelaciones, bloqueo de padre, eliminación de hoja,
+  reinicio y desconexión/reconexión.
+- Evidencias gráficas: docs/evidencias/C35/c35-048-01-url.png a
+  c35-048-11-offline.png, más c35-047-areas.png y c35-047-processes.png.
+- Solo Patricia puede declarar formalmente satisfactoria la validación física.
+
+8. Continuación aislada de 2026-10-13
+- Variante Android: c35test; paquete com.cactus.bitacora.c35test.
+- URL efectiva: https://161-22-47-89.sslip.io/bitacora-c35-test/.
+- Servicio: bitacora-c35-test.service, 127.0.0.1:8017, activo.
+- Base comprobada desde el proceso: bitacora_c35_test; conteo inicial y final dim_accion=0.
+- Separación: paquete, directorio de datos, URL, puerto y base distintos de producción.
+- APK c35test instalada en paralelo, versión maria62-c35-navegacion, versionCode 62.
+- SHA-256 APK c35test: 15EF8F70FEAE0373211CE8F4FD2FEBE0E8F29595B507AF8DDE3E182B27E6FFDE.
+- Prueba Android c35testDebug y compilación: BUILD SUCCESSFUL.
+- Recorrido API aislado: acceso inválido 401; validaciones 422/409; ciclos 409;
+  padre con hijas 409; concurrencia de edición 200/409; idempotencia sin duplicado;
+  dim_proceso 19 sin cambios; auditoría conservada; limpieza final comprobada.
+- Suite backend repetida: 259 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- El bloqueo temporal de pantalla fue resuelto por Patricia y el recorrido físico continuó.
+- Diferencia productiva de solo lectura: dim_accion contiene ID 1, nombre SUPERVISOR,
+  auditado como creación por P0001 desde V2035. No se modificó ni eliminó.
+
+9. Defecto encontrado y corrección
+- Defecto: dos ediciones exactamente simultáneas podían leer la misma huella antes
+  de que una confirmara, permitiendo dos respuestas exitosas.
+- Corrección: update_action bloquea la fila con SELECT ... FOR UPDATE antes de
+  recalcular y comparar la huella; una carrera real devuelve 200/409.
+- Regresión concurrente padre/eliminación: 200/409, sin referencia huérfana.
+- El servicio aislado fue actualizado y la repetición completa terminó aprobada,
+  con dim_accion=0 y dim_proceso 19 sin cambios.
+
+10. Despliegue y verificación productiva final
+- Respaldo de la corrección concurrente:
+  /srv/backups/c35-20261013_170300/navigation_admin_service.py.
+- bitacora-api.service quedó activo y /bitacora/health respondió status=ok.
+- La aplicación principal com.cactus.bitacora se abrió físicamente en V2035.
+- Navegación cargó en lectura la única fila productiva SUPERVISOR, ID 1.
+- dim_proceso 19 continuó como Enfermedad_Laboral.
+- No se ejecutó POST, PUT ni DELETE contra producción.
+- Evidencia: docs/evidencias/C35/c35-final-production-readonly.png.
