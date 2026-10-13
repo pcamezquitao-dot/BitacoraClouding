@@ -244,6 +244,17 @@ interface BitacoraApi {
         @Body payload: com.cactus.bitacora.model.WorkerIdentifyIn
     ): com.cactus.bitacora.model.WorkerSessionOut
 
+    @POST("portal-general/identificar")
+    suspend fun identifyPortal(
+        @Body payload: com.cactus.bitacora.model.PortalIdentifyIn
+    ): com.cactus.bitacora.model.PortalOut
+
+    @GET("portal-general/{code}/opciones/{actionId}")
+    suspend fun openPortalOption(
+        @Path("code") code: String,
+        @Path("actionId") actionId: Int
+    ): com.cactus.bitacora.model.PortalItemOut
+
     @GET("trabajador/{code}/tiempo")
     suspend fun getWorkerTime(
         @Path("code") code: String,

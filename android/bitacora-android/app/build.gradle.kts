@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 63
-        versionName = "maria63-c35-navegacion"
+        versionCode = 64
+        versionName = "maria64-c34-portal-general"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",
@@ -93,6 +93,12 @@ android {
             applicationId = "com.cactus.bitacora.c35test"
             manifestPlaceholders["appLabel"] = "Bitacora C35 Pruebas"
             buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c35-test/\"")
+        }
+        create("c34test") {
+            dimension = "edition"
+            applicationId = "com.cactus.bitacora.c34test"
+            manifestPlaceholders["appLabel"] = "Bitacora C34 Pruebas"
+            buildConfigField("String", "API_BASE_URL", "\"https://161-22-47-89.sslip.io/bitacora-c34-test/\"")
         }
         create("facial1") {
             dimension = "edition"

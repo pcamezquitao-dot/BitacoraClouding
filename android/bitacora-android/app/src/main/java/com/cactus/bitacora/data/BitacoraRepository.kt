@@ -125,6 +125,12 @@ class BitacoraRepository(
         }
     }
 
+    suspend fun identifyPortal(reference: String): com.cactus.bitacora.model.PortalOut =
+        api.identifyPortal(com.cactus.bitacora.model.PortalIdentifyIn(normalizeCatalogCode(reference)))
+
+    suspend fun openPortalOption(code: String, actionId: Int): com.cactus.bitacora.model.PortalItemOut =
+        api.openPortalOption(normalizeCatalogCode(code), actionId)
+
     suspend fun identifyManagement(reference: String): com.cactus.bitacora.model.ManagementSessionOut {
         val local = referenceCatalogRepository.localManagementSession(reference)
         return try {

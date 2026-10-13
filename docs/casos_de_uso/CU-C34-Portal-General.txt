@@ -1,0 +1,69 @@
+CU-C34 — PORTAL GENERAL
+Versión: 01
+Estado: Definición funcional aprobada; pendiente de pruebas e implantación física.
+
+1. OBJETIVO
+Permitir que un participante activo se identifique por su código y consulte un portal construido desde su tipo activo y el árbol real dim_accion. El portal presenta las opciones hijas de una raíz única, resuelve sus procesos y flujos BPM mediante relaciones reales y ofrece una única entrada final a Tareas BPM.
+
+2. ACTOR
+Participante identificado y activo con exactamente un tipo_participante activo. La identidad podrá recibirse más adelante desde reconocimiento facial, QR o huella, pero esos mecanismos no forman parte de C34.
+
+3. PRECONDICIONES
+- Backend disponible para identificar y autorizar.
+- participante, empleado_area, tipos_participante, dim_accion y dim_proceso disponibles.
+- Para destinos BPM, la relación se obtiene mediante bpm_etapa.id_etapa → dim_proceso.id_proceso y bpm_etapa.id_bpm_proceso → bpm_proceso.id_bpm_proceso.
+- No se presupone igualdad entre id_proceso e id_bpm_proceso.
+
+4. REGLAS
+- El participante se busca por participante.identificacion_participante y debe estar activo.
+- Debe tener exactamente un tipo activo obtenido por empleado_area.cargo → tipos_participante.codigo. Cero tipos rechaza la identificación; varios tipos producen error de configuración.
+- La raíz cumple dim_accion.nombre = tipos_participante.descripcion, sin distinguir mayúsculas ni espacios extremos, e id_accion_padre IS NULL.
+- Debe existir una sola raíz. Cero raíces y raíces duplicadas se informan de forma diferente.
+- dim_accion.id_accion es la PK; dim_accion.id_accion_padre referencia esa PK.
+- Se muestran solamente los hijos directos de la raíz, ordenados de forma estable por nombre normalizado y luego id_accion.
+- Cada pulsación vuelve a validar identidad, pertenencia de la opción al portal y destino en el servidor.
+- Una opción puede informar: sin proceso, proceso inexistente, sin flujo BPM, flujo ambiguo, flujo inactivo o disponible.
+- Abrir o consultar el portal no crea bpm_caso ni ejecuta operaciones BPM.
+- Tareas BPM aparece una sola vez, al final, aun con raíz ausente, duplicada, vacía o fallo del menú mientras la identidad siga válida.
+- La bandeja BPM conserva las restricciones vigentes por identidad, responsable, ejecutor y rol.
+- Al cambiar de participante se eliminan de memoria portal, opción seleccionada, mensajes y tareas visibles de la sesión anterior.
+
+5. PRESENTACIÓN
+- Ruta: pantalla inicial → Portal General.
+- Identificación por código y acción Continuar.
+- Opciones en botones cuadrados medianos, dos por fila, tamaño uniforme, separación de 12 dp, superficie completa pulsable y texto multilínea sin truncamiento.
+- Desplazamiento vertical.
+- Tareas BPM ocupa una sola posición final con el mismo lenguaje visual.
+- La consulta de una opción muestra proceso, flujo BPM, estado y la advertencia de que no se crea un caso.
+
+6. FLUJO PRINCIPAL
+1. El usuario abre Portal General e ingresa su código.
+2. El servidor valida participante, vigencia y tipo activo.
+3. Busca la raíz única y sus hijos directos.
+4. Resuelve cada id_proceso y su pertenencia a bpm_proceso a través de bpm_etapa.
+5. Android muestra las opciones en dos columnas y Tareas BPM al final.
+6. Al pulsar una opción, el servidor revalida acceso y devuelve su destino.
+7. El usuario puede cerrar la consulta sin crear casos o abrir Tareas BPM con su misma identidad.
+
+7. ALTERNOS Y EXCEPCIONES
+- Código vacío: validación local.
+- Participante inexistente/inactivo o sin tipo activo: rechazo 403.
+- Más de un tipo activo: error 409 de configuración.
+- Raíz ausente, duplicada o sin hijos: mensaje específico; Tareas BPM permanece disponible.
+- Referencia o destino inválido: error específico, sin ejecutar acciones.
+- Fallo de consulta: error; no se presenta como menú vacío.
+- Acceso ajeno: el endpoint de destino rechaza opciones fuera de la raíz vigente.
+- Bandeja sin tareas: “No tiene tareas pendientes”.
+
+8. ONLINE/OFFLINE
+La identificación y el menú requieren confirmación del servidor en C34; no se persiste un menú por participante. Un fallo de red conserva únicamente la vista válida en memoria para la misma identidad y no mezcla participantes. Tareas BPM reutiliza su almacenamiento y sincronización offline actuales. Ninguna operación se anuncia como confirmada hasta recibir confirmación del servidor.
+
+9. RESULTADOS
+- Portal consistente con el tipo y la navegación configurada.
+- Autorización nuevamente validada al abrir el destino.
+- Cero creación automática de casos.
+- Bandeja BPM única y accesible con identidad vigente.
+
+10. TRAZABILIDAD
+CP-C34-001 a CP-C34-024 verifican identificación, configuración, presentación, destinos, autorización, tareas, aislamiento de identidad, offline, regresiones y ausencia de efectos de escritura.
+

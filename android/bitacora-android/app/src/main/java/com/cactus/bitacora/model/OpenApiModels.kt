@@ -117,6 +117,32 @@ data class ControlSupervisorTotalsOut(
     val jornadas_incompletas: Int
 )
 data class WorkerIdentifyIn(val codigo: String)
+data class PortalIdentifyIn(val codigo: String)
+data class PortalParticipantOut(
+    val id_participante: Int,
+    val codigo: String,
+    val nombre_completo: String,
+    val tipo_codigo: Int,
+    val tipo_descripcion: String
+)
+data class PortalItemOut(
+    val id_accion: Int,
+    val nombre: String,
+    val descripcion: String? = null,
+    val id_proceso: Int? = null,
+    val nombre_proceso: String? = null,
+    val id_bpm_proceso: Long? = null,
+    val nombre_bpm: String? = null,
+    val bpm_activo: Boolean = false,
+    val estado_destino: String
+)
+data class PortalOut(
+    val participante: PortalParticipantOut,
+    val id_raiz: Int? = null,
+    val estado_menu: String,
+    val mensaje_menu: String? = null,
+    val opciones: List<PortalItemOut> = emptyList()
+)
 data class WorkerSessionOut(
     val id_participante: Int,
     val codigo: String,

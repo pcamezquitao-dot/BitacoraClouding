@@ -1,0 +1,102 @@
+CP-C34 — PORTAL GENERAL
+Versión: 01
+Fuente: docs/casos_de_uso/CU-C34-Portal-General.txt
+Estado de ejecución: resultados registrados individualmente; véase C34-INFORME-EJECUCION.txt.
+
+Formato de cada caso: objetivo; precondiciones; datos; pasos; resultado esperado; evidencias; trazabilidad.
+
+CP-C34-001 — Identificación válida
+Estado: APROBADA
+Objetivo: aceptar participante activo con un tipo activo. Precondiciones: fixture aislado. Datos: código válido. Pasos: identificar. Resultado esperado: identidad, tipo y portal correctos. Evidencias: respuesta y SELECT. Trazabilidad: CU 2, 3, 4 y 6.
+
+CP-C34-002 — Código vacío
+Estado: APROBADA
+Objetivo: validar entrada. Precondiciones: pantalla abierta. Datos: vacío. Pasos: Continuar. Resultado esperado: mensaje local; sin solicitud. Evidencias: prueba UI. Trazabilidad: CU 7.
+
+CP-C34-003 — Participante inexistente
+Estado: APROBADA
+Objetivo: rechazar identidad desconocida. Precondiciones: aislado. Datos: código inexistente. Pasos: identificar. Resultado esperado: 403 específico. Evidencias: respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-004 — Participante inactivo
+Estado: APROBADA
+Objetivo: rechazar vigencia terminada. Precondiciones: fixture inactivo. Datos: código inactivo. Pasos: identificar. Resultado esperado: 403. Evidencias: SELECT y respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-005 — Tipo activo y raíz
+Estado: APROBADA
+Objetivo: comprobar correspondencia por descripción. Precondiciones: una asignación y raíz. Datos: nombres con diferencias de caja. Pasos: identificar. Resultado esperado: raíz única correcta. Evidencias: SELECT y JSON. Trazabilidad: CU 3, 4 y 6.
+
+CP-C34-006 — Sin tipo activo
+Estado: APROBADA
+Objetivo: impedir portal sin tipo. Precondiciones: participante sin asignación. Datos: código válido. Pasos: identificar. Resultado esperado: 403. Evidencias: respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-007 — Múltiples tipos activos
+Estado: APROBADA
+Objetivo: evitar elegir tipo por inferencia. Precondiciones: dos tipos activos. Datos: participante ambiguo. Pasos: identificar. Resultado esperado: 409 configuración. Evidencias: SELECT y respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-008 — Raíz ausente
+Estado: APROBADA
+Objetivo: distinguir configuración ausente. Precondiciones: tipo sin raíz. Datos: rol. Pasos: identificar. Resultado esperado: RAIZ_AUSENTE y Tareas BPM disponible. Evidencias: JSON/UI. Trazabilidad: CU 4, 6 y 7.
+
+CP-C34-009 — Raíz duplicada
+Estado: APROBADA
+Objetivo: rechazar ambigüedad. Precondiciones: dos raíces del mismo nombre. Datos: IDs distintos. Pasos: identificar. Resultado esperado: RAIZ_DUPLICADA. Evidencias: JSON/SELECT. Trazabilidad: CU 4 y 7.
+
+CP-C34-010 — Raíz sin hijos
+Estado: APROBADA
+Objetivo: mostrar menú vacío real. Precondiciones: raíz única. Datos: cero hijos. Pasos: identificar. Resultado esperado: SIN_HIJOS, no error de consulta. Evidencias: JSON/UI. Trazabilidad: CU 4, 6 y 7.
+
+CP-C34-011 — Orden estable
+Estado: APROBADA
+Objetivo: verificar nombre e ID. Precondiciones: hijos desordenados/duplicados. Datos: nombres. Pasos: consultar. Resultado esperado: orden estable. Evidencias: JSON. Trazabilidad: CU 4 y 5.
+
+CP-C34-012 — Cuadrícula y texto largo
+Estado: APROBADA
+Objetivo: verificar dos cuadrados por fila y texto multilínea. Precondiciones: tres hijos, uno largo. Datos: etiquetas. Pasos: renderizar. Resultado esperado: filas 2+1, texto completo y scroll. Evidencias: prueba Android/captura emulador. Trazabilidad: CU 5.
+
+CP-C34-013 — Sin proceso
+Estado: APROBADA
+Objetivo: distinguir opción sin proceso. Precondiciones: hijo id_proceso NULL. Datos: acción. Pasos: pulsar. Resultado esperado: rechazo específico sin caso. Evidencias: 409/SELECT. Trazabilidad: CU 4 y 7.
+
+CP-C34-014 — Proceso inexistente
+Estado: APROBADA
+Objetivo: distinguir referencia inválida. Precondiciones: fixture controlado. Datos: referencia inválida. Pasos: abrir. Resultado esperado: error específico. Evidencias: respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-015 — Proceso sin flujo BPM
+Estado: APROBADA
+Objetivo: no asumir igualdad de IDs. Precondiciones: dim_proceso sin bpm_etapa. Datos: proceso. Pasos: abrir. Resultado esperado: 409 sin flujo. Evidencias: SELECT/JSON. Trazabilidad: CU 3, 4 y 7.
+
+CP-C34-016 — Flujo BPM válido
+Estado: APROBADA
+Objetivo: resolver relaciones reales. Precondiciones: bpm_etapa enlaza proceso y BPM activo. Datos: IDs diferentes. Pasos: consultar/abrir. Resultado esperado: DISPONIBLE con ambos IDs. Evidencias: SELECT/JSON. Trazabilidad: CU 3, 4 y 6.
+
+CP-C34-017 — Flujo ambiguo o inactivo
+Estado: APROBADA
+Objetivo: rechazar configuración no ejecutable. Precondiciones: dos BPM o BPM inactivo. Datos: proceso. Pasos: abrir. Resultado esperado: error específico. Evidencias: respuesta. Trazabilidad: CU 4 y 7.
+
+CP-C34-018 — Acceso ajeno
+Estado: APROBADA
+Objetivo: validar autorización servidor. Precondiciones: dos portales. Datos: identidad A/opción B. Pasos: abrir. Resultado esperado: 403. Evidencias: respuesta. Trazabilidad: CU 4 y 6.
+
+CP-C34-019 — No crear caso al abrir
+Estado: APROBADA
+Objetivo: impedir efecto automático. Precondiciones: opción válida. Datos: conteo bpm_caso. Pasos: identificar y abrir. Resultado esperado: conteo sin cambio. Evidencias: SELECT antes/después. Trazabilidad: CU 4, 6 y 9.
+
+CP-C34-020 — Tareas BPM única y final
+Estado: APROBADA
+Objetivo: evitar duplicados. Precondiciones: menú con/sin opción equivalente. Datos: portal. Pasos: renderizar. Resultado esperado: una entrada final. Evidencias: prueba fuente/UI. Trazabilidad: CU 4 y 5.
+
+CP-C34-021 — Bandeja sin tareas
+Estado: APROBADA
+Objetivo: mensaje contractual. Precondiciones: actor sin tareas. Datos: identidad. Pasos: abrir Tareas. Resultado esperado: “No tiene tareas pendientes”. Evidencias: prueba/regresión BPM. Trazabilidad: CU 4 y 7.
+
+CP-C34-022 — Cambio de participante
+Estado: APROBADA
+Objetivo: evitar mezcla. Precondiciones: dos identidades. Datos: menús diferentes. Pasos: A, cambiar, B. Resultado esperado: solo datos B. Evidencias: prueba de estado. Trazabilidad: CU 4 y 8.
+
+CP-C34-023 — Fallo, offline y recuperación
+Estado: APROBADA
+Objetivo: diferenciar fallo de vacío y preservar aislamiento. Precondiciones: vista válida y endpoint interrumpible. Datos: misma identidad. Pasos: fallar, reintentar y recuperar. Resultado esperado: error explícito; Tareas conserva comportamiento offline; recuperación sin duplicados. Evidencias: pruebas/logs. Trazabilidad: CU 7 y 8.
+
+CP-C34-024 — Regresiones e integración
+Estado: APROBADA
+Objetivo: proteger identificación, navegación y BPM. Precondiciones: suites disponibles. Datos: variantes production/c34test. Pasos: ejecutar pruebas y compilar. Resultado esperado: suites y APK exitosos. Evidencias: salidas/hash. Trazabilidad: CU completo.

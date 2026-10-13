@@ -1,0 +1,51 @@
+C34 — PORTAL GENERAL — INFORME DE EJECUCIÓN
+Fecha: 2026-10-13
+Rama: C34-portal-general
+Base: bitacora_c34_test
+Backend aislado: https://161-22-47-89.sslip.io/bitacora-c34-test/
+Paquete Android: com.cactus.bitacora.c34test
+
+AISLAMIENTO COMPROBADO
+- Servicio dedicado bitacora-c34-test, puerto interno 8018 y base efectiva bitacora_c34_test.
+- Paquete y URL diferentes de producción. No se desplegó ni escribió en producción.
+- Fixture reservado 934xx; producción no contiene acciones del rango reservado.
+- Conteo final bpm_caso=0. Abrir una opción no creó casos.
+
+RESULTADOS INDIVIDUALES
+CP-C34-001 APROBADA — HTTP 200; identidad, tipo y portal del fixture activo.
+CP-C34-002 APROBADA — prueba de fuente Android verifica rechazo local de requested.isBlank().
+CP-C34-003 APROBADA — código inexistente rechazado con 403.
+CP-C34-004 APROBADA — participante vencido rechazado con 403.
+CP-C34-005 APROBADA — raíz resuelta por descripción normalizada; JSON y fixture coinciden.
+CP-C34-006 APROBADA — participante sin tipo activo rechazado con 403.
+CP-C34-007 APROBADA — dos tipos activos producen 409, sin selección inferida.
+CP-C34-008 APROBADA — raíz ausente produce RAIZ_AUSENTE y conserva el portal para Tareas BPM.
+CP-C34-009 APROBADA — dos raíces producen RAIZ_DUPLICADA.
+CP-C34-010 APROBADA — raíz sin hijos produce SIN_HIJOS, no error de consulta.
+CP-C34-011 APROBADA — orden HTTP estable por nombre normalizado e ID: 93414, 93412, 93411, 93413.
+CP-C34-012 APROBADA AUTOMATIZADA — prueba Android confirma cuadrícula 2+1, orden y texto sin límite; APK compilada. Verificación visual no ejecutada: no había emulador ni dispositivo ADB disponible y la instalación física estaba excluida.
+CP-C34-013 APROBADA — acción con id_proceso NULL produce SIN_PROCESO y apertura 409.
+CP-C34-014 APROBADA — prueba unitaria cubre PROCESO_INEXISTENTE; la FK real impide fabricar esa inconsistencia en el esquema íntegro.
+CP-C34-015 APROBADA — proceso sin relación en bpm_etapa produce SIN_FLUJO_BPM y apertura 409.
+CP-C34-016 APROBADA — relación real bpm_etapa resolvió id_proceso 93421 a id_bpm_proceso 93431, IDs distintos.
+CP-C34-017 APROBADA — pruebas parametrizadas cubren FLUJO_BPM_AMBIGUO y FLUJO_BPM_INACTIVO.
+CP-C34-018 APROBADA — opción ajena al portal se rechazó con 403 tras revalidación servidor.
+CP-C34-019 APROBADA — bpm_caso permaneció en 0 antes y después de identificar y abrir.
+CP-C34-020 APROBADA — prueba Android confirma una única entrada Tareas BPM, colocada después de opciones.
+CP-C34-021 APROBADA — bandeja aislada vacía y texto contractual “No tiene tareas pendientes” verificado en regresión.
+CP-C34-022 APROBADA — prueba de fuente confirma limpieza de portal y selección antes de solicitar otra identidad.
+CP-C34-023 APROBADA — servicio C34 detenido: HTTP 502 esperado; reinicio e integración posterior aprobados sin duplicados (8 acciones fixture, 0 casos).
+CP-C34-024 APROBADA — pytest completo y pruebas/compilación Android de c34test y production aprobadas.
+
+EVIDENCIA CONSOLIDADA
+- Backend: 271 passed, 2 skipped preexistentes, 17 subtests passed.
+- Integración HTTP: portal OK, 4 opciones, BPM válido 93431, cero escrituras.
+- Recuperación: 502 durante interrupción exclusiva; integración aprobada tras reinicio.
+- Android: testC34testDebugUnitTest, testProductionDebugUnitTest y assembleC34testDebug: BUILD SUCCESSFUL.
+- APK: app-c34test-debug.apk; SHA-256 5D7B9E16BE8A2C68F9B91002DE04A07919055D94F66740481E1A66C3A97DF5B5.
+
+LIMITACIÓN DECLARADA
+No se realizó captura visual ni validación física porque no había destino ADB disponible y la orden excluyó instalar o probar en el celular. No se atribuye evidencia física.
+
+CONCLUSIÓN
+C34 — Portal General construido y probado en entorno aislado; pendiente de implantación y validación física en el celular.

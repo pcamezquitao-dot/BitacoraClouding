@@ -44,6 +44,7 @@ from app.routers.xml2er import router as xml2er_router
 from app.routers.bpm_motor import router as bpm_motor_router
 from app.routers.navigation_admin import router as navigation_admin_router
 from app.routers.admin_access import router as admin_access_router
+from app.routers.portal_general import router as portal_general_router
 from app.services.evidencia_file_service import evidencia_root
 from app.services.audio_transcription_service import recover_pending_transcriptions
 
@@ -97,6 +98,7 @@ app.include_router(xml2er_router)
 app.include_router(bpm_motor_router)
 app.include_router(navigation_admin_router)
 app.include_router(admin_access_router)
+app.include_router(portal_general_router)
 
 
 # Conserva la política operativa del backend principal: la recuperación masiva

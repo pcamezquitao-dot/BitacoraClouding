@@ -152,6 +152,7 @@ internal enum class AppEnvironment(val label: String) {
     TRABAJADOR("Trabajador"),
     GERENCIA("Gerencia"),
     MOTOR_BPM("Motor BPM"),
+    PORTAL_GENERAL("Portal General"),
     SEGUIMIENTO_SATELITAL("Seguimiento satelital de embalses")
 }
 
@@ -286,6 +287,7 @@ fun BitacoraApp() {
             activeEnvironment == AppEnvironment.TRABAJADOR ||
             activeEnvironment == AppEnvironment.GERENCIA
             || activeEnvironment == AppEnvironment.MOTOR_BPM
+            || activeEnvironment == AppEnvironment.PORTAL_GENERAL
         ) {
             try {
                 repository.checkHealth()
@@ -401,6 +403,10 @@ fun BitacoraApp() {
             }
             if (environment == AppEnvironment.MOTOR_BPM) {
                 BpmMotorScreen(onExit = ::changeEnvironment)
+                return@Column
+            }
+            if (environment == AppEnvironment.PORTAL_GENERAL) {
+                PortalGeneralScreen(repository = repository, onExit = ::changeEnvironment)
                 return@Column
             }
 
@@ -665,6 +671,10 @@ private fun EnvironmentSelectionScreen(onSelect: (AppEnvironment) -> Unit) {
     ) {
         Text("Bitácora", style = MaterialTheme.typography.headlineSmall)
         Text("Seleccione cómo desea ingresar", style = MaterialTheme.typography.titleLarge)
+        Button(
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            onClick = { onSelect(AppEnvironment.PORTAL_GENERAL) }
+        ) { Text("Portal General") }
         Button(
             modifier = Modifier.fillMaxWidth().height(72.dp),
             onClick = { onSelect(AppEnvironment.ADMINISTRADOR) }
