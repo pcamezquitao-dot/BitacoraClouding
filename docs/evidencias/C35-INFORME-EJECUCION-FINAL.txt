@@ -93,3 +93,11 @@ Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
 - dim_proceso 19 continuó como Enfermedad_Laboral.
 - No se ejecutó POST, PUT ni DELETE contra producción.
 - Evidencia: docs/evidencias/C35/c35-final-production-readonly.png.
+
+11. Integración y control de versiones
+- Commit funcional y de evidencias: 3c81ac2e71a77f5d7e15b240a660cadc8294e1de.
+- Rama C35-navegacion enviada a GitHub.
+- Integración fast-forward, sin conflictos, sobre la rama principal vigente
+  C33-supervisor-rh; ambas referencias remotas quedaron en el mismo commit.
+- No se creó ni movió tag: las invariantes reservan el tag estable para una
+  declaración formal de validación de Patricia.
