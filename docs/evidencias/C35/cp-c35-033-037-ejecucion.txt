@@ -1,0 +1,40 @@
+EJECUCIÓN CP-C35-033 Y CP-C35-037
+Fecha: 2026-10-13
+Entorno autorizado: com.cactus.bitacora.c35test / bitacora_c35_test
+URL: https://161-22-47-89.sslip.io/bitacora-c35-test/
+
+CP-C35-033 — Rechazar eliminación referenciada
+- Definición conservada sin cambios.
+- Esquema real: fk_dim_accion_padre, dim_accion.id_accion_padre -> dim_accion.id_accion.
+- Fixture: padre ID 66 e hijo ID 67, exclusivamente en bitacora_c35_test.
+- DELETE del padre: HTTP 409.
+- Comprobación posterior: padre e hijo presentes; hijo.id_accion_padre=66.
+- Limpieza: DELETE hijo, DELETE padre; fixtures restantes=0.
+- Auditoría: CREAR IDs 66/67 y ELIMINAR IDs 67/66, actor CP-C35-033,
+  dispositivo V2035.
+- Resultado: APROBADA.
+
+CP-C35-037 — Fallo al consultar procesos
+- Definición conservada sin cambios.
+- Fixture: acción ID 68 asociada a dim_proceso ID 19, Enfermedad_Laboral.
+- Fallo controlado: GET /bitacora-c35-test/admin/procesos -> HTTP 503.
+- Separación durante el fallo:
+  GET /bitacora-c35-test/admin/navegacion -> HTTP 200.
+  GET /bitacora/health -> HTTP 200.
+- Resultado físico en V2035: se mostró “Fallo controlado CP-C35-037 al consultar
+  procesos”; la acción ID 68 permaneció visible; al abrir edición se conservó
+  “Proceso: Enfermedad_Laboral”. No se guardaron cambios desde el editor.
+- Recuperación: restauración de Nginx, nginx -t exitoso, ambos endpoints aislados
+  en HTTP 200 y desaparición del aviso al actualizar.
+- Limpieza: acción ID 68 eliminada; GET posterior=404; fixtures CP-C35-03%=0.
+- Auditoría: CREAR y ELIMINAR ID 68, actor CP-C35-037, dispositivo V2035.
+- Resultado: APROBADA tras corregir el aviso omitido en Android.
+
+Controles de cierre
+- APK c35test: maria63-c35-navegacion, versionCode 63.
+- APK principal actualizada con adb install -r: maria63-c35-navegacion,
+  versionCode 63; no se desinstaló ni se borró almacenamiento.
+- No se ejecutaron POST, PUT ni DELETE en producción.
+- No se mostraron ni registraron credenciales.
+- Regresión backend completa: 260 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- Pruebas Android productionDebug y c35testDebug: BUILD SUCCESSFUL.

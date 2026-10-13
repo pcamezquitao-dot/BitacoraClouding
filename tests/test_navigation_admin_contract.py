@@ -48,3 +48,13 @@ def test_main_registers_navigation_and_access_routers():
     source = Path("app/main.py").read_text(encoding="utf-8")
     assert "navigation_admin_router" in source
     assert "admin_access_router" in source
+
+
+def test_android_reports_process_failure_without_discarding_cached_catalog():
+    source = Path(
+        "android/bitacora-android/app/src/main/java/com/cactus/bitacora/ui/admin/NavigationAdminPanel.kt"
+    ).read_text(encoding="utf-8")
+    assert "var processError" in source
+    assert "onSuccess { processes = it; processError = null }" in source
+    assert "se conserva la asociación vigente" in source
+    assert ".getOrElse { processes }" not in source

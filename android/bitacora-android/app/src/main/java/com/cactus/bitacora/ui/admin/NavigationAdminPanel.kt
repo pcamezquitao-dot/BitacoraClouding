@@ -101,6 +101,7 @@ internal fun NavigationAdminPanel(repository: BitacoraRepository, actor: String)
     var selected by remember { mutableStateOf<Int?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var processError by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<NavigationAdminOut?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -114,7 +115,14 @@ internal fun NavigationAdminPanel(repository: BitacoraRepository, actor: String)
         scope.launch {
             try {
                 actions = repository.adminNavigation(actor)
-                processes = runCatching { repository.adminProcesses(actor) }.getOrElse { processes }
+                runCatching { repository.adminProcesses(actor) }
+                    .onSuccess { processes = it; processError = null }
+                    .onFailure { failure ->
+                        processError = navigationFailure(
+                            failure as? Exception ?: Exception(failure),
+                            "No fue posible cargar los procesos; se conserva la asociación vigente",
+                        )
+                    }
             } catch (failure: Exception) { error = navigationFailure(failure, "No fue posible cargar la navegación") }
             finally { loading = false }
         }
@@ -132,6 +140,7 @@ internal fun NavigationAdminPanel(repository: BitacoraRepository, actor: String)
         }
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error); Button(onClick = ::load) { Text("Reintentar") } }
+        processError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (actor.isNotBlank() && !loading && error == null && actions.isEmpty()) Text("No hay acciones de navegación registradas")
         val rows = buildNavigationTreeRows(actions, expanded)
         if (rows.any(NavigationTreeRow::inconsistent)) Text("La jerarquía contiene registros inconsistentes", color = MaterialTheme.colorScheme.error)

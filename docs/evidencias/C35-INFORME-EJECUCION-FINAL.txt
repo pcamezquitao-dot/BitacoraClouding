@@ -14,7 +14,7 @@ Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
 - No se requirió migración.
 
 3. Pruebas automatizadas
-- Backend: 259 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- Backend: 260 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
 - Android: suite productionDebug aprobada.
 - C35 Android: orden, contracción, descendientes e inconsistencias aprobados.
 - Regresiones focalizadas de Administración Proceso aprobadas.
@@ -40,16 +40,16 @@ Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
 6. V2035
 - Dispositivo: V2035, serial 3065397347006YM.
 - APK principal instalada mediante adb install -r, sin desinstalar ni borrar almacenamiento.
-- Versión: maria62-c35-navegacion; versionCode 62.
-- SHA-256 APK: 3FCA09F951A28D7EA52CA7D7FDE8A25378CF99C3C579CE842E997B711C37E60D.
+- Versión: maria63-c35-navegacion; versionCode 63.
+- SHA-256 APK: BBC9B6F9E41DCA6582EDE4EB6FA9D313C49CF440D9A445A23C1532C90DBCCF2C.
 - Datos antes/después: 6450 KB.
 - Verificado físicamente: acceso con clave, actor de auditoría P0001, entrada Navegación,
   consulta productiva y catálogo vacío coherente con MariaDB.
 - No se guardaron cambios en producción.
 
 7. Resultado del ciclo físico y documental
-- CP-C35-001 a CP-C35-048 quedaron registrados individualmente: 46 APROBADAS y
-  2 NO APLICA justificadas (CP-C35-033 y CP-C35-037).
+- CP-C35-001 a CP-C35-048 quedaron registrados individualmente: 48 APROBADAS,
+  0 NO APLICA y 0 NO EJECUTADAS.
 - CP-C35-048 se ejecutó físicamente en V2035 contra paquete y base aislados:
   creación raíz/hija, expansión/contracción, edición, movimiento, asociación y
   retiro de proceso, cancelaciones, bloqueo de padre, eliminación de hoja,
@@ -64,8 +64,8 @@ Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
 - Servicio: bitacora-c35-test.service, 127.0.0.1:8017, activo.
 - Base comprobada desde el proceso: bitacora_c35_test; conteo inicial y final dim_accion=0.
 - Separación: paquete, directorio de datos, URL, puerto y base distintos de producción.
-- APK c35test instalada en paralelo, versión maria62-c35-navegacion, versionCode 62.
-- SHA-256 APK c35test: 15EF8F70FEAE0373211CE8F4FD2FEBE0E8F29595B507AF8DDE3E182B27E6FFDE.
+- APK c35test instalada en paralelo, versión maria63-c35-navegacion, versionCode 63.
+- SHA-256 APK c35test: 66A97EEE9FB634CB29047FE9D63558AFE21AC3A02344D73FC4FE42CA43B6ECEB.
 - Prueba Android c35testDebug y compilación: BUILD SUCCESSFUL.
 - Recorrido API aislado: acceso inválido 401; validaciones 422/409; ciclos 409;
   padre con hijas 409; concurrencia de edición 200/409; idempotencia sin duplicado;
@@ -101,3 +101,31 @@ Base inicial: f0aa8bfb515b071be85a1668755093a3ae21d315
   C33-supervisor-rh; ambas referencias remotas quedaron en el mismo commit.
 - No se creó ni movió tag: las invariantes reservan el tag estable para una
   declaración formal de validación de Patricia.
+
+12. Aclaración y ejecución de CP-C35-033 y CP-C35-037
+- Se conservaron literalmente sus objetivos, precondiciones, datos, pasos,
+  resultados esperados, evidencias y trazabilidad; solo cambió el estado.
+- La justificación anterior de NO APLICA para CP-C35-033 era incorrecta: la FK
+  autorreferente fk_dim_accion_padre sí constituye una referencia entrante real.
+  En bitacora_c35_test se crearon padre ID 66 e hijo ID 67; DELETE del padre
+  respondió 409, ambas filas y su relación siguieron presentes, y luego fueron
+  retiradas en orden hijo/padre. No quedaron fixtures de esa ejecución.
+- La justificación anterior de NO APLICA para CP-C35-037 dejó de ser válida al
+  autorizarse su ejecución: se introdujo temporalmente un 503 exclusivo para
+  /bitacora-c35-test/admin/procesos. Durante la falla, navegación respondió 200
+  y /bitacora/health productivo respondió 200.
+- La primera revisión encontró un defecto: Android conservaba silenciosamente el
+  catálogo anterior sin informar el fallo. Se corrigió para mostrar el detalle
+  del servidor y conservar el catálogo en memoria. En V2035, la acción aislada
+  ID 68 siguió visible y su editor mostró Proceso: Enfermedad_Laboral (ID 19).
+- Restaurado Nginx, /admin/procesos volvió a 200 y el aviso desapareció al
+  actualizar. El fixture ID 68 se eliminó y GET posterior respondió 404.
+- Nginx quedó restaurado y validado con nginx -t. No se escribió en producción.
+- La auditoría aislada conserva CREAR/ELIMINAR para IDs 66, 67 y 68 con los
+  actores CP-C35-033/037 y dispositivo V2035; no quedaron fixtures CP-C35-03%.
+- Regresión final: backend 260 aprobadas, 2 omitidas y 17 subpruebas aprobadas;
+  Android productionDebug y c35testDebug con BUILD SUCCESSFUL.
+- Evidencias: docs/evidencias/C35/cp-c35-033-037-ejecucion.txt,
+  cp-c35-037-preloaded.png, cp-c35-037-process-failure.png,
+  cp-c35-037-association-preserved.png, cp-c35-037-recovery.png y
+  c35-v63-production-installed.png.

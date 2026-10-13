@@ -1,7 +1,7 @@
 CP-C35 — ADMINISTRACIÓN DEL ÁRBOL DE NAVEGACIÓN
 Versión: 01
 Estado inicial de todos los casos: NO EJECUTADA
-Estado final: 46 APROBADAS y 2 NO APLICA justificadas; 0 NO EJECUTADAS.
+Estado final: 48 APROBADAS; 0 NO APLICA; 0 NO EJECUTADAS.
 Fuente: docs/casos_de_uso/CU_C35-Navegacion.txt
 
 1. OBJETIVO
@@ -338,7 +338,7 @@ Evidencias: respuesta y SELECT.
 Trazabilidad: CU 8, 9 y 10.
 
 CP-C35-033 — Rechazar eliminación referenciada
-Estado: NO APLICA
+Estado: APROBADA
 Objetivo: proteger referencias entrantes reales.
 Precondiciones: esquema real inspeccionado y acción referenciada.
 Datos: referencia impeditiva documentada.
@@ -378,7 +378,7 @@ Evidencias: capturas y logs.
 Trazabilidad: CU 10 y 11.
 
 CP-C35-037 — Fallo al consultar procesos
-Estado: NO APLICA
+Estado: APROBADA
 Objetivo: no confundir fallo con catálogo vacío ni retirar asociación.
 Precondiciones: acción con proceso y endpoint de procesos fallando.
 Datos: asociación existente.
@@ -534,11 +534,11 @@ no forman parte de las evidencias. La base aislada terminó con dim_accion=0.
 - CP-C35-030 — APROBADA. Eliminación cancelada conservó raíz B. Evidencia: c35-048-07-delete-cancel.png y GET posterior.
 - CP-C35-031 — APROBADA. Hoja ID 33 eliminada; GET posterior=404. Evidencia: c35-048-09-leaf-deleted.png.
 - CP-C35-032 — APROBADA. Raíz B con hija rechazó eliminación 409. Evidencia: c35-048-08-parent-blocked.png.
-- CP-C35-033 — NO APLICA. KEY_COLUMN_USAGE no contiene referencia entrante a dim_accion distinta de su FK jerárquica, ya cubierta por CP-C35-032; no existe fixture real adicional que probar.
+- CP-C35-033 — APROBADA. La FK autorreferente fk_dim_accion_padre es una referencia entrante real: DELETE del padre ID 66 devolvió 409 y padre/hijo ID 66/67 conservaron la relación; limpieza posterior=0 fixtures. Evidencia: docs/evidencias/C35/cp-c35-033-037-ejecucion.txt.
 - CP-C35-034 — APROBADA. Eliminar acción asociada no alteró proceso 19. Evidencia: process_19_unchanged=true.
 - CP-C35-035 — APROBADA. Segundo cliente recibió 404 para registro ya eliminado. Evidencia: GET /33 posterior a eliminación.
 - CP-C35-036 — APROBADA. Sin red se mostró error explícito y se conservó formulario/datos. Evidencia: c35-048-11-offline.png.
-- CP-C35-037 — NO APLICA. Acciones y procesos comparten el mismo servicio/host y no existe mecanismo autorizado para interrumpir solo /admin/procesos; no se alteró proxy ni código para fabricar el escenario.
+- CP-C35-037 — APROBADA tras corrección. Fallo selectivo confirmado HTTP 503 en /admin/procesos, con /admin/navegacion y salud productiva en 200; Android mostró error específico, conservó la acción ID 68 y su asociación con proceso 19, y recuperó el catálogo al restaurar el endpoint. Evidencias: cp-c35-037-process-failure.png, cp-c35-037-association-preserved.png, cp-c35-037-recovery.png y cp-c35-033-037-ejecucion.txt.
 - CP-C35-038 — APROBADA. Excepción previa al commit hizo rollback y dejó conteo intacto. Evidencia: prueba de servicio aislada y SELECT posterior.
 - CP-C35-039 — APROBADA. Escritura confirmada seguida de refresco fallido mostró aviso y la recuperación manual no duplicó. Evidencia: aviso físico y GET único.
 - CP-C35-040 — APROBADA. Reenvío con request_id devolvió el mismo ID. Evidencia: idempotent_id del recorrido API y una sola auditoría CREAR.
