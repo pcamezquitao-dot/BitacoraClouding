@@ -50,9 +50,46 @@ import retrofit2.HttpException
 internal const val PROCESS_ADMIN_NOTE =
     "Organice los procesos por niveles y asocie, cuando corresponda, una actividad del Catálogo de Actividades"
 
-private fun processKey(value: String): String = Normalizer.normalize(
+internal fun processKey(value: String): String = Normalizer.normalize(
     value.trim(), Normalizer.Form.NFD
 ).replace(Regex("\\p{M}+"), "").lowercase(Locale.ROOT)
+
+internal data class ProcessSearchResult(
+    val process: ProcessAdminOut,
+    val parentPath: String
+)
+
+internal fun searchProcesses(
+    processes: List<ProcessAdminOut>,
+    query: String
+): List<ProcessSearchResult> {
+    val normalizedQuery = processKey(query)
+    if (normalizedQuery.isEmpty()) return emptyList()
+    val byId = processes.associateBy(ProcessAdminOut::id_proceso)
+    fun parentPath(item: ProcessAdminOut): String {
+        val names = ArrayDeque<String>()
+        val visited = mutableSetOf(item.id_proceso)
+        var parentId = item.id_proceso_padre
+        while (parentId != null && visited.add(parentId)) {
+            val parent = byId[parentId] ?: break
+            names.addFirst(parent.nombre)
+            parentId = parent.id_proceso_padre
+        }
+        return names.joinToString(" > ").ifEmpty { "Proceso raíz" }
+    }
+    return processes.asSequence()
+        .filter { item ->
+            normalizedQuery in item.id_proceso.toString() ||
+                normalizedQuery in processKey(item.nombre)
+        }
+        .map { ProcessSearchResult(it, parentPath(it)) }
+        .sortedWith(
+            compareBy<ProcessSearchResult> { processKey(it.parentPath) }
+                .thenBy { processKey(it.process.nombre) }
+                .thenBy { it.process.id_proceso }
+        )
+        .toList()
+}
 
 internal fun processErrorDetail(rawBody: String?, fallback: String): String =
     Regex("\\\"detail\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\"")
@@ -183,6 +220,7 @@ internal fun ProcessAdminPanel(repository: BitacoraRepository, actor: String) {
     var viewing by remember { mutableStateOf<ProcessAdminOut?>(null) }
     var deleting by remember { mutableStateOf<ProcessAdminOut?>(null) }
     var deleteError by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
 
     fun load() {
         if (actor.trim().isEmpty()) { error = "Identifique al administrador para consultar los procesos"; return }
@@ -215,29 +253,67 @@ internal fun ProcessAdminPanel(repository: BitacoraRepository, actor: String) {
         if (!loading && error == null && processes.isEmpty()) Text("No hay procesos registrados")
         val summaryRows = buildProcessTreeRows(processes, processes.mapTo(mutableSetOf(), ProcessAdminOut::id_proceso), true)
         if (processes.isNotEmpty()) ProcessSummary(summaryRows)
-        val rows = buildProcessTreeRows(processes, expanded)
-        if (rows.any(ProcessTreeRow::inconsistent)) Text("La jerarquía contiene registros inconsistentes; revise antes de modificar", color = MaterialTheme.colorScheme.error)
         Text("Árbol interactivo", style = MaterialTheme.typography.titleMedium)
-        rows.forEach { row ->
-            Row(
-                Modifier.fillMaxWidth().padding(start = (row.depth * 10).dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { creating = true; editing = null; presetParent = row.process.id_proceso }, modifier = Modifier.size(36.dp)) { Text("+") }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Buscar por código o nombre") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedButton(
+                onClick = { searchQuery = "" },
+                enabled = searchQuery.isNotEmpty()
+            ) { Text("Limpiar") }
+        }
+        val normalizedSearch = processKey(searchQuery)
+        if (normalizedSearch.isNotEmpty()) {
+            val searchResults = searchProcesses(processes, searchQuery)
+            if (!loading && error == null && searchResults.isEmpty()) {
+                Text("No se encontraron procesos")
+            }
+            searchResults.forEach { result ->
                 TextButton(
-                    onClick = { if (row.hasChildren) expanded = if (row.expanded) expanded - row.process.id_proceso else expanded + row.process.id_proceso },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                    onClick = { viewing = result.process },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text(
-                        when { row.hasChildren && row.expanded -> "▼ ${row.process.nombre}"; row.hasChildren -> "▶ ${row.process.nombre}"; else -> "└─ ${row.process.nombre}" },
-                        fontSize = 12.sp,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(Modifier.fillMaxWidth()) {
+                        Text("Código: ${result.process.id_proceso}")
+                        Text("Nombre: ${result.process.nombre}")
+                        Text("Ruta: ${result.parentPath}", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                IconButton(onClick = { viewing = row.process }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_view), "Consultar", tint = Color(0xFF1976D2), modifier = Modifier.size(18.dp)) }
-                IconButton(onClick = { editing = row.process; creating = false; presetParent = row.process.id_proceso_padre }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_edit), "Editar", tint = Color(0xFFF9A825), modifier = Modifier.size(18.dp)) }
-                IconButton(onClick = { deleting = row.process; deleteError = null }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_retire), "Eliminar", tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp)) }
+            }
+        } else {
+            val rows = buildProcessTreeRows(processes, expanded)
+            if (rows.any(ProcessTreeRow::inconsistent)) Text("La jerarquía contiene registros inconsistentes; revise antes de modificar", color = MaterialTheme.colorScheme.error)
+            rows.forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth().padding(start = (row.depth * 10).dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { creating = true; editing = null; presetParent = row.process.id_proceso }, modifier = Modifier.size(36.dp)) { Text("+") }
+                    TextButton(
+                        onClick = { if (row.hasChildren) expanded = if (row.expanded) expanded - row.process.id_proceso else expanded + row.process.id_proceso },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            when { row.hasChildren && row.expanded -> "▼ ${row.process.nombre}"; row.hasChildren -> "▶ ${row.process.nombre}"; else -> "└─ ${row.process.nombre}" },
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    IconButton(onClick = { viewing = row.process }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_view), "Consultar", tint = Color(0xFF1976D2), modifier = Modifier.size(18.dp)) }
+                    IconButton(onClick = { editing = row.process; creating = false; presetParent = row.process.id_proceso_padre }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_edit), "Editar", tint = Color(0xFFF9A825), modifier = Modifier.size(18.dp)) }
+                    IconButton(onClick = { deleting = row.process; deleteError = null }, modifier = Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_participant_retire), "Eliminar", tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp)) }
+                }
             }
         }
     }
