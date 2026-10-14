@@ -1,7 +1,7 @@
 CP-C34 — PORTAL GENERAL
 Versión: 01
 Fuente: docs/casos_de_uso/CU-C34-Portal-General.txt
-Estado de ejecución: 24 pruebas aisladas APROBADAS y C34 VALIDADA por Patricia el 14 de octubre de 2026. La integración productiva quedó bloqueada antes de instalar la APK principal; véanse C34-INFORME-EJECUCION.txt y C34-INFORME-INTEGRACION.txt.
+Estado de ejecución: 24 pruebas aisladas APROBADAS; integración productiva y recorrido físico aplicable APROBADOS el 14 de octubre de 2026. CP-C34-014 a 017 no fueron ejecutables físicamente en producción por ausencia comprobada de asociaciones BPM; conservan su aprobación aislada y no se aprueban por inferencia en producción. Véanse C34-INFORME-EJECUCION.txt y C34-INFORME-INTEGRACION.txt.
 
 Formato de cada caso: objetivo; precondiciones; datos; pasos; resultado esperado; evidencias; trazabilidad.
 
@@ -151,3 +151,10 @@ VALIDACIÓN FORMAL — 2026-10-14
 - Resultado del conjunto CP-C34-001 a CP-C34-024: APROBADO.
 - Estado de la célula: VALIDADA; lista para integración posterior.
 - La validación no autoriza integración, despliegue productivo ni actualización de la aplicación principal.
+
+INTEGRACIÓN PRODUCTIVA — 2026-10-14
+- Instalación nueva autorizada de com.cactus.bitacora v69 en V2035; no se acredita conservación de datos locales anteriores porque el paquete principal estaba ausente.
+- CP-C34-001, 003, 010, 012, 013 y 019 a 024: APROBADAS en el recorrido productivo aplicable, con evidencias 31 a 42. La reapertura vuelve al inicio conforme a la regla de no persistir identidad/menú entre procesos.
+- CP-C34-014 a 017: NO EJECUTABLES FÍSICAMENTE EN PRODUCCIÓN. Todas las opciones reales tienen id_proceso NULL y bpm_proceso/bpm_etapa están vacías; no se crearon fixtures ni asociaciones. Siguen APROBADAS en el entorno aislado.
+- CP-C34-002, 004 a 009, 011 y 018 conservan las pruebas automatizadas y aisladas existentes; no se marcan como nuevas aprobaciones físicas productivas.
+- Base final: bitacora; bpm_caso=0, bpm_proceso=0, bpm_etapa=0. Conectividad restaurada: Wi-Fi=1 y datos móviles=1.

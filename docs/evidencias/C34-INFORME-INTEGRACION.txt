@@ -1,6 +1,6 @@
 C34 — INFORME DE INTEGRACIÓN
 Fecha: 2026-10-14
-Estado: INTEGRACIÓN PARCIAL BLOQUEADA; no declarar INTEGRADA ni TERMINADA.
+Estado: INTEGRADA Y TERMINADA. Las comprobaciones de destinos BPM se clasifican como NO EJECUTABLES por ausencia comprobada de configuración productiva, no como aprobadas.
 
 1. Base validada e integración Git
 - Rama validada: C34-portal-general.
@@ -44,13 +44,21 @@ Estado: INTEGRACIÓN PARCIAL BLOQUEADA; no declarar INTEGRADA ni TERMINADA.
 - /srv/bitacora/app/schemas/portal_general.py: 8966425056e69f71446eba7cf7d0e0568603d9dbb1bba044f961eff2e03709a1.
 - /srv/bitacora/app/services/portal_general_service.py: 4acd728dc02a949645c18a2df67bfb3ca9fa80819a0c48f552b6b27545fa8a7a.
 
-6. Bloqueo físico indispensable
+6. Instalación y verificación física productiva
 - Dispositivo: vivo V2035, serie ADB 3065397347006YM, autorizado.
-- `pm list packages -u` no devuelve com.cactus.bitacora. El paquete principal ya estaba ausente antes de intentar instalar C34.
-- No existe paquete, APK instalada ni almacenamiento local principal que pueda respaldarse o actualizarse con `adb install -r`.
-- Instalar ahora sería una instalación nueva y no permitiría demostrar conservación de datos ni de pendientes de sincronización.
-- No se desinstaló ningún paquete, no se borró almacenamiento y no se instaló la APK principal.
+- Patricia autorizó expresamente la instalación nueva tras comprobarse la ausencia del paquete principal. Se instaló com.cactus.bitacora v69 sin `-r`; firstInstallTime y lastUpdateTime coinciden en 2026-10-14 00:28:59. No se acredita conservación de datos locales anteriores porque no existía paquete ni almacenamiento principal que conservar.
+- No se desinstaló ni alteró otra aplicación y no se borró almacenamiento del dispositivo.
+- P0276: identificación correcta, tipo supervisor y diez opciones productivas reales, en dos columnas, sin mezcla de identidad.
+- Las funcionalidades midieron 468 x 290 px; Tareas BPM 970 x 229 px; Cambiar participante y Salir del portal 970 x 142 px. Textos completos, centrados y legibles.
+- Una opción productiva con id_proceso NULL mostró "La opción no tiene proceso asociado" sin crear caso.
+- Tareas BPM abrió para P0276 y mostró "No tiene tareas pendientes".
+- Al retirar Wi-Fi y datos, Actualizar mostró un error explícito de resolución del servidor; al restaurarlos, recuperó la bandeja sin duplicados. Estado final: wifi_on=1 y mobile_data=1.
+- Cambio P0276 -> P0003: la vista anterior se limpió; P0003 mostró tipo supervisor_RH, "La raíz no tiene opciones configuradas" y mantuvo Tareas BPM disponible.
+- Código NOEXISTEC34: rechazado físicamente con "El participante no existe o no está activo".
+- Tras force-stop y reapertura se mostró la pantalla inicial, comportamiento de persistencia previsto por el CU: identidad y menú no se conservan entre procesos.
+- Verificación final de base productiva: DATABASE()=bitacora, bpm_caso=0, bpm_proceso=0 y bpm_etapa=0. No se crearon procesos, asociaciones, casos ni datos productivos.
 
-7. Pendiente obligatorio
-- Patricia debe indicar si autoriza una instalación nueva de com.cactus.bitacora pese a la ausencia comprobada, o restaurar primero la aplicación principal y su almacenamiento desde un respaldo externo disponible.
-- Permanecen pendientes la instalación conservando datos, la verificación física productiva ONLINE/OFFLINE, recuperación, persistencia y regresiones existentes.
+7. Clasificación de resultados y evidencias
+- APROBADAS en producción: identificación válida/inválida, menú por tipo, proporciones, desplazamiento, opción sin proceso, autorización, Tareas BPM aun sin hijos, cambio de participante, ONLINE/OFFLINE, recuperación y reapertura.
+- NO EJECUTABLES en producción por configuración: proceso inexistente, proceso sin flujo, flujo válido y flujo ambiguo/inactivo. Las diez opciones reales tienen id_proceso NULL y no hay filas en bpm_proceso ni bpm_etapa. Estas reglas permanecen aprobadas en el entorno aislado, pero no se declaran probadas físicamente en producción.
+- Evidencias 31 a 42 en docs/evidencias/C34/: inicio, P0276, menú, dimensiones, mensaje sin proceso, Tareas BPM, fallo offline, recuperación, controles completos, P0003 sin hijos, reinicio y rechazo de identidad.
