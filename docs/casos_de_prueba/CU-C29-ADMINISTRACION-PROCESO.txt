@@ -230,6 +230,21 @@ Decisión aprobada por Patricia el 2026-10-08:
 - `id_proceso` se ingresa manualmente y es inmutable al editar.
 - Tiempo y costo se presentan numéricamente, sin inventar unidad o moneda.
 
+18. MEJORA AUTORIZADA — BÚSQUEDA EN EL CATÁLOGO
+
+Decisión aprobada por Patricia el 2026-10-14:
+- Encima del árbol interactivo se muestra «Buscar por código o nombre» y una acción «Limpiar».
+- La búsqueda se actualiza mientras se escribe y trabaja localmente sobre el catálogo completo ya cargado. No consulta el servidor por cada tecla.
+- Código y nombre admiten coincidencias parciales. La comparación de nombres ignora mayúsculas, minúsculas, tildes y espacios en los extremos.
+- Se consideran todos los procesos cargados, aunque sus padres estén replegados, sin límites arbitrarios de resultados.
+- Cada resultado muestra código, nombre y la ruta jerárquica de sus padres.
+- Pulsar un resultado abre el detalle vigente; no altera altas, modificaciones, eliminación, autorización o auditoría.
+- Limpiar recupera el árbol sin modificar el conjunto de nodos expandidos; la posición se conserva cuando lo permite el contenedor vigente.
+- Una consulta válida sin coincidencias muestra «No se encontraron procesos». Un error de carga conserva su mensaje propio.
+- ONLINE/OFFLINE no cambia: la búsqueda opera sobre el catálogo que C29 haya cargado conforme a sus reglas existentes y no agrega sincronización ni cola offline.
+
+Estado: implementada, integrada e instalada en la aplicación principal versión 72. CP-C29-037 a CP-C29-047 aprobados técnica y físicamente el 2026-10-14, con la salvedad documentada de que los homónimos no aplican en producción por la restricción UNIQUE del esquema y se comprobaron con datos controlados.
+
 5. Obtener SHOW CREATE TABLE dim_proceso y referencias entrantes para ajustar las
    validaciones al esquema real. Comparar con el C16 original cuando estÃƒÂ© disponible.
 

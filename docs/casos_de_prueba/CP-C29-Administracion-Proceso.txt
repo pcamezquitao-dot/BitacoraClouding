@@ -692,3 +692,42 @@ Resultados físicos posteriores a la corrección:
 Estado final de CP-C29: 36 APROBADOS, 0 FALLIDOS, 0 BLOQUEADOS y 0 NO
 EJECUTADOS. La verificación física final de la aplicación principal queda APROBADA.
 C29 queda TERMINADO respecto del alcance implementado y probado.
+
+8. AMPLIACIÓN DE PRUEBAS — BÚSQUEDA C29 — 2026-10-14
+
+La mejora agrega CP-C29-037 a CP-C29-047. Los 36 casos originales conservan sus resultados históricos. La ampliación se ejecutó técnica y físicamente el 2026-10-14 en el V2035 con la aplicación principal versión 72.
+
+CP-C29-037 — Código completo y parcial
+Objetivo: localizar por identificador completo o parcial. Datos controlados: 205 y 20. Datos productivos de solo lectura: 19 y 1. Resultado esperado: coincidencias correctas aunque el padre esté replegado. Evidencia: ProcessAdminPolicyTest; `07-busqueda-codigo-19.png`; `08-busqueda-codigo-parcial.png`. Estado: APROBADO.
+
+CP-C29-038 — Nombre completo y parcial
+Objetivo: localizar por nombre o fragmento. Datos controlados: Operaciones y racio. Dato productivo: Enfermedad_Laboral / enfermedad. Resultado esperado: mismo proceso correcto. Evidencia: ProcessAdminPolicyTest; `05-busqueda-descendiente-replegado.png`. Estado: APROBADO.
+
+CP-C29-039 — Mayúsculas, tildes y espacios extremos
+Objetivo: normalizar la comparación. Datos controlados: proceso «Gestión Clínica» y consulta «  GESTION clin ». Dato físico: «  ENFERMEDAD  ». Resultado esperado: coincidencia correcta. Evidencia: ProcessAdminPolicyTest cubre tildes; `11-mayusculas-espacios.png` cubre caja y espacios en el V2035. Estado: APROBADO.
+
+CP-C29-040 — Rama replegada
+Objetivo: buscar en todo el catálogo, no solo en filas visibles. Datos controlados: hijo 205. Dato productivo: proceso 19 bajo la ruta INASISTENCIAS > INASISTENCIAS_REMUNERADAS. Resultado esperado: hijo encontrado con la raíz interactiva replegada. Evidencia: ProcessAdminPolicyTest; `04-arbol-expandido.png`; `05-busqueda-descendiente-replegado.png`. Estado: APROBADO.
+
+CP-C29-041 — Nombres repetidos y ruta
+Objetivo: distinguir homónimos. Datos: dos «Revisión» bajo Raíz A > Padre A y Raíz B > Padre B. Resultado esperado: ambos códigos y rutas. Evidencia: ProcessAdminPolicyTest. La consulta productiva confirmó que `dim_proceso.nombre` es UNIQUE y no existen homónimos; por la restricción de solo lectura, la repetición física no aplica. La presentación física de ruta se comprobó con el proceso 19 en `05-busqueda-descendiente-replegado.png`. Estado: APROBADO (datos controlados); NO APLICA la duplicación en producción.
+
+CP-C29-042 — Apertura del detalle correcto
+Objetivo: reutilizar el detalle existente. Pasos: pulsar un resultado. Resultado esperado: abrir el ProcessAdminOut seleccionado. Evidencia: contrato fuente; `06-detalle-resultado-correcto.png`, proceso 19, padre y propiedades correctos. Estado: APROBADO.
+
+CP-C29-043 — Sin resultados y error de carga
+Objetivo: distinguir ausencia válida de fallo. Datos: «zzsinresultado» y recarga sin red. Resultado esperado: «No se encontraron procesos» solo sin coincidencias; el fallo de conexión muestra su error y conserva el catálogo. Evidencia: helper/contrato; `09-sin-resultados.png`; `13-offline-error-conserva-catalogo.png`. Estado: APROBADO.
+
+CP-C29-044 — Limpiar y recuperar árbol
+Objetivo: volver al árbol conservando expansión. Pasos: replegar, buscar y pulsar Limpiar. Resultado esperado: consulta vacía y `expanded` sin modificación. Evidencia: contrato fuente; `10-limpieza-recupera-arbol-replegado.png`. El árbol regresó replegado y mantuvo la posición funcional del buscador. Estado: APROBADO.
+
+CP-C29-045 — Ausencia de truncamiento
+Objetivo: comprobar que no hay límite arbitrario. Datos: 250 coincidencias controladas y 39 procesos productivos tipo 1. Resultado esperado: 250 resultados en la prueba y catálogo productivo coincidente con la consulta independiente. Evidencia: ProcessAdminPolicyTest; consulta MariaDB final `COUNT=39`, `SUM(id_proceso)=988`. Estado: APROBADO.
+
+CP-C29-046 — Respuesta local
+Objetivo: evitar tráfico por tecla y mantener respuesta fluida. Resultado esperado: `onValueChange` solo modifica `searchQuery`; `adminProcesses` se reserva para carga/actualización. Evidencia: contrato fuente, prueba unitaria y escritura física sin recargas ni ANR. Estado: APROBADO.
+
+CP-C29-047 — Regresión física integral
+Objetivo: comprobar en Android presentación, fluidez, rutas, detalle, limpieza, expansión y ONLINE/OFFLINE vigente. Resultado esperado: cumplimiento del CU sin escrituras productivas. Evidencia: capturas `03` a `14` en `docs/evidencias/C29/busqueda-v72/`; OFFLINE mantuvo la búsqueda local, la recarga informó error sin borrar el catálogo y ONLINE recuperó la carga. Conectividad final habilitada. Estado: APROBADO.
+
+Resultado de la ampliación: CP-C29-037 a CP-C29-047 APROBADOS. La variante de homónimos de CP-C29-041 se aprobó con datos controlados y no aplica físicamente en producción porque el esquema impone unicidad de nombre; no se fabricaron datos. La aplicación principal quedó actualizada con conservación comprobada de almacenamiento y conexión restablecida.

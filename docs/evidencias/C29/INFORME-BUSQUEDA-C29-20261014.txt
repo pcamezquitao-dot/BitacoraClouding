@@ -1,0 +1,68 @@
+C29 — ADMINISTRACIÓN DE PROCESOS — MEJORA DE BÚSQUEDA
+Fecha: 2026-10-14
+Estado: INTEGRADA Y VERIFICADA.
+
+1. Causa y solución
+La pantalla no contenía búsqueda y el árbol interactivo exponía únicamente los nodos
+según su expansión. Se agregó un filtro reactivo local sobre el catálogo completo ya
+cargado, con coincidencia parcial por identificador o nombre, normalización de caja,
+tildes y espacios extremos, ruta de padres, limpieza y apertura del detalle existente.
+No se modificaron backend, esquema, datos, permisos, auditoría, CRUD ni la restricción
+`tipo_proceso=1`.
+
+2. Integración y artefacto
+- Rama: `C29-busqueda-procesos`, basada en `0694f451a2eba29726590ed9475433eeb78e7b33`.
+- La base contiene por ascendencia C34 (`d257a30f...`) y C04 (`2f39935...`).
+- Paquete: `com.cactus.bitacora`.
+- versionCode/versionName: `72` / `maria72-c29-busqueda-procesos`.
+- Backend: `https://161-22-47-89.sslip.io/bitacora/`.
+- SHA-256 APK: `A73A56C6D05FD3E5A90299DD668C104A87649FC765EAD37C14A3188863CB8431`.
+- Firma SHA-256: `81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0`, idéntica a v71.
+
+3. Pruebas técnicas
+- `ProcessAdminPolicyTest`: APROBADO.
+- `PortalGeneralPolicyTest`: APROBADO.
+- `AdminAssignmentFormContractTest`: APROBADO.
+- `assembleProductionDebug`: BUILD SUCCESSFUL.
+- 250 coincidencias controladas devueltas sin truncamiento.
+- Homónimos con rutas diferentes y normalización de tildes comprobados con datos
+  controlados. Producción no contiene homónimos: `dim_proceso.nombre` es UNIQUE.
+
+4. Instalación y conservación
+- Dispositivo: V2035, serie ADB `3065397347006YM`.
+- Instalación: `adb install -r`, resultado Success; no hubo desinstalación ni limpieza.
+- `firstInstallTime` se conservó en `2026-10-14 00:28:59`.
+- `ceDataInode` se conservó en `1061106`.
+- Archivos locales accesibles mediante `run-as`: 72 antes y 72 después.
+- Respaldo de APK v71: `C:\Bitacora\device-backups\C29-search-20261014-v71\base-v71.apk`.
+
+5. Verificación física CP-C29-037 a CP-C29-047
+- Código completo/parcial: APROBADO con 19 y 1.
+- Nombre completo/parcial, caja y espacios: APROBADO con Enfermedad_Laboral.
+- Tildes: APROBADO en prueba controlada; el catálogo productivo actual no contiene un
+  nombre aplicable para reproducirla sin fabricar datos.
+- Descendiente replegado: APROBADO con proceso 19 bajo
+  INASISTENCIAS > INASISTENCIAS_REMUNERADAS.
+- Código, nombre y ruta: APROBADO.
+- Detalle correcto: APROBADO para proceso 19.
+- Sin resultados: APROBADO con `zzsinresultado`.
+- Limpiar, expansión/repliegue y desplazamiento: APROBADO.
+- Fluidez: APROBADA; no hubo ANR y escribir no provocó recargas remotas.
+- ONLINE/OFFLINE: APROBADO. La búsqueda siguió sobre el catálogo cargado; la recarga
+  sin red mostró error de DNS y conservó el resumen. Reintentar tras recuperar la red
+  eliminó el error y cargó nuevamente.
+- Conectividad final: habilitada, red activa 158.
+
+6. Datos productivos
+Consulta final de solo lectura: 39 procesos `tipo_proceso=1`, suma de IDs 988 y suma
+de padres 775, coincidente con el catálogo consultado antes del recorrido. No se
+activaron acciones de crear, editar o eliminar y no se guardaron datos productivos.
+
+7. Evidencias
+Capturas reales: `docs/evidencias/C29/busqueda-v72/03-c29-online-cargado.png` a
+`14-online-recuperado.png`. Incluyen árbol, búsqueda, ruta, detalle, ausencia de
+resultados, limpieza, estado OFFLINE y recuperación ONLINE.
+
+Resultado: CP-C29-037 a CP-C29-047 APROBADOS. CP-C29-041 usa datos controlados para
+homónimos y la presentación física de ruta; la repetición en producción NO APLICA por
+la unicidad comprobada y la prohibición de fabricar datos.
