@@ -1,0 +1,50 @@
+CU-C04 — EMPLEO ÁREA
+Versión: 01
+Estado: Corrección implementada y desplegada; verificación física pendiente por dispositivo no disponible en ADB.
+
+1. OBJETIVO
+Administrar la asignación temporal de participantes elegibles a áreas, mostrando la lista completa de participantes activos que no tengan otra asignación activa vigente.
+
+2. ACTOR
+Administrador que haya superado el acceso administrativo provisional validado por el servidor.
+
+3. PRECONDICIONES
+- Backend y base efectiva disponibles.
+- Catálogos de áreas, tipos de participante, capacidades y jornadas disponibles.
+- El acceso administrativo conserva token técnico, clave provisional, identidad del actor y dispositivo.
+
+4. REGLAS FUNCIONALES
+- Es elegible el participante activo cuya fecha de salida sea nula o anterior a su fecha de entrada.
+- Se excluye quien tenga una asignación con activo = TRUE, fecha_inicia no posterior a hoy y fecha_final nula o no anterior a hoy.
+- Una asignación histórica, inactiva o vencida no excluye por sí sola al participante.
+- La consulta no tiene un límite fijo oculto; devuelve la totalidad de coincidencias elegibles.
+- La búsqueda admite código, documento, nombres, apellidos y nombre completo.
+- Android usa la consulta administrativa remota; no deriva esta lista del catálogo Room general.
+- La presentación no trunca la lista y permite desplazamiento.
+- Antes de guardar, el servidor vuelve a comprobar solapamientos y rechaza cualquier asignación activa incompatible, aunque pertenezca a otra área.
+- Las operaciones administrativas mantienen autorización y auditoría.
+
+5. FLUJO PRINCIPAL
+1. El administrador abre Más opciones → Administrar maestros → Empleo área.
+2. La aplicación consulta el árbol de asignaciones y los participantes elegibles.
+3. El administrador elige un área y solicita agregar una asignación.
+4. La aplicación muestra todos los participantes elegibles y permite buscarlos.
+5. El administrador selecciona participante, cargo, capacidad, jornada y vigencia.
+6. Al guardar, el servidor revalida compatibilidad, persiste y audita.
+7. La aplicación actualiza el árbol y la lista; el participante recién asignado deja de ser elegible mientras la asignación esté activa.
+
+6. ALTERNOS Y EXCEPCIONES
+- Lista vacía: se informa que no hay participantes elegibles.
+- Error de consulta o conexión: se muestra el fallo; no se presenta como una lista vacía confirmada.
+- Conflicto concurrente: el servidor responde 409 y no crea una segunda asignación incompatible.
+- Cancelación: no crea ni modifica asignaciones.
+- Asignación retirada o vencida: el participante vuelve a ser elegible si cumple las demás reglas.
+
+7. RESULTADOS
+- La lista coincide con una consulta independiente de las reglas de elegibilidad.
+- Participantes posteriores a P0012 pueden verse y buscarse.
+- No se crean asignaciones duplicadas o incompatibles.
+- La auditoría registra las escrituras autorizadas.
+
+8. TRAZABILIDAD
+CP-C04-001 a CP-C04-018 verifican consulta completa, elegibilidad, búsqueda, presentación, persistencia, concurrencia, autorización, errores, regresión e instalación física.

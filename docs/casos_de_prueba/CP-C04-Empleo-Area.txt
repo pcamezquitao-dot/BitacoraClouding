@@ -1,0 +1,60 @@
+CP-C04 — EMPLEO ÁREA
+Versión: 01
+Fuente: docs/casos_de_uso/CU-C04-Empleo-Area.txt
+Estado de ejecución: pruebas automatizadas y aisladas aprobadas; CP-C04-016 a CP-C04-018 pendientes de comprobación física porque el V2035 no está visible en ADB.
+
+Formato: objetivo; precondiciones; datos; pasos; resultado esperado; evidencia; trazabilidad.
+
+CP-C04-001 — Coincidencia con consulta independiente
+Estado: APROBADA. Objetivo: validar totalidad y exactitud. Precondiciones: bitacora_c04_test. Datos: copia controlada de catálogos y asignaciones. Pasos: ejecutar SQL independiente y servicio. Resultado esperado: mismos códigos y conteo. Evidencia: tests/integration_c04_isolated.py, EXPECTED=488 y OBTAINED=488. Trazabilidad: CU 4 y 7.
+
+CP-C04-002 — Participantes posteriores a P0012
+Estado: APROBADA. Objetivo: detectar truncamiento original. Precondiciones: participantes elegibles posteriores. Datos: P0013 y siguientes. Pasos: consultar opciones. Resultado esperado: se incluyen. Evidencia: POST_P0012=478 y búsqueda P0013=1. Trazabilidad: CU 4.
+
+CP-C04-003 — Exclusión por asignación activa
+Estado: APROBADA. Objetivo: excluir ocupados vigentes. Precondiciones: asignación activa actual. Datos: participante aislado. Pasos: consultar. Resultado esperado: código ausente. Evidencia: prueba de creación y refresco aislados. Trazabilidad: CU 4 y 5.
+
+CP-C04-004 — Histórica inactiva no excluye
+Estado: APROBADA. Objetivo: conservar elegibles históricos. Precondiciones: asignación inactiva sin otra vigente. Datos: P0132. Pasos: consultar. Resultado esperado: código presente. Evidencia: HISTORICAL_INCLUDED=P0132. Trazabilidad: CU 4.
+
+CP-C04-005 — Asignación vencida no excluye
+Estado: APROBADA. Objetivo: aplicar vigencia temporal. Precondiciones: fecha_final anterior a hoy. Datos: fixture aislado. Pasos: consultar. Resultado esperado: participante elegible. Evidencia: integración aislada y predicados unitarios. Trazabilidad: CU 4.
+
+CP-C04-006 — Búsqueda por código
+Estado: APROBADA. Objetivo: localizar código exacto. Precondiciones: lista disponible. Datos: P0013. Pasos: buscar. Resultado esperado: coincidencia. Evidencia: SEARCH_P0013=1 y prueba Android. Trazabilidad: CU 4 y 5.
+
+CP-C04-007 — Búsqueda por nombre y documento
+Estado: APROBADA. Objetivo: preservar campos de búsqueda. Precondiciones: opciones conocidas. Datos: nombre, apellido y documento. Pasos: filtrar. Resultado esperado: coincidencias sin truncamiento. Evidencia: test unitario Android y test de consulta backend. Trazabilidad: CU 4.
+
+CP-C04-008 — Lista sin límite fijo
+Estado: APROBADA. Objetivo: eliminar límites indebidos. Precondiciones: más de 100 elegibles. Datos: 488 elegibles. Pasos: consultar endpoint. Resultado esperado: 488. Evidencia: producción de solo lectura COUNT=488; prueba SQL sin LIMIT. Trazabilidad: CU 4.
+
+CP-C04-009 — Desplazamiento y presentación completa
+Estado: APROBADA AUTOMATIZADA; PENDIENTE FÍSICA. Objetivo: recorrer más de 12 opciones. Precondiciones: formulario Android. Datos: 30 opciones unitarias y catálogo productivo. Pasos: renderizar/filtrar/desplazar. Resultado esperado: ninguna truncada. Evidencia: AdminAssignmentFormContractTest; captura física pendiente. Trazabilidad: CU 4 y 5.
+
+CP-C04-010 — Guardado y actualización de lista
+Estado: APROBADA EN AISLADO. Objetivo: retirar de la lista al recién asignado. Precondiciones: participante elegible. Datos: fixture temporal. Pasos: crear y volver a consultar. Resultado esperado: ausente. Evidencia: CREATE_REFRESH=OK. Trazabilidad: CU 4 y 5.
+
+CP-C04-011 — Revalidación concurrente
+Estado: APROBADA. Objetivo: impedir asignación incompatible entre áreas. Precondiciones: asignación creada. Datos: segundo id_area. Pasos: intentar segunda creación solapada. Resultado esperado: 409, sin duplicado. Evidencia: CONFLICT_REVALIDATION=OK y prueba unitaria. Trazabilidad: CU 4 y 6.
+
+CP-C04-012 — Retiro y recuperación de elegibilidad
+Estado: APROBADA EN AISLADO. Objetivo: devolver participante retirado. Precondiciones: asignación aislada. Datos: mismo participante. Pasos: retirar y consultar. Resultado esperado: vuelve una vez. Evidencia: RETIRE_REFRESH=OK. Trazabilidad: CU 4 y 6.
+
+CP-C04-013 — Cancelación
+Estado: APROBADA POR CONTRATO; PENDIENTE FÍSICA. Objetivo: no escribir al cancelar. Precondiciones: diálogo abierto. Datos: selección válida. Pasos: seleccionar y cancelar. Resultado esperado: cero escritura. Evidencia: flujo Compose y prueba física pendiente. Trazabilidad: CU 6.
+
+CP-C04-014 — Error y lista vacía
+Estado: APROBADA AUTOMATIZADA. Objetivo: distinguir error de cero elegibles. Precondiciones: respuestas controladas. Datos: fallo HTTP y lista vacía. Pasos: cargar. Resultado esperado: mensaje de error o vacío correspondiente. Evidencia: regresión de repositorio/UI. Trazabilidad: CU 6.
+
+CP-C04-015 — Autorización y auditoría
+Estado: APROBADA. Objetivo: conservar controles. Precondiciones: endpoint protegido. Datos: credenciales válidas, inválidas y ausentes. Pasos: consultar/escribir en aislado. Resultado esperado: solo credenciales válidas acceden; escrituras auditadas. Evidencia: suite backend 271 aprobadas, 2 omitidas; pruebas de contrato administrativas. Trazabilidad: CU 2, 3 y 4.
+
+CP-C04-016 — Instalación conservando datos
+Estado: PENDIENTE. Objetivo: actualizar com.cactus.bitacora sin desinstalar ni borrar datos. Precondiciones: V2035 conectado y autorizado. Datos: APK v71. Pasos: registrar versión/inodo, adb install -r y comparar. Resultado esperado: datos conservados. Evidencia: pendiente; ADB informó no devices/emulators found. Trazabilidad: CU 3 y 7.
+
+CP-C04-017 — Lista productiva física
+Estado: PENDIENTE. Objetivo: comprobar conteo, búsqueda y selección sin guardar. Precondiciones: V2035 y producción. Datos: 488 elegibles, P0013. Pasos: abrir Empleo área, recorrer, buscar, seleccionar y cancelar. Resultado esperado: lista completa, búsqueda correcta, cero escritura. Evidencia: pendiente por dispositivo no visible. Trazabilidad: CU 5 y 7.
+
+CP-C04-018 — Regresión física y persistencia
+Estado: PENDIENTE. Objetivo: confirmar C34, acceso administrativo, sincronización y reapertura. Precondiciones: APK instalada. Datos: aplicación principal. Pasos: recorrer, cerrar/reabrir y verificar pendientes. Resultado esperado: funciones previas intactas y datos locales conservados. Evidencia: pendiente por dispositivo no visible. Trazabilidad: CU 3, 5 y 7.

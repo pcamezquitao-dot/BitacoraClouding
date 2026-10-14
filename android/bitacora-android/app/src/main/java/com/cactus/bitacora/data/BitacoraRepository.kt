@@ -676,9 +676,17 @@ class BitacoraRepository(
     suspend fun adminParticipantOptions(
         actor: String,
         search: String = ""
-    ): List<ParticipantOptionOut> = referenceCatalogRepository.localParticipantOptions().filter {
-        search.isBlank() || it.nombre_completo.contains(search, ignoreCase = true) ||
-            it.codigo.contains(search, ignoreCase = true)
+    ): List<ParticipantOptionOut> {
+        val response = api.getAdminParticipantOptions(
+            actor.trim().ifBlank { "administrador-consulta" },
+            Build.MODEL,
+            search.trim()
+        )
+        if (!response.isSuccessful) {
+            throw IOException("No fue posible consultar los participantes elegibles")
+        }
+        return response.body()
+            ?: throw IOException("El servidor respondió sin la lista de participantes elegibles")
     }
 
     suspend fun updateAdminEmployeeArea(

@@ -31,14 +31,18 @@ class AdminCatalogServiceTest(unittest.TestCase):
         )
         self.identity = AdminIdentity("pruebas", "dispositivo-pruebas")
 
-    def test_selector_permite_cargar_los_51_participantes_actuales(self):
+    def test_selector_devuelve_todos_los_elegibles_sin_limite(self):
         db = MagicMock()
         db.execute.return_value.mappings.return_value.all.return_value = []
 
         self.assertEqual([], list_participant_options(db, ""))
 
         query = str(db.execute.call_args.args[0]).upper()
-        self.assertIn("LIMIT 100", query)
+        self.assertNotIn("LIMIT 100", query)
+        self.assertIn("NOT EXISTS", query)
+        self.assertIn("EA.ACTIVO = TRUE", query)
+        self.assertIn("EA.FECHA_INICIA <= CURDATE()", query)
+        self.assertIn("EA.FECHA_FINAL IS NULL OR EA.FECHA_FINAL >= CURDATE()", query)
 
     def test_crea_asignacion_y_auditoria_en_una_transaccion(self):
         db = MagicMock()
@@ -81,6 +85,9 @@ class AdminCatalogServiceTest(unittest.TestCase):
         db.rollback.assert_called_once_with()
         db.commit.assert_not_called()
         self.assertEqual(4, db.execute.call_count)
+        conflict_sql = str(db.execute.call_args_list[3].args[0]).upper()
+        self.assertNotIn("ID_AREA=:ID_AREA", conflict_sql)
+        self.assertIn("ID_PARTICIPANTE=:ID_PARTICIPANTE", conflict_sql)
 
     def test_asignacion_retirada_no_bloquea_una_nueva_creacion(self):
         db = MagicMock()

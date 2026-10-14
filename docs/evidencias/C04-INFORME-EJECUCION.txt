@@ -1,0 +1,44 @@
+C04 — EMPLEO ÁREA — INFORME DE EJECUCIÓN
+Fecha: 2026-10-14
+Estado: CORRECCIÓN DESPLEGADA; CIERRE FÍSICO PENDIENTE.
+
+1. Causa comprobada
+- Android truncaba explícitamente las opciones elegibles con `.take(12)` en AdminCatalogScreen.kt.
+- El backend terminaba la consulta con `LIMIT 100`.
+- Android obtenía las opciones del catálogo Room general y no del endpoint administrativo, por lo que no aplicaba la exclusión vigente de empleado_area.
+- La consulta anterior no excluía asignaciones activas actuales y la revalidación de conflicto estaba restringida al mismo id_area.
+
+2. Corrección
+- Eliminado el truncamiento Android y el límite backend.
+- La lista Android consume GET /admin/participantes/options con acceso administrativo servidor.
+- La consulta excluye asignaciones activas vigentes mediante NOT EXISTS y conserva históricos inactivos/vencidos.
+- La búsqueda cubre código, documento, nombres, apellidos y nombre completo.
+- El servidor revalida solapamiento para cualquier área antes de crear.
+- Se conservan require_admin_access y la auditoría; no se incorporaron secretos al repositorio.
+
+3. Pruebas
+- Backend focalizado: 20 aprobadas.
+- Backend completo: 271 aprobadas, 2 omitidas, 17 subpruebas aprobadas.
+- Android AdminAssignmentFormContractTest: aprobada.
+- Android testProductionDebugUnitTest y assembleProductionDebug: BUILD SUCCESSFUL.
+- Aislado bitacora_c04_test: esperado 488, obtenido 488; 478 códigos posteriores a P0012; P0132 histórica incluida; creación/refresco, conflicto entre áreas y retiro/refresco aprobados.
+- Producción, solo lectura después del despliegue: 518 participantes activos, 30 con asignación activa vigente, 488 elegibles; endpoint obtuvo 488; P0013 obtuvo una coincidencia; empleado_area permaneció en 35 filas.
+- El entorno temporal bitacora_c04_test y /srv/bitacora-c04-test se retiraron después de conservar los resultados; esquema y privilegios residuales: 0. La base productiva conservó 35 filas de empleado_area.
+
+4. Despliegue y reversión
+- Servicio: /srv/bitacora/app/services/admin_catalog_service.py.
+- Respaldo del archivo anterior SHA-256: 4955b72c34419008ba88943aa93461398d3b23f9a745a916d073ef6398d56542.
+- Archivo desplegado SHA-256: 0795d13d8e2c0337a9bf333493abd9e12fd095ddfe17516bc57b47df4ae076ee.
+- Dump previo válido: /srv/bitacora/db-backups/c04/20261014_0130_predeploy/bitacora-before-c04-valid.sql.gz.
+- Tamaño: 131172 bytes. SHA-256: 6cbb780d5e4a3cf5f0a5c548ebfebe4a157925deebb5bc6f1d3a0dd0265e766b. gzip -t aprobado.
+- Reversión: restaurar el archivo respaldado y reiniciar bitacora; el dump permite restauración de base si fuera necesaria. El cambio no ejecutó migraciones ni escrituras productivas.
+
+5. APK preparada
+- Paquete: com.cactus.bitacora.
+- versionCode: 71.
+- versionName: maria71-c04-empleo-area-elegibles.
+- Backend: https://161-22-47-89.sslip.io/bitacora/.
+- SHA-256: 5E6903B453F2C2261ACEAFC65997BEF069490B4033194C6381906EE87CE378F0.
+
+6. Pendiente indispensable
+El V2035 no estaba visible por ADB (`no devices/emulators found`). Por ello no se ha instalado la APK ni se han acreditado conservación de datos, lista productiva física, búsqueda/selección/cancelación, capturas ni regresión física. C04 no se declara resuelta hasta completar CP-C04-016 a CP-C04-018.

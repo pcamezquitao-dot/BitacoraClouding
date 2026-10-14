@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 70
-        versionName = "maria70-admin-token-camera-permission-fix"
+        versionCode = 71
+        versionName = "maria71-c04-empleo-area-elegibles"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

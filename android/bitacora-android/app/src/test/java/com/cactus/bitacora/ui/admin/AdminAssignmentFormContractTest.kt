@@ -90,7 +90,7 @@ class AdminAssignmentFormContractTest {
     @Test
     fun retiredConflictMessageIsHiddenOutsideExplicitRetireAction() {
         assertEquals(
-            "El participante ya tiene una asignación activa en esta área.",
+            "El participante ya tiene una asignación activa incompatible.",
             normalizeAssignmentError("La asignación ya está retirada", false)
         )
         assertEquals(
@@ -101,6 +101,24 @@ class AdminAssignmentFormContractTest {
             "El participante ya tiene una asignación activa en esta área.",
             normalizeAssignmentError("El participante ya tiene una asignación activa en esta área.", false)
         )
+    }
+
+    @Test
+    fun participantOptionsAreNotTruncatedAndSearchByCodeOrName() {
+        val options = (1..30).map { id ->
+            ParticipantOptionOut(
+                id_participante = id,
+                codigo = "P${id.toString().padStart(4, '0')}",
+                nombres = if (id == 25) "María Especial" else "Nombre $id",
+                apellidos = "Apellido $id",
+                nombre_completo = if (id == 25) "María Especial Apellido 25" else "Nombre $id Apellido $id",
+                documento = "DOC$id"
+            )
+        }
+
+        assertEquals(30, filterParticipantOptions(options, "").size)
+        assertEquals("P0025", filterParticipantOptions(options, "P0025").single().codigo)
+        assertEquals("P0025", filterParticipantOptions(options, "maría especial").single().codigo)
     }
 
     @Test

@@ -666,7 +666,7 @@ def _ensure_area_reference_not_duplicate(
 
 
 ACTIVE_ASSIGNMENT_CONFLICT_MESSAGE = (
-    "El participante ya tiene una asignación activa en esta área."
+    "El participante ya tiene una asignación activa incompatible."
 )
 
 
@@ -727,7 +727,6 @@ def create_employee_area(
                 SELECT id_empleado_area
                 FROM empleado_area
                 WHERE id_participante=:id_participante
-                  AND id_area=:id_area
                   AND activo=TRUE
                   AND fecha_inicia <= COALESCE(:fecha_final, '9999-12-31')
                   AND COALESCE(fecha_final, '9999-12-31') >= :fecha_inicia
@@ -737,7 +736,6 @@ def create_employee_area(
             ),
             {
                 "id_participante": payload.id_participante,
-                "id_area": payload.id_area,
                 "fecha_inicia": payload.fecha_inicia,
                 "fecha_final": payload.fecha_final,
             },
@@ -859,6 +857,14 @@ def list_participant_options(db: Session, search: str) -> list[dict]:
                    documento
             FROM {participant_table}
             WHERE (fecha_salida IS NULL OR fecha_salida < fecha_entrada)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM empleado_area AS ea
+                  WHERE ea.id_participante = {participant_table}.id_participante
+                    AND ea.activo = TRUE
+                    AND ea.fecha_inicia <= CURDATE()
+                    AND (ea.fecha_final IS NULL OR ea.fecha_final >= CURDATE())
+              )
               AND (
                   :search = ''
                   OR UPPER(identificacion_participante) LIKE :pattern
@@ -868,7 +874,6 @@ def list_participant_options(db: Session, search: str) -> list[dict]:
                   OR UPPER(CONCAT_WS(' ', nombre, apellido)) LIKE :pattern
               )
             ORDER BY id_participante
-            LIMIT 100
             """
         ),
         {"search": normalized, "pattern": pattern},

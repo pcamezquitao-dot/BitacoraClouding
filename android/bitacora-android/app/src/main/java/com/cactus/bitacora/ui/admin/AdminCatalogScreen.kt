@@ -124,6 +124,23 @@ internal fun filterParticipantTypes(
     ParticipantTypeFilter.INACTIVE -> types.filterNot(ParticipantTypeAdminOut::activo)
 }
 
+internal fun filterParticipantOptions(
+    options: List<ParticipantOptionOut>,
+    query: String
+): List<ParticipantOptionOut> {
+    val normalized = query.trim().lowercase()
+    if (normalized.isEmpty()) return options
+    return options.filter { option ->
+        listOf(
+            option.codigo,
+            option.nombre_completo,
+            option.nombres,
+            option.apellidos,
+            option.documento.orEmpty()
+        ).any { it.lowercase().contains(normalized) }
+    }
+}
+
 internal fun validateAssignmentForm(
     current: EmployeeAreaAssignmentOut?,
     participant: ParticipantOptionOut?,
@@ -144,7 +161,7 @@ internal fun normalizeAssignmentError(
 ): String? = when {
     message == null -> null
     message == "La asignación ya está retirada" && !isRetireAction ->
-        "El participante ya tiene una asignación activa en esta área."
+        "El participante ya tiene una asignación activa incompatible."
     else -> message
 }
 
@@ -1666,15 +1683,7 @@ fun AdminCatalogScreen(
     assignmentArea?.let { area ->
         val current = editingAssignment
         val query = assignmentSearch.trim().lowercase()
-        val filteredOptions = participantOptions.filter { option ->
-            query.isEmpty() || listOf(
-                option.codigo,
-                option.nombre_completo,
-                option.nombres,
-                option.apellidos,
-                option.documento.orEmpty()
-            ).any { it.lowercase().contains(query) }
-        }.take(12)
+        val filteredOptions = filterParticipantOptions(participantOptions, query)
         AlertDialog(
             onDismissRequest = {
                 if (!assignmentActionLoading) closeAssignmentForm()
