@@ -22,6 +22,8 @@ class PortalGeneralPolicyTest {
         assertTrue("openPortalOption" in source)
         assertTrue("queueOpenCase" !in source)
         assertTrue("Cambiar participante" in source)
+        assertTrue("fontSize = 14.sp" in source)
+        assertTrue("lineHeight = 18.sp" in source)
     }
 }
 

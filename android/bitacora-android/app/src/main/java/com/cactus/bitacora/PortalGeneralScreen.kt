@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cactus.bitacora.data.BitacoraRepository
 import com.cactus.bitacora.feature.bpm.ParticipantBpmTasksScreen
 import com.cactus.bitacora.model.PortalItemOut
@@ -106,7 +107,14 @@ internal fun PortalGeneralScreen(repository: BitacoraRepository, onExit: () -> U
                             }
                         },
                         modifier = Modifier.weight(1f).aspectRatio(1f)
-                    ) { Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.Center) { Text(item.nombre) } }
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize().padding(8.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(item.nombre, fontSize = 14.sp, lineHeight = 18.sp)
+                        }
+                    }
                 }
                 if (row.size == 1) Column(Modifier.weight(1f)) {}
             }

@@ -44,8 +44,41 @@ EVIDENCIA CONSOLIDADA
 - Android: testC34testDebugUnitTest, testProductionDebugUnitTest y assembleC34testDebug: BUILD SUCCESSFUL.
 - APK: app-c34test-debug.apk; SHA-256 5D7B9E16BE8A2C68F9B91002DE04A07919055D94F66740481E1A66C3A97DF5B5.
 
-LIMITACIÓN DECLARADA
-No se realizó captura visual ni validación física porque no había destino ADB disponible y la orden excluyó instalar o probar en el celular. No se atribuye evidencia física.
+VALIDACIÓN FÍSICA AISLADA — 2026-10-13
+- Dispositivo comprobado antes de instalar: vivo V2035, Android 13, serie 3065397347006YM, ADB autorizado.
+- Se instaló y luego actualizó exclusivamente com.cactus.bitacora.c34test con `adb install -r`.
+- Versión final: versionCode 65; versionName maria65-c34-portal-general-visual-fix.
+- APK final SHA-256: 3606192C7C5091524573A0323897D97A419CCC414B289D39789D37B7D396F27A.
+- La aplicación principal com.cactus.bitacora permaneció instalada en versionCode 63 y no fue actualizada ni desinstalada.
+- Backend/base usados exclusivamente: bitacora-c34-test / bitacora_c34_test.
+- Identificación válida e inválida, cambio de participante, raíz ausente, raíz sin hijos, cuadrícula, desplazamiento, tareas vacías, proceso válido y errores de destino fueron comprobados físicamente.
+- Tareas BPM apareció una sola vez y al final, incluso sin raíz y sin hijos.
+- Offline: la bandeja local siguió disponible; una nueva identificación mostró un error de red explícito. Tras restaurar Wi-Fi y datos móviles, el menú volvió a cargar sin duplicados.
+- Reapertura: la instalación y datos de la aplicación se conservaron. El portal volvió al inicio sin persistir identidad/menú, conforme a la regla offline del CU.
+- Conteo final bitacora_c34_test.bpm_caso=0; abrir portal y opciones no creó casos.
+- Fixture temporal de referencia inexistente eliminado; dim_accion volvió a 8 registros del rango C34.
+- Conectividad final restaurada: wifi_on=1 y mobile_data=1.
+
+DEFECTO ENCONTRADO Y CORREGIDO
+- Defecto: el texto largo se cortaba dentro del botón y dos etiquetas de fixture mostraban `??`.
+- Corrección: texto de 14 sp, línea de 18 sp y padding de 8 dp; etiquetas UTF-8 corregidas exclusivamente en bitacora_c34_test.
+- Regresión: pruebas Android c34test y production y compilación de APK aprobaron; repetición física mostró el texto completo.
+
+EVIDENCIAS FÍSICAS
+- 01-inicio.png: paquete C34 en pantalla inicial.
+- 03-identificacion-invalida.png: rechazo de identidad inexistente.
+- 04-menu-valido.png: defecto visual original.
+- 05-menu-valido-corregido.png: cuadrícula corregida, texto completo, Tareas BPM única y final.
+- 06-proceso-bpm-valido.png: proceso, flujo y estado DISPONIBLE; advertencia de no creación.
+- 07-sin-proceso.png, 08-sin-flujo.png y 16-referencia-invalida.png: errores específicos.
+- 09-tareas-vacias.png: identidad correcta y bandeja sin tareas.
+- 10-sin-raiz-tareas.png y 11-sin-hijos-tareas.png: Tareas BPM disponible sin menú.
+- 12-offline-tareas.png, 13-offline-error.png y 14-recuperacion.png: secuencia offline y recuperación.
+- 15-reapertura.png: cierre y reapertura conforme al CU.
+- Los XML homónimos conservan jerarquía, textos, paquete y límites de cada elemento.
+
+PENDIENTE REAL
+Patricia debe declarar si la validación física es satisfactoria. No se integró ni desplegó en producción.
 
 CONCLUSIÓN
-C34 — Portal General construido y probado en entorno aislado; pendiente de implantación y validación física en el celular.
+C34 — Portal General instalado y probado físicamente en variante aislada; técnicamente listo para posterior integración en la aplicación principal, sujeto a validación de Patricia.

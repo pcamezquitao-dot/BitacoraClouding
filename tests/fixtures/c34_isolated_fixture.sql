@@ -45,9 +45,9 @@ VALUES(93440,1,'CP_C34_SIN_HIJOS','Raiz sin hijos',NULL,NULL);
 INSERT INTO dim_accion(id_accion,tipo_accion,nombre,descripcion,id_accion_padre,id_proceso) VALUES
  (93410,1,'CP_C34_ROL','Raíz activa',NULL,NULL),
  (93411,1,'Proceso disponible','Opción válida',93410,93421),
- (93412,1,'Opción sin proceso','Sin destino',93410,NULL),
+ (93412,1,CONVERT(0x4f706369c3b36e2073696e2070726f6365736f USING utf8mb4),'Sin destino',93410,NULL),
  (93413,1,'Proceso sin flujo BPM','Destino incompleto',93410,93422),
- (93414,1,'Etiqueta extremadamente larga para comprobar varias líneas sin cortar el texto','Texto largo',93410,93421),
+ (93414,1,CONVERT(0x45746971756574612065787472656d6164616d656e7465206c61726761207061726120636f6d70726f62617220766172696173206cc3ad6e6561732073696e20636f7274617220656c20746578746f USING utf8mb4),'Texto largo',93410,93421),
  (93430,1,'CP_C34_DUPLICADA','Raíz duplicada A',NULL,NULL),
  (93431,1,'cp_c34_duplicada','Raíz duplicada B',NULL,NULL);
 

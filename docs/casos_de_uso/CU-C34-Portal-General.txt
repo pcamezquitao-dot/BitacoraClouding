@@ -1,6 +1,6 @@
 CU-C34 — PORTAL GENERAL
 Versión: 01
-Estado: Definición funcional aprobada; pendiente de pruebas e implantación física.
+Estado: Definición funcional aprobada; pruebas técnicas y físicas ejecutadas; pendiente de validación de Patricia e integración.
 
 1. OBJETIVO
 Permitir que un participante activo se identifique por su código y consulte un portal construido desde su tipo activo y el árbol real dim_accion. El portal presenta las opciones hijas de una raíz única, resuelve sus procesos y flujos BPM mediante relaciones reales y ofrece una única entrada final a Tareas BPM.

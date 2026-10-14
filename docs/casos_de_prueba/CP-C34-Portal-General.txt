@@ -100,3 +100,20 @@ Objetivo: diferenciar fallo de vacío y preservar aislamiento. Precondiciones: v
 CP-C34-024 — Regresiones e integración
 Estado: APROBADA
 Objetivo: proteger identificación, navegación y BPM. Precondiciones: suites disponibles. Datos: variantes production/c34test. Pasos: ejecutar pruebas y compilar. Resultado esperado: suites y APK exitosos. Evidencias: salidas/hash. Trazabilidad: CU completo.
+
+EJECUCIÓN FÍSICA AISLADA — 2026-10-13
+Dispositivo: vivo V2035, Android 13, serie ADB 3065397347006YM.
+Aplicación: com.cactus.bitacora.c34test, versión 65, maria65-c34-portal-general-visual-fix.
+Backend/base: bitacora-c34-test / bitacora_c34_test.
+
+- CP-C34-001 a 011: APROBADAS FÍSICAMENTE cuando tienen interacción de usuario; respuestas de configuración respaldadas por XML y capturas.
+- CP-C34-012: APROBADA FÍSICAMENTE después de corregir el corte del texto largo. Dos cuadrados por fila, separación, texto completo y desplazamiento comprobados en 05-menu-valido-corregido.png.
+- CP-C34-013: APROBADA FÍSICAMENTE; mensaje “La opción no tiene proceso asociado”, evidencia 07-sin-proceso.png.
+- CP-C34-014: APROBADA FÍSICAMENTE con fixture temporal retirado; mensaje “El proceso asociado no existe”, evidencia 16-referencia-invalida.png.
+- CP-C34-015 y 016: APROBADAS FÍSICAMENTE; rechazo sin flujo en 08-sin-flujo.png y destino válido en 06-proceso-bpm-valido.png.
+- CP-C34-017 y 018: APROBADAS AUTOMATIZADAS; las reglas ambiguo/inactivo y acceso ajeno se validan en servidor y no se exponen como opciones ejecutables en la interfaz.
+- CP-C34-019: APROBADA FÍSICA Y EN BASE; bpm_caso permaneció en cero.
+- CP-C34-020 y 021: APROBADAS FÍSICAMENTE; una sola entrada final y bandeja vacía en 09-tareas-vacias.png.
+- CP-C34-022: APROBADA FÍSICAMENTE; el cambio borró identidad/menú anterior antes de cargar el nuevo participante.
+- CP-C34-023: APROBADA FÍSICAMENTE; Tareas BPM funcionó offline, identificación informó fallo de red y recuperó el menú al restaurar conectividad. Wi-Fi y datos móviles quedaron restaurados.
+- CP-C34-024: APROBADA TÉCNICA Y FÍSICAMENTE; compilación, actualización conservando datos y reapertura correctas. Conforme al CU, el menú/identidad no se persisten entre procesos y se vuelve al inicio.
