@@ -1,6 +1,6 @@
 C04 — EMPLEO ÁREA — INFORME DE EJECUCIÓN
 Fecha: 2026-10-14
-Estado: CORRECCIÓN DESPLEGADA; CIERRE FÍSICO PENDIENTE.
+Estado: DEFECTO RESUELTO TÉCNICAMENTE; INSTALACIÓN Y VERIFICACIÓN FÍSICA APROBADAS EL 14 DE OCTUBRE DE 2026. La declaración de estado VALIDADA corresponde exclusivamente a Patricia.
 
 1. Causa comprobada
 - Android truncaba explícitamente las opciones elegibles con `.take(12)` en AdminCatalogScreen.kt.
@@ -40,5 +40,37 @@ Estado: CORRECCIÓN DESPLEGADA; CIERRE FÍSICO PENDIENTE.
 - Backend: https://161-22-47-89.sslip.io/bitacora/.
 - SHA-256: 5E6903B453F2C2261ACEAFC65997BEF069490B4033194C6381906EE87CE378F0.
 
-6. Pendiente indispensable
-El V2035 no estaba visible por ADB (`no devices/emulators found`). Por ello no se ha instalado la APK ni se han acreditado conservación de datos, lista productiva física, búsqueda/selección/cancelación, capturas ni regresión física. C04 no se declara resuelta hasta completar CP-C04-016 a CP-C04-018.
+6. Instalación física
+- Dispositivo: vivo V2035, serie ADB 3065397347006YM.
+- Actualización: `adb install -r`, resultado Success; no se desinstaló ni se borró almacenamiento.
+- Versión anterior: versionCode 70, maria70-admin-token-camera-permission-fix.
+- Versión instalada: versionCode 71, maria71-c04-empleo-area-elegibles.
+- Conservación: ceDataInode 1061106, firstInstallTime 2026-10-14 00:28:59 y 72 archivos internos antes/después.
+- APK v70 recuperable: C:\Bitacora\device-backups\C04-20261014-pre-v71\com.cactus.bitacora-v70.apk; SHA-256 9607C701FFFD38567750F9F5D94AD1086DFA7886021CD97478AD47C4919BC4EF.
+
+7. Verificación física productiva
+- El acceso administrativo provisional fue validado por el servidor y abrió Empleado–área.
+- El endpoint y la consulta independiente devolvieron 488 elegibles.
+- El recorrido físico automatizado de la lista observó 488 códigos únicos y 0 faltantes, desde P0002 hasta P0513.
+- Se localizaron participantes posteriores a P0012; P0013 apareció por código y por el nombre ISRAEL.
+- Se desplazó la lista hasta el final, se seleccionó P0002 y se canceló sin guardar.
+- P0001, visible con asignación activa vigente en Gerencia, no apareció al buscarla entre elegibles.
+- Verificación posterior: 518 participantes activos, 30 participantes asignados activamente, 488 elegibles y 35 filas totales en empleado_area, sin variación.
+- Portal General: P0003 abrió como supervisor_RH, informó correctamente que la raíz no tiene opciones y conservó Tareas BPM, Cambiar participante y Salir del portal. P0001 informó su configuración real ambigua de más de un tipo activo.
+- La aplicación cerró y reabrió sin fallo; versión e inodo se conservaron.
+
+8. Evidencias físicas
+- docs/evidencias/C04/c04-01-inicio-v71.png
+- docs/evidencias/C04/c04-02-elegibles-inicio.png
+- docs/evidencias/C04/c04-03-seleccion-sin-guardar.png
+- docs/evidencias/C04/c04-04-busqueda-P0013.png
+- docs/evidencias/C04/c04-05-busqueda-nombre.png
+- docs/evidencias/C04/c04-06-activo-excluido-P0001.png
+- docs/evidencias/C04/c04-07-desplazamiento.png
+- docs/evidencias/C04/c04-08-final-lista-P0513.png
+- docs/evidencias/C04/c04-09-regresion-portal-general.png
+- docs/evidencias/C04/c04-10-portal-supervisor-rh.png
+- docs/evidencias/C04/c04-11-persistencia-reapertura.png
+
+9. Conclusión
+El defecto de truncamiento y elegibilidad queda resuelto técnicamente. Las 18 pruebas de CP-C04 están aprobadas y no se detectaron escrituras productivas ni regresiones atribuibles a C04.

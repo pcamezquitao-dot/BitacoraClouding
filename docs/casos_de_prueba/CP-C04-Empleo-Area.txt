@@ -1,7 +1,7 @@
 CP-C04 — EMPLEO ÁREA
 Versión: 01
 Fuente: docs/casos_de_uso/CU-C04-Empleo-Area.txt
-Estado de ejecución: pruebas automatizadas y aisladas aprobadas; CP-C04-016 a CP-C04-018 pendientes de comprobación física porque el V2035 no está visible en ADB.
+Estado de ejecución: 18 pruebas aprobadas. Comprobación física completada en el V2035 el 14 de octubre de 2026 con `com.cactus.bitacora` v71.
 
 Formato: objetivo; precondiciones; datos; pasos; resultado esperado; evidencia; trazabilidad.
 
@@ -30,7 +30,7 @@ CP-C04-008 — Lista sin límite fijo
 Estado: APROBADA. Objetivo: eliminar límites indebidos. Precondiciones: más de 100 elegibles. Datos: 488 elegibles. Pasos: consultar endpoint. Resultado esperado: 488. Evidencia: producción de solo lectura COUNT=488; prueba SQL sin LIMIT. Trazabilidad: CU 4.
 
 CP-C04-009 — Desplazamiento y presentación completa
-Estado: APROBADA AUTOMATIZADA; PENDIENTE FÍSICA. Objetivo: recorrer más de 12 opciones. Precondiciones: formulario Android. Datos: 30 opciones unitarias y catálogo productivo. Pasos: renderizar/filtrar/desplazar. Resultado esperado: ninguna truncada. Evidencia: AdminAssignmentFormContractTest; captura física pendiente. Trazabilidad: CU 4 y 5.
+Estado: APROBADA. Objetivo: recorrer más de 12 opciones. Precondiciones: formulario Android. Datos: 30 opciones unitarias y catálogo productivo. Pasos: renderizar/filtrar/desplazar. Resultado esperado: ninguna truncada. Evidencia: AdminAssignmentFormContractTest; recorrido ADB de 488 códigos, capturas c04-02, c04-07 y c04-08. Trazabilidad: CU 4 y 5.
 
 CP-C04-010 — Guardado y actualización de lista
 Estado: APROBADA EN AISLADO. Objetivo: retirar de la lista al recién asignado. Precondiciones: participante elegible. Datos: fixture temporal. Pasos: crear y volver a consultar. Resultado esperado: ausente. Evidencia: CREATE_REFRESH=OK. Trazabilidad: CU 4 y 5.
@@ -42,7 +42,7 @@ CP-C04-012 — Retiro y recuperación de elegibilidad
 Estado: APROBADA EN AISLADO. Objetivo: devolver participante retirado. Precondiciones: asignación aislada. Datos: mismo participante. Pasos: retirar y consultar. Resultado esperado: vuelve una vez. Evidencia: RETIRE_REFRESH=OK. Trazabilidad: CU 4 y 6.
 
 CP-C04-013 — Cancelación
-Estado: APROBADA POR CONTRATO; PENDIENTE FÍSICA. Objetivo: no escribir al cancelar. Precondiciones: diálogo abierto. Datos: selección válida. Pasos: seleccionar y cancelar. Resultado esperado: cero escritura. Evidencia: flujo Compose y prueba física pendiente. Trazabilidad: CU 6.
+Estado: APROBADA. Objetivo: no escribir al cancelar. Precondiciones: diálogo abierto. Datos: P0002. Pasos: seleccionar y cancelar. Resultado esperado: cero escritura. Evidencia: c04-03-seleccion-sin-guardar.png; empleado_area permaneció en 35 filas. Trazabilidad: CU 6.
 
 CP-C04-014 — Error y lista vacía
 Estado: APROBADA AUTOMATIZADA. Objetivo: distinguir error de cero elegibles. Precondiciones: respuestas controladas. Datos: fallo HTTP y lista vacía. Pasos: cargar. Resultado esperado: mensaje de error o vacío correspondiente. Evidencia: regresión de repositorio/UI. Trazabilidad: CU 6.
@@ -51,10 +51,10 @@ CP-C04-015 — Autorización y auditoría
 Estado: APROBADA. Objetivo: conservar controles. Precondiciones: endpoint protegido. Datos: credenciales válidas, inválidas y ausentes. Pasos: consultar/escribir en aislado. Resultado esperado: solo credenciales válidas acceden; escrituras auditadas. Evidencia: suite backend 271 aprobadas, 2 omitidas; pruebas de contrato administrativas. Trazabilidad: CU 2, 3 y 4.
 
 CP-C04-016 — Instalación conservando datos
-Estado: PENDIENTE. Objetivo: actualizar com.cactus.bitacora sin desinstalar ni borrar datos. Precondiciones: V2035 conectado y autorizado. Datos: APK v71. Pasos: registrar versión/inodo, adb install -r y comparar. Resultado esperado: datos conservados. Evidencia: pendiente; ADB informó no devices/emulators found. Trazabilidad: CU 3 y 7.
+Estado: APROBADA. Objetivo: actualizar com.cactus.bitacora sin desinstalar ni borrar datos. Precondiciones: V2035 conectado y autorizado. Datos: APK v71. Pasos: registrar versión/inodo, adb install -r y comparar. Resultado esperado: datos conservados. Evidencia: instalación Success; ceDataInode 1061106, firstInstallTime 2026-10-14 00:28:59 y 72 archivos antes/después. Trazabilidad: CU 3 y 7.
 
 CP-C04-017 — Lista productiva física
-Estado: PENDIENTE. Objetivo: comprobar conteo, búsqueda y selección sin guardar. Precondiciones: V2035 y producción. Datos: 488 elegibles, P0013. Pasos: abrir Empleo área, recorrer, buscar, seleccionar y cancelar. Resultado esperado: lista completa, búsqueda correcta, cero escritura. Evidencia: pendiente por dispositivo no visible. Trazabilidad: CU 5 y 7.
+Estado: APROBADA. Objetivo: comprobar conteo, búsqueda y selección sin guardar. Precondiciones: V2035 y producción. Datos: 488 elegibles, P0013. Pasos: abrir Empleo área, recorrer, buscar, seleccionar y cancelar. Resultado esperado: lista completa, búsqueda correcta, cero escritura. Evidencia: 488 códigos físicos únicos, 0 faltantes; búsquedas P0013/ISRAEL; P0001 activa excluida; capturas c04-02 a c04-08. Trazabilidad: CU 5 y 7.
 
 CP-C04-018 — Regresión física y persistencia
-Estado: PENDIENTE. Objetivo: confirmar C34, acceso administrativo, sincronización y reapertura. Precondiciones: APK instalada. Datos: aplicación principal. Pasos: recorrer, cerrar/reabrir y verificar pendientes. Resultado esperado: funciones previas intactas y datos locales conservados. Evidencia: pendiente por dispositivo no visible. Trazabilidad: CU 3, 5 y 7.
+Estado: APROBADA. Objetivo: confirmar C34, acceso administrativo y reapertura. Precondiciones: APK instalada. Datos: P0003 supervisor_RH. Pasos: abrir Portal General, identificar, comprobar Tareas BPM y reiniciar la aplicación. Resultado esperado: funciones previas intactas y datos locales conservados. Evidencia: c04-10-portal-supervisor-rh.png y c04-11-persistencia-reapertura.png; reapertura sin fallo. Trazabilidad: CU 3, 5 y 7.

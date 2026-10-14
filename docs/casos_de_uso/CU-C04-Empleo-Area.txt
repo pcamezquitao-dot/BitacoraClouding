@@ -1,6 +1,6 @@
 CU-C04 — EMPLEO ÁREA
 Versión: 01
-Estado: Corrección implementada y desplegada; verificación física pendiente por dispositivo no disponible en ADB.
+Estado: Corrección implementada, desplegada y verificada físicamente el 14 de octubre de 2026. Defecto resuelto técnicamente; la declaración VALIDADA corresponde exclusivamente a Patricia.
 
 1. OBJETIVO
 Administrar la asignación temporal de participantes elegibles a áreas, mostrando la lista completa de participantes activos que no tengan otra asignación activa vigente.
