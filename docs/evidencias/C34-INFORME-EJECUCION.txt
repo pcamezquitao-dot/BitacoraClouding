@@ -77,8 +77,77 @@ EVIDENCIAS FÍSICAS
 - 15-reapertura.png: cierre y reapertura conforme al CU.
 - Los XML homónimos conservan jerarquía, textos, paquete y límites de cada elemento.
 
-PENDIENTE REAL
-Patricia debe declarar si la validación física es satisfactoria. No se integró ni desplegó en producción.
+CORRECCIÓN VISUAL SUSTITUIDA — VERSIÓN 66
+- Esta regla quedó sustituida por la orden definitiva de proporción áurea de la versión 67.
+- Orden entonces vigente: conservar anchos originales y reducir exclusivamente las alturas a un tercio.
+- Dimensiones originales medidas: funcionalidades 468 × 468 px; Tareas BPM 970 × 485 px.
+- Dimensiones finales medidas en altura-tercio-v66.xml: funcionalidades 468 × 156 px; Tareas BPM 970 × 162 px.
+- La diferencia de un píxel en Tareas BPM corresponde al redondeo de 485/3 en la conversión dp/píxel.
+- Con densidad física 440 dpi, las alturas finales equivalen a 56,7 dp y 58,9 dp; no infringen el mínimo táctil de 48 dp.
+- La etiqueta larga requirió 9 sp y línea de 10 sp; se comprobó físicamente completa, legible, multilínea y centrada. Las etiquetas normales permanecen en 14 sp.
+- Se conservaron dos funcionalidades por fila y una sola entrada Tareas BPM al final.
+- La apertura del proceso disponible y la bandeja Tareas BPM siguieron funcionando después del ajuste.
+- APK instalada con conservación de datos: versionCode 66, versionName maria66-c34-portal-height-third.
+- SHA-256: 9DC9221B3CED321C851EF144AACE3254B412AFE25ED5DCC6ECB8772A9CDADDFA.
+- Evidencias: 17-altura-tercio-v66.png, 18-altura-tercio-proceso-v66.png, 19-altura-tercio-tareas-v66.png y XML homónimos.
+- `com.cactus.bitacora` permaneció en versionCode 63 sin actualización.
+
+CORRECCIÓN VISUAL PARCIALMENTE SUSTITUIDA — VERSIÓN 67
+- La regla `alto = ancho / 1.618` continúa vigente únicamente para los botones de funcionalidades; fue sustituida en v68 para Tareas BPM y los dos controles inferiores.
+- APK aislada instalada conservando datos: package `com.cactus.bitacora.c34test`, versionCode 67, versionName `maria67-c34-portal-golden-ratio`.
+- SHA-256: 4A1C3E86B78EB9ADC12A2EF168E8805C3E3C17E89B8E4AC18A680C2799137315.
+- Dispositivo físico: vivo V2035, Android 13, serie ADB 3065397347006YM.
+- Dimensiones medidas mediante jerarquía UI: funcionalidades 468 × 290 px; Tareas BPM 970 × 600 px.
+- Cálculo esperado: 468/1.618 = 289,25 px y 970/1.618 = 599,51 px; la diferencia subpíxel se resolvió por redondeo a 290 px y 600 px.
+- Se conservaron los anchos de 468 px y 970 px, dos funcionalidades por fila y una sola entrada Tareas BPM al final.
+- Todos los textos del Portal General quedaron completos, legibles, multilínea cuando corresponde y centrados.
+- Se verificó la apertura del proceso asociado sin crear un caso y la navegación efectiva a Tareas BPM.
+- Evidencias: `20-proporcion-aurea-v67.png`, `proporcion-aurea-v67.xml`, `21-proporcion-aurea-proceso-v67.png/xml` y `22-proporcion-aurea-tareas-v67.png/xml`.
+- Compilación `assembleC34testDebug` y prueba `testC34testDebugUnitTest`: APROBADAS.
+- La aplicación principal `com.cactus.bitacora` permaneció en versionCode 63, versionName `maria63-c35-navegacion`, sin actualización.
+- No se modificaron datos ni servicios productivos.
+
+AJUSTE VISUAL SUSTITUIDO — VERSIÓN 68
+- Las proporciones de los tres botones quedaron sustituidas por la instrucción definitiva de v69.
+- Los botones de funcionalidades aprobados conservaron sus dimensiones de 468 × 290 px y su disposición de dos por fila.
+- Tareas BPM conservó 970 px de ancho y midió 371 px de alto. El cálculo 970/2.618 = 370,51 px se redondeó físicamente a 371 px.
+- Cambiar participante y Salir del portal conservaron 970 px de ancho y midieron 229 px de alto. El cálculo 970/4.236 = 228,99 px se redondeó a 229 px.
+- Los textos permanecieron completos, centrados y legibles; se conservaron ubicación relativa, orden y funcionamiento.
+- Verificación funcional: Tareas BPM abrió la bandeja; Cambiar participante volvió a identificación; Salir del portal volvió a la pantalla inicial.
+- APK aislada instalada conservando datos: package `com.cactus.bitacora.c34test`, versionCode 68, versionName `maria68-c34-portal-proportions`.
+- SHA-256: EE193AEDD0C34B52FA2159978BAF876E3C1B4A82A54CA9B3BD833A75B164CF3E.
+- Dispositivo: vivo V2035, Android 13, serie ADB 3065397347006YM.
+- Evidencias: `23-proporciones-v68.png/XML`, `24-tareas-v68.png/XML`, `25-cambiar-participante-v68.png/XML` y `26-salir-portal-v68.png/XML`.
+- Compilación `assembleC34testDebug` y prueba focalizada `testC34testDebugUnitTest`: APROBADAS.
+- La aplicación principal `com.cactus.bitacora` permaneció en versionCode 63 y no fue actualizada.
+- No se modificaron datos, esquemas ni servicios productivos.
+
+PROPORCIONES DEFINITIVAS — VERSIÓN 69
+- Los botones de funcionalidades permanecieron sin cambios: 468 × 290 px, dos por fila.
+- Tareas BPM conservó 970 px de ancho y midió 229 px de alto; `970/4.236 = 228,99 px`.
+- Cambiar participante y Salir del portal conservaron 970 px de ancho y midieron 142 px de alto; `970/6.854 = 141,52 px`.
+- Los límites táctiles obtenidos de la jerarquía UI coinciden con las dimensiones visibles: padding y alturas mínimas no modificaron el resultado.
+- Los textos permanecieron completos, centrados y legibles; ubicación relativa, orden y funcionamiento se conservaron.
+- Verificación funcional: Tareas BPM abrió la bandeja; Cambiar participante volvió a identificación; Salir del portal volvió a la pantalla principal.
+- APK aislada instalada conservando datos: package `com.cactus.bitacora.c34test`, versionCode 69, versionName `maria69-c34-portal-final-proportions`.
+- SHA-256: CA838735A0B952C9E7AAA45594E2E79558CC5583D14D1BF12DFADB3396669DD5.
+- Dispositivo: vivo V2035, Android 13, serie ADB 3065397347006YM.
+- Evidencias: `27-proporciones-finales-v69.png/XML`, `28-tareas-v69.png/XML`, `29-cambiar-participante-v69.png/XML` y `30-salir-portal-v69.png/XML`.
+- Compilación `assembleC34testDebug` y prueba focalizada `testC34testDebugUnitTest`: APROBADAS.
+- La aplicación principal `com.cactus.bitacora` permaneció en versionCode 63 y no fue actualizada.
+- No se modificaron datos, esquemas ni servicios productivos.
+
+VALIDACIÓN FORMAL — 2026-10-14
+- Patricia confirmó expresamente que los tamaños finales son aceptables y que la funcionalidad observada es satisfactoria.
+- C34 — Portal General queda en estado VALIDADA.
+- Versión validada: Android c34test versionCode 69, versionName `maria69-c34-portal-final-proportions`.
+- Artefacto validado: `app-c34test-debug.apk`.
+- SHA-256: CA838735A0B952C9E7AAA45594E2E79558CC5583D14D1BF12DFADB3396669DD5.
+- Pruebas: CP-C34-001 a CP-C34-024 APROBADAS; compilación y prueba focalizada APROBADAS; recorrido físico y proporciones finales APROBADOS por Patricia.
+- Evidencias finales: `27-proporciones-finales-v69.png/XML`, `28-tareas-v69.png/XML`, `29-cambiar-participante-v69.png/XML` y `30-salir-portal-v69.png/XML`.
+- Rama de cierre: `C34-portal-general`; el identificador del commit queda registrado en el historial Git publicado de esta rama.
+- Integración: PENDIENTE DE AUTORIZACIÓN POSTERIOR.
+- Producción y actualización de la aplicación principal: NO AUTORIZADAS.
 
 CONCLUSIÓN
-C34 — Portal General instalado y probado físicamente en variante aislada; técnicamente listo para posterior integración en la aplicación principal, sujeto a validación de Patricia.
+C34 — Portal General VALIDADA por Patricia y lista para integración posterior. El diseño aprobado debe conservarse sin cambios.

@@ -22,8 +22,15 @@ class PortalGeneralPolicyTest {
         assertTrue("openPortalOption" in source)
         assertTrue("queueOpenCase" !in source)
         assertTrue("Cambiar participante" in source)
-        assertTrue("fontSize = 14.sp" in source)
-        assertTrue("lineHeight = 18.sp" in source)
+        assertTrue("val goldenRatio = 1.618f" in source)
+        assertTrue("val tasksRatio = 4.236f" in source)
+        assertTrue("val functionHeight = functionWidth / goldenRatio" in source)
+        assertTrue("val tasksHeight = maxWidth / tasksRatio" in source)
+        assertEquals(2, Regex("val secondaryHeight = maxWidth / 6\\.854f").findAll(source).count())
+        assertTrue("Modifier.weight(1f).height(functionHeight)" in source)
+        assertTrue("Modifier.fillMaxWidth().height(tasksHeight)" in source)
+        assertEquals(2, Regex("Modifier\\.fillMaxWidth\\(\\)\\.height\\(secondaryHeight\\)").findAll(source).count())
+        assertTrue("textAlign = TextAlign.Center" in source)
     }
 }
 

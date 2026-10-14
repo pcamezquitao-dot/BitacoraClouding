@@ -1,6 +1,6 @@
 CU-C34 — PORTAL GENERAL
 Versión: 01
-Estado: Definición funcional aprobada; pruebas técnicas y físicas ejecutadas; pendiente de validación de Patricia e integración.
+Estado: VALIDADA por Patricia el 14 de octubre de 2026; pendiente únicamente de integración posterior autorizada.
 
 1. OBJETIVO
 Permitir que un participante activo se identifique por su código y consulte un portal construido desde su tipo activo y el árbol real dim_accion. El portal presenta las opciones hijas de una raíz única, resuelve sus procesos y flujos BPM mediante relaciones reales y ofrece una única entrada final a Tareas BPM.
@@ -31,9 +31,10 @@ Participante identificado y activo con exactamente un tipo_participante activo. 
 5. PRESENTACIÓN
 - Ruta: pantalla inicial → Portal General.
 - Identificación por código y acción Continuar.
-- Opciones en botones cuadrados medianos, dos por fila, tamaño uniforme, separación de 12 dp, superficie completa pulsable y texto multilínea sin truncamiento.
+- Opciones en botones rectangulares, dos por fila, conservando el ancho original y calculando la altura como `ancho / 1.618`, separación de 12 dp, superficie completa pulsable y texto multilínea sin truncamiento.
 - Desplazamiento vertical.
-- Tareas BPM ocupa una sola posición final con el mismo lenguaje visual.
+- Tareas BPM ocupa una sola posición final, conserva su ancho original y calcula su altura como `ancho / 4.236` usando su propio ancho.
+- Cambiar participante y Salir del portal conservan su ancho original y calculan su altura como `ancho / 6.854`; mantienen orden, texto centrado y funcionamiento.
 - La consulta de una opción muestra proceso, flujo BPM, estado y la advertencia de que no se crea un caso.
 
 6. FLUJO PRINCIPAL

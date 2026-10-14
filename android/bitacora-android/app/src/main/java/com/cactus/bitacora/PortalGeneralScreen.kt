@@ -1,11 +1,12 @@
 package com.cactus.bitacora
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +23,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cactus.bitacora.data.BitacoraRepository
@@ -95,38 +98,65 @@ internal fun PortalGeneralScreen(repository: BitacoraRepository, onExit: () -> U
         Text("${active.participante.codigo} · ${active.participante.nombre_completo}")
         Text("Tipo: ${active.participante.tipo_descripcion}")
         active.mensaje_menu?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        portalRows(active.opciones).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { item ->
-                    Card(
-                        onClick = {
-                            scope.launch {
-                                runCatching { repository.openPortalOption(active.participante.codigo, item.id_accion) }
-                                    .onSuccess { selected = it; error = null }
-                                    .onFailure { error = portalError(it) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val goldenRatio = 1.618f
+            val tasksRatio = 4.236f
+            val functionWidth = (maxWidth - 12.dp) / 2
+            val functionHeight = functionWidth / goldenRatio
+            val tasksHeight = maxWidth / tasksRatio
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                portalRows(active.opciones).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        row.forEach { item ->
+                            Card(
+                                onClick = {
+                                    scope.launch {
+                                        runCatching { repository.openPortalOption(active.participante.codigo, item.id_accion) }
+                                            .onSuccess { selected = it; error = null }
+                                            .onFailure { error = portalError(it) }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(functionHeight)
+                            ) {
+                                val longLabel = item.nombre.length > 45
+                                Column(
+                                    Modifier.fillMaxSize().padding(8.dp),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        item.nombre,
+                                        fontSize = if (longLabel) 12.sp else 14.sp,
+                                        lineHeight = if (longLabel) 14.sp else 16.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
-                        },
-                        modifier = Modifier.weight(1f).aspectRatio(1f)
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize().padding(8.dp),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(item.nombre, fontSize = 14.sp, lineHeight = 18.sp)
                         }
+                        if (row.size == 1) Column(Modifier.weight(1f)) {}
                     }
                 }
-                if (row.size == 1) Column(Modifier.weight(1f)) {}
+                Button(onClick = { view = PortalView.TASKS }, modifier = Modifier.fillMaxWidth().height(tasksHeight)) {
+                    Text("Tareas BPM")
+                }
             }
         }
-        Button(onClick = { view = PortalView.TASKS }, modifier = Modifier.fillMaxWidth().aspectRatio(2f)) {
-            Text("Tareas BPM")
-        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        OutlinedButton(onClick = { portal = null; code = ""; selected = null; error = null; view = PortalView.IDENTIFY }, modifier = Modifier.fillMaxWidth()) {
-            Text("Cambiar participante")
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val secondaryHeight = maxWidth / 6.854f
+            OutlinedButton(
+                onClick = { portal = null; code = ""; selected = null; error = null; view = PortalView.IDENTIFY },
+                modifier = Modifier.fillMaxWidth().height(secondaryHeight)
+            ) {
+                Text("Cambiar participante", textAlign = TextAlign.Center)
+            }
         }
-        OutlinedButton(onExit, modifier = Modifier.fillMaxWidth()) { Text("Salir del portal") }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val secondaryHeight = maxWidth / 6.854f
+            OutlinedButton(onExit, modifier = Modifier.fillMaxWidth().height(secondaryHeight)) {
+                Text("Salir del portal", textAlign = TextAlign.Center)
+            }
+        }
     }
 
     selected?.let { item ->

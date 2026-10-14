@@ -14,8 +14,8 @@ android {
         applicationId = "com.cactus.bitacora"
         minSdk = 24
         targetSdk = 34
-        versionCode = 65
-        versionName = "maria65-c34-portal-general-visual-fix"
+        versionCode = 69
+        versionName = "maria69-c34-portal-final-proportions"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
             "String",

@@ -1,7 +1,7 @@
 CP-C34 — PORTAL GENERAL
 Versión: 01
 Fuente: docs/casos_de_uso/CU-C34-Portal-General.txt
-Estado de ejecución: resultados registrados individualmente; véase C34-INFORME-EJECUCION.txt.
+Estado de ejecución: 24 pruebas APROBADAS y C34 VALIDADA por Patricia el 14 de octubre de 2026; véase C34-INFORME-EJECUCION.txt.
 
 Formato de cada caso: objetivo; precondiciones; datos; pasos; resultado esperado; evidencias; trazabilidad.
 
@@ -107,13 +107,47 @@ Aplicación: com.cactus.bitacora.c34test, versión 65, maria65-c34-portal-genera
 Backend/base: bitacora-c34-test / bitacora_c34_test.
 
 - CP-C34-001 a 011: APROBADAS FÍSICAMENTE cuando tienen interacción de usuario; respuestas de configuración respaldadas por XML y capturas.
-- CP-C34-012: APROBADA FÍSICAMENTE después de corregir el corte del texto largo. Dos cuadrados por fila, separación, texto completo y desplazamiento comprobados en 05-menu-valido-corregido.png.
+- CP-C34-012: APROBADA FÍSICAMENTE con la corrección definitiva v67. Dos funcionalidades por fila; ancho original conservado; altura calculada como `ancho / 1.618`; texto completo, centrado y legible. Evidencia: 20-proporcion-aurea-v67.png y proporcion-aurea-v67.xml.
 - CP-C34-013: APROBADA FÍSICAMENTE; mensaje “La opción no tiene proceso asociado”, evidencia 07-sin-proceso.png.
 - CP-C34-014: APROBADA FÍSICAMENTE con fixture temporal retirado; mensaje “El proceso asociado no existe”, evidencia 16-referencia-invalida.png.
 - CP-C34-015 y 016: APROBADAS FÍSICAMENTE; rechazo sin flujo en 08-sin-flujo.png y destino válido en 06-proceso-bpm-valido.png.
 - CP-C34-017 y 018: APROBADAS AUTOMATIZADAS; las reglas ambiguo/inactivo y acceso ajeno se validan en servidor y no se exponen como opciones ejecutables en la interfaz.
 - CP-C34-019: APROBADA FÍSICA Y EN BASE; bpm_caso permaneció en cero.
-- CP-C34-020 y 021: APROBADAS FÍSICAMENTE; una sola entrada final y bandeja vacía en 09-tareas-vacias.png.
+- CP-C34-020 y 021: APROBADAS FÍSICAMENTE; una sola entrada final con proporción definitiva `ancho / 4.236` en v69 y bandeja vacía. Evidencias: 27-proporciones-finales-v69.png/XML y 28-tareas-v69.png/XML.
 - CP-C34-022: APROBADA FÍSICAMENTE; el cambio borró identidad/menú anterior antes de cargar el nuevo participante.
 - CP-C34-023: APROBADA FÍSICAMENTE; Tareas BPM funcionó offline, identificación informó fallo de red y recuperó el menú al restaurar conectividad. Wi-Fi y datos móviles quedaron restaurados.
 - CP-C34-024: APROBADA TÉCNICA Y FÍSICAMENTE; compilación, actualización conservando datos y reapertura correctas. Conforme al CU, el menú/identidad no se persisten entre procesos y se vuelve al inicio.
+
+CORRECCIÓN VISUAL DEFINITIVA — VERSIÓN 67 — 2026-10-13
+- La regla v66 de altura igual a un tercio quedó sustituida por la instrucción definitiva `alto = ancho / 1.618`.
+- Referencia de ancho anterior a los ajustes: funcionalidades 468 px; Tareas BPM 970 px.
+- Resultado medido en V2035: funcionalidades 468 × 290 px; Tareas BPM 970 × 600 px.
+- Cálculo: 468/1.618 = 289,25 px y 970/1.618 = 599,51 px; Compose y la conversión de densidad producen 290 px y 600 px por redondeo.
+- Los anchos permanecieron en 468 px y 970 px; se conservaron dos funcionalidades por fila y Tareas BPM como entrada única final.
+- La etiqueta larga se mostró completa, legible, multilínea y centrada; las etiquetas normales también permanecieron completas y centradas.
+- Apertura del proceso disponible y entrada a Tareas BPM se repitieron satisfactoriamente.
+- Evidencias: 20-proporcion-aurea-v67.png, proporcion-aurea-v67.xml, 21-proporcion-aurea-proceso-v67.png/xml y 22-proporcion-aurea-tareas-v67.png/xml.
+
+AJUSTE VISUAL SUSTITUIDO — VERSIÓN 68 — 2026-10-13
+- Las proporciones de Tareas BPM y los controles inferiores quedaron sustituidas por v69.
+- Los botones de funcionalidades conservaron 468 × 290 px, dos por fila, sin cambios respecto de v67.
+- Tareas BPM conservó 970 px de ancho y midió 371 px de alto: 970/2.618 = 370,51 px, redondeado físicamente a 371 px.
+- Cambiar participante y Salir del portal conservaron 970 px de ancho y midieron 229 px de alto: 970/4.236 = 228,99 px, redondeado a 229 px.
+- Los tres textos quedaron completos, centrados y legibles; se conservaron orden y funcionamiento.
+- Tareas BPM abrió la bandeja, Cambiar participante volvió a identificación limpiando la sesión visible y Salir del portal volvió a la pantalla principal.
+- Evidencias: 23-proporciones-v68.png/XML, 24-tareas-v68.png/XML, 25-cambiar-participante-v68.png/XML y 26-salir-portal-v68.png/XML.
+
+PROPORCIONES DEFINITIVAS — VERSIÓN 69 — 2026-10-13
+- Los botones de funcionalidades conservaron exactamente 468 × 290 px y dos posiciones por fila.
+- Tareas BPM conservó 970 px de ancho y midió 229 px de alto: 970/4.236 = 228,99 px, redondeado físicamente a 229 px.
+- Cambiar participante y Salir del portal conservaron 970 px de ancho y midieron 142 px de alto: 970/6.854 = 141,52 px, redondeado a 142 px.
+- La jerarquía física confirma que padding y mínimos táctiles no alteraron las dimensiones solicitadas.
+- Los textos quedaron completos, centrados y legibles; se conservaron orden y funcionamiento.
+- Tareas BPM abrió la bandeja, Cambiar participante volvió a identificación y Salir del portal volvió a la pantalla principal.
+- Evidencias: 27-proporciones-finales-v69.png/XML, 28-tareas-v69.png/XML, 29-cambiar-participante-v69.png/XML y 30-salir-portal-v69.png/XML.
+
+VALIDACIÓN FORMAL — 2026-10-14
+- Patricia confirmó que los tamaños finales de los botones son aceptables y que la funcionalidad observada es satisfactoria.
+- Resultado del conjunto CP-C34-001 a CP-C34-024: APROBADO.
+- Estado de la célula: VALIDADA; lista para integración posterior.
+- La validación no autoriza integración, despliegue productivo ni actualización de la aplicación principal.
