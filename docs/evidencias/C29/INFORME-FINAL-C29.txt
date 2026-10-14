@@ -47,3 +47,14 @@ Evidencia
 - 12-edit-type-readonly.png
 
 Resultado: C29 TERMINADO.
+
+CORRECCIÓN APK PRINCIPAL v70 — 2026-10-14
+- Incidencia reproducida: la v69 mostraba "Clave incorrecta o servicio administrativo no disponible" aun con la clave provisional correcta.
+- Causa comprobada: el artefacto productivo v69 contenía `ADMIN_API_TOKEN` vacío. El servidor mantenía configurados el token técnico y la clave compartida; no se cambiaron secretos ni se incorporaron a archivos versionados.
+- Corrección: compilación productiva v70 pasando el token técnico exclusivamente mediante variable de entorno segura. `build.gradle.kts` conserva la lectura desde propiedad/entorno y solo cambia versionCode/versionName.
+- Resultado focal: clave incorrecta rechazada y clave provisional correcta aceptada; se abrió "Administrar maestros" contra producción.
+- Incidencia concurrente de fotografía: el permiso CAMERA estaba denegado en el V2035 (`granted=false`, AppOps `ignore`). Se concedió al paquete principal; estado final `granted=true`, AppOps `foreground`, y la cámara Vivo abrió correctamente. No se guardó fotografía ni registro productivo.
+- Instalación: `adb install -r`, com.cactus.bitacora, versionCode 70, versionName `maria70-admin-token-camera-permission-fix`. El `ceDataInode` permaneció en 1061106 antes y después, acreditando conservación del almacenamiento de la v69.
+- APK SHA-256: 9607C701FFFD38567750F9F5D94AD1086DFA7886021CD97478AD47C4919BC4EF.
+- Pruebas: `testProductionDebugUnitTest` y `assembleProductionDebug` APROBADAS.
+- Evidencias: `correccion-v70/43-admin-clave-incorrecta-v70.*`, `44-admin-clave-correcta-v70.*` y `45-camera-disponible-v70.png`.
