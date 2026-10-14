@@ -151,3 +151,8 @@ VALIDACIÓN FORMAL — 2026-10-14
 
 CONCLUSIÓN
 C34 — Portal General VALIDADA por Patricia y lista para integración posterior. El diseño aprobado debe conservarse sin cambios.
+
+INTEGRACIÓN PRODUCTIVA — 2026-10-14
+- Integración Git fast-forward desde `C34-portal-general` sobre `C35-navegacion`, sin conflictos y conservando las células previas.
+- Backend productivo desplegado y verificado; detalles, respaldos, reversión y bloqueo físico en `docs/evidencias/C34-INFORME-INTEGRACION.txt`.
+- La célula conserva estado VALIDADA, pero no se declara INTEGRADA ni TERMINADA mientras falte instalar y verificar físicamente la aplicación principal.

@@ -1,7 +1,7 @@
 CP-C34 — PORTAL GENERAL
 Versión: 01
 Fuente: docs/casos_de_uso/CU-C34-Portal-General.txt
-Estado de ejecución: 24 pruebas APROBADAS y C34 VALIDADA por Patricia el 14 de octubre de 2026; véase C34-INFORME-EJECUCION.txt.
+Estado de ejecución: 24 pruebas aisladas APROBADAS y C34 VALIDADA por Patricia el 14 de octubre de 2026. La integración productiva quedó bloqueada antes de instalar la APK principal; véanse C34-INFORME-EJECUCION.txt y C34-INFORME-INTEGRACION.txt.
 
 Formato de cada caso: objetivo; precondiciones; datos; pasos; resultado esperado; evidencias; trazabilidad.
 

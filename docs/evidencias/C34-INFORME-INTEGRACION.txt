@@ -1,0 +1,56 @@
+C34 — INFORME DE INTEGRACIÓN
+Fecha: 2026-10-14
+Estado: INTEGRACIÓN PARCIAL BLOQUEADA; no declarar INTEGRADA ni TERMINADA.
+
+1. Base validada e integración Git
+- Rama validada: C34-portal-general.
+- Commit validado: d257a30f3c838eca74afd393193de15c99254c37.
+- Rama principal vigente usada por la secuencia de células: C35-navegacion.
+- Base previa: cdbbd3d277f06667a737055326c484c0af7612ae.
+- Integración fast-forward, sin conflictos; el worktree principal con cambios ajenos no se modificó.
+
+2. Regresiones
+- Backend: 271 aprobadas, 2 omitidas y 17 subpruebas aprobadas.
+- Android productionDebug: prueba unitaria y compilación APROBADAS.
+- URL de producción incorporada en la variante: https://161-22-47-89.sslip.io/bitacora/.
+- Paquete generado: com.cactus.bitacora, versionCode 69, versionName maria69-c34-portal-final-proportions.
+- SHA-256 APK: DBE538653E90D7E8BCBC49E07CA99C684F05B5BF4288920F467701E6DAECB6E6.
+- Firma compatible comprobada contra APK principal histórica v57: certificado SHA-256 81346b9dea2351e96e2a02a01b52596dd7865b538f67f2009b7127692e7a98f0.
+
+3. Respaldos y reversión
+- Backend y base: /srv/bitacora/db-backups/c34/20261014_0718_preintegration/.
+- backend-app-before-c34.tar.gz: SHA-256 2a2dcd4de432c45108f99bbef35559884da941687a392b90ad5aa4bbca677c30.
+- bitacora-api.service.txt: SHA-256 ba7fd54d54858e9b0308f72d7d5f72ac9b29bd1e81482ec3b0b5f1aad4214134.
+- bitacora-before-c34.sql.gz: SHA-256 b93330ec343bdd5587720c7d4ddf5300c4a0c8f584fbb901a941dab8068515e6; gzip verificado.
+- APK nueva y APK de reversión compatible: C:\Bitacora\Backups\C34\integration_20261014_0718\.
+- APK v57 de reversión: SHA-256 5B74CBA864F7A543598A592A7A7DB426F221877E33A6B0EBCF045A17F261C24B.
+- Reversión backend: detener bitacora-api.service, conservar el directorio desplegado, extraer backend-app-before-c34.tar.gz en /srv/bitacora y reiniciar el servicio.
+- Reversión de base, solo si se comprobara una alteración: verificar el hash, ejecutar gzip -t y restaurar bitacora-before-c34.sql.gz con el cliente MariaDB. C34 no realizó escrituras ni migraciones.
+- Reversión Android: instalar con `adb install -r -d` una APK compatible respaldada, sin borrar almacenamiento. No se ejecutó porque el paquete principal está ausente.
+
+4. Producción
+- Servicio bitacora-api.service activo después del despliegue.
+- GET /bitacora/health: status=ok.
+- P0276: identificación autorizada, raíz real supervisor ID 4 y diez opciones reales.
+- P0003: identificación autorizada, raíz real supervisor_RH ID 6 y estado SIN_HIJOS.
+- Código inexistente: HTTP 403.
+- Conteos antes/después de las consultas: bpm_caso=0; no se crearon casos ni evidencias.
+- Esquema real comprobado: dim_accion referencia dim_proceso; bpm_etapa referencia dim_proceso y bpm_proceso.
+- Configuración faltante comprobada: las diez opciones de supervisor tienen id_proceso NULL; bpm_proceso=0 y bpm_etapa=0. No existen destinos BPM productivos que probar y no se inventaron asociaciones.
+
+5. Archivos desplegados y hashes
+- /srv/bitacora/app/main.py: 09390348c57b31869b902eb58d9387c3b9e73c37353cde982544047d61a7bb40.
+- /srv/bitacora/app/routers/portal_general.py: 2de3caf9f010cf63df95d4756acc0abf7399298a1a4520767ed9e54239bfa974.
+- /srv/bitacora/app/schemas/portal_general.py: 8966425056e69f71446eba7cf7d0e0568603d9dbb1bba044f961eff2e03709a1.
+- /srv/bitacora/app/services/portal_general_service.py: 4acd728dc02a949645c18a2df67bfb3ca9fa80819a0c48f552b6b27545fa8a7a.
+
+6. Bloqueo físico indispensable
+- Dispositivo: vivo V2035, serie ADB 3065397347006YM, autorizado.
+- `pm list packages -u` no devuelve com.cactus.bitacora. El paquete principal ya estaba ausente antes de intentar instalar C34.
+- No existe paquete, APK instalada ni almacenamiento local principal que pueda respaldarse o actualizarse con `adb install -r`.
+- Instalar ahora sería una instalación nueva y no permitiría demostrar conservación de datos ni de pendientes de sincronización.
+- No se desinstaló ningún paquete, no se borró almacenamiento y no se instaló la APK principal.
+
+7. Pendiente obligatorio
+- Patricia debe indicar si autoriza una instalación nueva de com.cactus.bitacora pese a la ausencia comprobada, o restaurar primero la aplicación principal y su almacenamiento desde un respaldo externo disponible.
+- Permanecen pendientes la instalación conservando datos, la verificación física productiva ONLINE/OFFLINE, recuperación, persistencia y regresiones existentes.
