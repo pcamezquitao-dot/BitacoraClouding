@@ -1,0 +1,161 @@
+CU-C24 — AUTENTICACIÓN ADMINISTRATIVA
+
+Versión documental: 1.0
+Fecha: 17 de octubre de 2026
+Estado: CANCELADA POR ALCANCE — NO EJECUTABLE
+Célula: C24
+Actor originalmente previsto: administrador
+
+1. Propósito del documento
+
+Registrar el estado vigente de C24 y evitar que una implementación anterior,
+un prototipo o una referencia histórica se interpreten como un requisito
+activo de Bitácora.
+
+C24 no define actualmente un flujo funcional ejecutable. Patricia retiró de
+su alcance el PIN personal, su validación y cualquier sesión o requisito
+sustituto para la administración de jornadas.
+
+2. Decisión vigente
+
+C24 está cancelada por alcance. En consecuencia:
+
+- no publica endpoints de autenticación;
+- no define ni distribuye PIN, clave o contraseña;
+- no publica tokens administrativos;
+- no crea ni valida sesiones administrativas;
+- no almacena credenciales localmente;
+- no agrega requisitos de autenticación a C23;
+- no autoriza el uso de tablas o estructuras generadas durante prototipos o
+  pruebas anteriores.
+
+3. Alcance excluido
+
+Quedan expresamente fuera de C24:
+
+- solicitar un PIN personal antes de administrar jornadas;
+- verificar un PIN en la aplicación o en el servidor;
+- identificar individualmente al administrador mediante ese PIN;
+- crear, renovar, persistir o cerrar una sesión administrativa;
+- enviar encabezados Authorization o X-Admin-Actor como requisito de C23;
+- cambiar permisos, roles, claves, endpoints, tablas o datos;
+- definir un mecanismo sustituto de autenticación.
+
+4. Precondiciones
+
+No aplican precondiciones operativas porque el caso de uso está cancelado y no
+debe iniciarse.
+
+La única precondición documental es conservar la decisión registrada en
+`cells/C24_AUTENTICACION_ADMINISTRATIVA.md`.
+
+5. Disparador
+
+No existe disparador funcional vigente.
+
+Si una pantalla, servicio o documento intenta invocar C24 como autenticación
+activa, debe tratarse como una referencia obsoleta o una contradicción que
+requiere revisión; no como autorización para reactivar la célula.
+
+6. Flujo principal
+
+NO APLICA.
+
+C24 no presenta pantalla, no solicita credenciales, no llama un endpoint, no
+concede acceso y no crea sesión.
+
+7. Resultado vigente
+
+- C24 permanece sin ejecución.
+- La administración de jornadas de C23 conserva su contrato sin autenticación
+  administrativa temporal atribuida a C24.
+- No se realizan escrituras en MariaDB, SQLite/Room ni otros almacenes.
+- No se crean registros de sesión, auditoría o credenciales por cuenta de C24.
+
+8. Compatibilidad con C23
+
+C23 conserva el listado, consulta, creación, edición y cambio de estado de
+jornadas conforme a su propio contrato.
+
+C23 no acepta ni exige por causa de C24:
+
+- X-Admin-Actor;
+- Authorization;
+- PIN;
+- contraseña;
+- confirmación adicional;
+- sesión administrativa.
+
+Este documento no modifica las protecciones o dependencias que otras células
+hayan definido bajo sus propios contratos.
+
+9. Datos y estructuras históricas
+
+Las tablas u otras estructuras que hubieran sido creadas durante pruebas
+anteriores de C24 quedan fuera de uso y no forman parte del contrato vigente.
+
+La cancelación de C24 no autoriza eliminarlas, migrarlas, reutilizarlas ni
+alterarlas. Cualquier intervención sobre ellas requiere una autorización
+independiente y el procedimiento de protección de datos aplicable.
+
+10. Relación con C36
+
+El acceso administrativo provisional mediante clave compartida observado en
+versiones posteriores está documentado en C36, no en C24.
+
+C36:
+
+- no reactiva C24;
+- no modifica esta decisión de cancelación;
+- no convierte la clave compartida en PIN personal de C24;
+- no convierte el mecanismo provisional en autenticación individual;
+- conserva sus propias limitaciones y estado documental.
+
+Referencia: `docs/casos_de_uso/CU-C36-ACCESO-ADMINISTRATIVO-PROVISIONAL.txt`.
+
+11. Flujos alternos y errores
+
+11.1 Intento de reactivar C24 por referencia histórica
+
+1. Se encuentra código, una tabla, una prueba o un documento anterior asociado
+   a C24.
+2. El elemento se trata como evidencia histórica, no como contrato vigente.
+3. No se ejecuta ni se modifica automáticamente.
+4. Una futura autenticación requiere una célula diferente y autorización
+   expresa.
+
+Resultado: C24 continúa cancelada.
+
+11.2 Solicitud de autenticación administrativa nueva
+
+1. Se identifica una necesidad nueva de control de acceso.
+2. No se amplía C24 por inferencia.
+3. Se define una célula independiente con alcance, contrato, seguridad y
+   pruebas propios.
+
+Resultado: se conserva la trazabilidad de la cancelación de C24.
+
+12. Criterios de aceptación documental
+
+- El estado de C24 aparece como CANCELADA POR ALCANCE — NO EJECUTABLE.
+- No se describe ningún flujo ejecutable como vigente.
+- No se publican ni se requieren credenciales.
+- C23 permanece sin autenticación temporal atribuida a C24.
+- Las estructuras históricas quedan fuera de uso y no son modificadas.
+- C36 se identifica como célula separada para el mecanismo provisional actual.
+- Ninguna frase del documento puede interpretarse como autorización para
+  implementar, desplegar o reactivar C24.
+
+13. Trazabilidad
+
+Fuente normativa funcional:
+
+- `cells/C24_AUTENTICACION_ADMINISTRATIVA.md`.
+
+Documentos relacionados:
+
+- `cells/C23_CRUD_JORNADAS_DE_TRABAJO.md`.
+- `cells/C36_ACCESO_ADMINISTRATIVO_PROVISIONAL.md`.
+- `docs/casos_de_uso/CU-C36-ACCESO-ADMINISTRATIVO-PROVISIONAL.txt`.
+
+FIN DE CU-C24
